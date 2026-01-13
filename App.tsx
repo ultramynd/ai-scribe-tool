@@ -1004,70 +1004,79 @@ const App: React.FC = () => {
                   <div className={`mt-10 transition-all duration-300 ${isReadyToTranscribe() ? 'opacity-100 translate-y-0' : 'opacity-30 translate-y-4 pointer-events-none'}`}>
                      
                      <div className="flex flex-col gap-4 max-w-sm mx-auto">
-                        <div className="flex items-center justify-center gap-3">
-                           {/* Mode Selection Pill */}
-                           <div className="bg-slate-100/50 dark:bg-white/5 backdrop-blur-md p-1 rounded-2xl border border-white/40 dark:border-white/5 flex shadow-sm">
-                              <button 
-                                onClick={() => setIsAutoEditEnabled(false)}
-                                className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${!isAutoEditEnabled ? 'bg-white dark:bg-dark-card text-primary shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
+                        <div className="flex flex-col gap-4 max-w-sm mx-auto p-4 rounded-3xl bg-white/40 dark:bg-black/20 border border-white/20 shadow-sm backdrop-blur-md transition-all">
+                           {/* Mode Selection Cards */}
+                           <div className="grid grid-cols-2 gap-2 p-1 bg-slate-200/50 dark:bg-white/5 rounded-2xl">
+                              <button
+                                 onClick={() => setTranscriptionMode('verbatim')}
+                                 className={`flex flex-col items-center justify-center py-4 px-2 rounded-xl transition-all duration-300 ${transcriptionMode === 'verbatim' ? 'bg-white dark:bg-dark-card text-primary shadow-sm scale-[1.02]' : 'text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200'}`}
                               >
-                                Verbatim
+                                 <Lightning size={24} weight={transcriptionMode === 'verbatim' ? "duotone" : "regular"} className="mb-2" />
+                                 <span className="font-bold text-sm">Verbatim</span>
+                                 <span className="text-[10px] opacity-60 mt-0.5">Exact Words</span>
                               </button>
-                              <button 
-                                onClick={() => setIsAutoEditEnabled(true)}
-                                className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${isAutoEditEnabled ? 'bg-white dark:bg-dark-card text-primary shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
+                              <button
+                                 onClick={() => setTranscriptionMode('polish')}
+                                 className={`flex flex-col items-center justify-center py-4 px-2 rounded-xl transition-all duration-300 ${transcriptionMode === 'polish' ? 'bg-white dark:bg-dark-card text-primary shadow-sm scale-[1.02]' : 'text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200'}`}
                               >
-                                Polish
+                                 <Sparkle size={24} weight={transcriptionMode === 'polish' ? "duotone" : "regular"} className="mb-2" />
+                                 <span className="font-bold text-sm">Polish</span>
+                                 <span className="text-[10px] opacity-60 mt-0.5">Smart Edit</span>
                               </button>
                            </div>
 
-                           {/* Speaker Toggle Icon Only */}
-                           <button
-                              onClick={() => setIsSpeakerDetectEnabled(!isSpeakerDetectEnabled)}
-                              className={`w-10 h-10 flex items-center justify-center rounded-2xl transition-all ${isSpeakerDetectEnabled ? 'bg-primary/10 text-primary border border-primary/20' : 'bg-slate-100/50 dark:bg-white/5 text-slate-300 border border-transparent'}`}
-                              title="Speaker Detection"
-                           >
-                              <Users size={16} weight="duotone" />
-                           </button>
+                           {/* Dynamic Description */}
+                           <div className="text-center px-2 min-h-[40px] flex items-center justify-center">
+                              <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
+                                 {transcriptionMode === 'verbatim' 
+                                    ? "Captures every utterance, stutter, and filler word for a 100% literal transcript." 
+                                    : "Smooths out grammar, removes fillers, and formats text while keeping the original meaning."}
+                              </p>
+                           </div>
+
+                           {/* Settings Toggles */}
+                           <div className="flex flex-col gap-2">
+                              {/* Speaker Detection */}
+                              <button 
+                                 onClick={() => setIsSpeakerDetectEnabled(!isSpeakerDetectEnabled)}
+                                 className={`flex items-center justify-between p-3 rounded-xl border transition-all ${isSpeakerDetectEnabled ? 'bg-primary/5 border-primary/20' : 'bg-transparent border-slate-200 dark:border-white/10 opacity-70 hover:opacity-100'}`}
+                              >
+                                 <div className="flex items-center gap-3">
+                                    <div className={`w-8 h-8 rounded-full flex items-center justify-center ${isSpeakerDetectEnabled ? 'bg-primary/10 text-primary' : 'bg-slate-100 dark:bg-white/10'}`}>
+                                       <Users size={16} weight="duotone" />
+                                    </div>
+                                    <div className="text-left">
+                                       <div className="text-xs font-bold text-slate-700 dark:text-slate-200">Speaker Labels</div>
+                                       <div className="text-[10px] text-slate-500">{isSpeakerDetectEnabled ? "Identifying distinct voices" : "Generalized labeling"}</div>
+                                    </div>
+                                 </div>
+                                 <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center transition-all ${isSpeakerDetectEnabled ? 'border-primary bg-primary' : 'border-slate-300 dark:border-slate-600'}`}>
+                                    {isSpeakerDetectEnabled && <Check size={10} color="white" weight="bold" />}
+                                 </div>
+                              </button>
+
+                              {/* Deep Thinking (Polish Only) */}
+                              {transcriptionMode === 'polish' && (
+                                 <button 
+                                    onClick={() => setIsDeepThinking(!isDeepThinking)}
+                                    className={`flex items-center justify-between p-3 rounded-xl border transition-all animate-in fade-in slide-in-from-top-2 ${isDeepThinking ? 'bg-purple-500/5 border-purple-500/20' : 'bg-transparent border-slate-200 dark:border-white/10 opacity-70 hover:opacity-100'}`}
+                                 >
+                                    <div className="flex items-center gap-3">
+                                       <div className={`w-8 h-8 rounded-full flex items-center justify-center ${isDeepThinking ? 'bg-purple-500/10 text-purple-600' : 'bg-slate-100 dark:bg-white/10'}`}>
+                                          <Brain size={16} weight="duotone" />
+                                       </div>
+                                       <div className="text-left">
+                                          <div className="text-xs font-bold text-slate-700 dark:text-slate-200">Deep Thinking</div>
+                                          <div className="text-[10px] text-slate-500">Enhanced reasoning (Slower)</div>
+                                       </div>
+                                    </div>
+                                    <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center transition-all ${isDeepThinking ? 'border-purple-500 bg-purple-500' : 'border-slate-300 dark:border-slate-600'}`}>
+                                       {isDeepThinking && <Check size={10} color="white" weight="bold" />}
+                                    </div>
+                                 </button>
+                              )}
+                           </div>
                         </div>
-
-                        {/* Model Selection Bar - Abstracted */}
-                        <div className="flex bg-slate-100/30 dark:bg-white/5 p-1 rounded-2xl border border-white/20 dark:border-white/5">
-                            <button
-                              onClick={() => setTranscriptionMode('verbatim')}
-                              className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl transition-all ${transcriptionMode === 'verbatim' ? 'bg-white dark:bg-dark-card text-primary shadow-sm scale-[1.02]' : 'text-slate-400 hover:text-slate-600'}`}
-                            >
-                              <Lightning size={16} weight={transcriptionMode === 'verbatim' ? 'fill' : 'duotone'} />
-                              <span className="text-xs font-bold">Verbatim</span>
-                            </button>
-                            <button
-                              onClick={() => setTranscriptionMode('polish')}
-                              className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl transition-all ${transcriptionMode === 'polish' ? 'bg-white dark:bg-dark-card text-primary shadow-sm scale-[1.02]' : 'text-slate-400 hover:text-slate-600'}`}
-                            >
-                              <Sparkle size={16} weight={transcriptionMode === 'polish' ? 'fill' : 'duotone'} />
-                              <span className="text-xs font-bold">Polish</span>
-                            </button>
-                        </div>
-
-                        {/* Additional Toggles */}
-                        {transcriptionMode === 'polish' && (
-                          <div className="flex flex-col gap-2 animate-in slide-in-from-top-2 fade-in">
-                             <label className="flex items-center gap-3 p-3 rounded-xl bg-slate-50 dark:bg-dark-card/30 border border-slate-100 dark:border-white/5 cursor-pointer group hover:border-primary/20 transition-all">
-                                <div className={`w-5 h-5 rounded-md border flex items-center justify-center transition-all ${isDeepThinking ? 'bg-primary border-primary text-white' : 'border-slate-300 dark:border-white/20 bg-white dark:bg-transparent'}`}>
-                                  {isDeepThinking && <Check size={12} weight="bold" />}
-                                </div>
-                                <input type="checkbox" className="hidden" checked={isDeepThinking} onChange={(e) => setIsDeepThinking(e.target.checked)} />
-                                <div className="flex-1">
-                                   <div className="flex items-center gap-2">
-                                      <Brain size={14} weight="duotone" className="text-purple-500"/>
-                                      <span className="text-xs font-bold text-slate-700 dark:text-white">Deep Thinking</span>
-                                   </div>
-                                   <p className="text-[9px] text-slate-400 dark:text-dark-muted font-medium mt-0.5">Slower, but higher reasoning capability.</p>
-                                </div>
-                             </label>
-                          </div>
-                        )}
-
                         <button
                           onClick={handleTranscribe}
                           disabled={!isReadyToTranscribe()}
