@@ -31,7 +31,7 @@ const getMimeTypeFromExtension = (filename: string): string | null => {
  * Helper to upload large files to Gemini API
  */
 const uploadFileToGemini = async (mediaFile: File | Blob, mimeType: string): Promise<string> => {
-  const uploadUrl = `https://generativelanguage.googleapis.com/upload/v1beta/files?key=${process.env.API_KEY}`;
+  const uploadUrl = `https://generativelanguage.googleapis.com/upload/v1beta/files?key=${import.meta.env.VITE_GEMINI_API_KEY}`;
   const displayName = mediaFile instanceof File ? mediaFile.name : 'uploaded_media';
   
   const initialResponse = await fetch(uploadUrl, {
@@ -78,7 +78,7 @@ const uploadFileToGemini = async (mediaFile: File | Blob, mimeType: string): Pro
      let retries = 0;
      while (currentState === 'PROCESSING' && retries < 30) {
          await new Promise(r => setTimeout(r, 2000));
-         const pollUrl = `https://generativelanguage.googleapis.com/v1beta/files/${fileInfo.file.name}?key=${process.env.API_KEY}`;
+         const pollUrl = `https://generativelanguage.googleapis.com/v1beta/files/${fileInfo.file.name}?key=${import.meta.env.VITE_GEMINI_API_KEY}`;
          const pollResp = await fetch(pollUrl);
          const pollData = await pollResp.json();
          currentState = pollData.state;
@@ -100,11 +100,11 @@ export const transcribeAudio = async (
   detectSpeakers: boolean = true,
   useSmartModel: boolean = true
 ): Promise<string> => {
-  if (!process.env.API_KEY) {
+  if (!import.meta.env.VITE_GEMINI_API_KEY) {
     throw new Error("API Key is missing. Please check your environment configuration.");
   }
 
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+  const ai = new GoogleGenAI({ apiKey: import.meta.env.VITE_GEMINI_API_KEY });
   
   let finalMimeType = mimeType;
 
@@ -250,7 +250,7 @@ export const transcribeAudio = async (
  * Analyzes video visual content for key info
  */
 export const analyzeVideoContent = async (mediaFile: File | Blob): Promise<string> => {
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+  const ai = new GoogleGenAI({ apiKey: import.meta.env.VITE_GEMINI_API_KEY });
   const model = "gemini-3-pro-preview";
 
   let finalMimeType = mediaFile.type;
@@ -314,7 +314,7 @@ export const analyzeVideoContent = async (mediaFile: File | Blob): Promise<strin
  * Classifies the content type based on the text.
  */
 export const classifyContent = async (text: string): Promise<string> => {
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+  const ai = new GoogleGenAI({ apiKey: import.meta.env.VITE_GEMINI_API_KEY });
   const model = "gemini-3-flash-preview";
   const sample = text.substring(0, 2000);
   const prompt = `Classify this text into one category: Song, Podcast, Interview, Meeting, Lecture, Video, Voice Note, News. Return ONLY the category name.\n\nText:\n${sample}`;
@@ -328,7 +328,7 @@ export const classifyContent = async (text: string): Promise<string> => {
 };
 
 export const summarizeText = async (text: string): Promise<string> => {
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+  const ai = new GoogleGenAI({ apiKey: import.meta.env.VITE_GEMINI_API_KEY });
   const model = "gemini-3-pro-preview"; 
   const response = await ai.models.generateContent({
     model,
@@ -341,7 +341,7 @@ export const summarizeText = async (text: string): Promise<string> => {
  * Context-aware formatting enhancement with diff support
  */
 export const enhanceFormatting = async (text: string, contextType: string = "General"): Promise<string> => {
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+  const ai = new GoogleGenAI({ apiKey: import.meta.env.VITE_GEMINI_API_KEY });
   const model = "gemini-3-pro-preview";
   
   const prompt = `
