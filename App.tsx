@@ -282,24 +282,17 @@ const App: React.FC = () => {
   const executeTranscription = async (mediaBlob: Blob | File, mimeType: string, onStatus?: (msg: string) => void): Promise<string> => {
     let text: string;
     
-    // VERBATIM MODE: Use Groq (Whisper Large V3) for speed and literal accuracy
+    // VERBATIM MODE: Use Gemini Flash (Fast, Cheap) with Strict Verbatim Prompt
+    // Switching from Groq to Gemini Flash to enable native Speaker Diarization which Groq-Whisper lacks.
     if (transcriptionMode === 'verbatim') {
-      try {
-        text = await transcribeWithGroq(mediaBlob!, { model: 'whisper-large-v3', onStatus });
-        text = `**Verbatim Transcript**\n\n${text}`;
-      } catch (err) {
-        // Fallback to WebSpeech if Groq fails or API key missing, but warn user
-        console.warn("Groq failed, trying WebSpeech", err);
-        if (isWebSpeechSupported()) {
-           onStatus?.("Verbatim engine busy, switching to local backup...");
-           text = await transcribeWithWebSpeech(mediaBlob!, { language: 'en-US' }, (result) => {
-             if (result.isFinal) onStatus?.(`✓ ${result.text.substring(0, 30)}...`);
-           });
-           text = `**Browser Transcription** (Offline Fallback)\n\n${text}`;
-        } else {
-           throw err;
-        }
-      }
+       text = await transcribeAudio(
+         mediaBlob!, 
+         mimeType, 
+         false, // autoEdit = false (Strict Verbatim)
+         isSpeakerDetectEnabled, 
+         false, // useSmartModel = false (Use Flash for speed/verbatim)
+         onStatus
+       );
     } 
     // POLISH MODE: Use Gemini (Flash for Speed, Pro for Thinking/Quality)
     else {

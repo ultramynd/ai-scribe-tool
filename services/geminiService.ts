@@ -142,12 +142,12 @@ export const transcribeAudio = async (
       `;
 
       const rawPrompt = `
-        Task: Generate a high-accuracy, 100% VERBATIM transcription.
+        Task: Generate a STRICT, 100% VERBATIM transcription.
         Guidelines:
         ${commonInstructions}
-        4. **Verbatim Accuracy**: Capture EVERY word. Do not summarize, do not "clean up" grammar, and do not remove stutters or fillers (um, ah, like).
-        5. **African Dialects/Pidgin**: High priority on maintaining cultural nuances. If the speaker says "I dey go", DO NOT change it to "I am going".
-        6. **Formatting**: Use clear paragraph breaks between speakers. Avoid massive blocks of text.
+        4. **Strict Verbatim**: Capture EVERY utterance, stutter, false start, and filler word (um, uh, like, you know). DO NOT EDIT or "clean up" anything.
+        5. **Accuracy**: If a sentence is grammatically incorrect, TRANSCRIPE IT EXACTLY AS SPOKEN.
+        6. **Formatting**: Start every speaker turn on a new line with their label and timestamp.
       `;
 
       const autoEditPrompt = `
