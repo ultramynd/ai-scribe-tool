@@ -698,89 +698,6 @@ const TranscriptionEditor: React.FC<TranscriptionEditorProps> = ({
                         </div>
                     )}
                 </div>
-
-                <div className="w-px h-5 bg-slate-200 dark:bg-dark-border mx-1"></div>
-
-                {/* Copy As Dropdown */}
-                <div className="relative">
-                    <button onClick={() => toggleMenu('copy-as')} className={`flex items-center gap-1.5 px-3 py-2 rounded-2xl text-xs font-bold transition-all ${activeMenu === 'copy-as' ? 'bg-primary/10 text-primary' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-dark-bg'}`}>
-                        <Copy size={16} strokeWidth={2} />
-                        <span>Copy As</span>
-                        <ChevronDown size={12} strokeWidth={2.5} className={`transition-transform ${activeMenu === 'copy-as' ? 'rotate-180' : ''}`}/>
-                    </button>
-                    {activeMenu === 'copy-as' && (
-                        <div className="absolute top-full left-0 mt-2 bg-white dark:bg-dark-card rounded-2xl shadow-xl border border-slate-100 dark:border-dark-border z-50 p-1.5 min-w-[140px] animate-in fade-in slide-in-from-top-2">
-                            <button onClick={() => { handleCopy(); setActiveMenu(null); }} className="w-full flex items-center gap-2 px-2.5 py-2 text-left text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-white/5 rounded-lg transition-colors">
-                                <FileIcon size={14} className="text-slate-400"/>
-                                Markdown
-                            </button>
-                            <button onClick={() => { navigator.clipboard.writeText(markdownToHtml(text)); setCopied(true); setTimeout(() => setCopied(false), 2000); setActiveMenu(null); }} className="w-full flex items-center gap-2 px-2.5 py-2 text-left text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-white/5 rounded-lg transition-colors">
-                                <FileType size={14} className="text-slate-400"/>
-                                HTML
-                            </button>
-                            <button onClick={() => { navigator.clipboard.writeText(text.replace(/[*_#\[\]]/g, '')); setCopied(true); setTimeout(() => setCopied(false), 2000); setActiveMenu(null); }} className="w-full flex items-center gap-2 px-2.5 py-2 text-left text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-white/5 rounded-lg transition-colors">
-                                <FileText size={14} className="text-slate-400"/>
-                                Plain Text
-                            </button>
-                        </div>
-                    )}
-                </div>
-
-                {/* AI Features Dropdown */}
-                <div className="relative">
-                    <button onClick={() => toggleMenu('ai-features')} className={`flex items-center gap-1.5 px-3 py-2 rounded-2xl text-xs font-bold transition-all ${activeMenu === 'ai-features' ? 'bg-primary/10 text-primary' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-dark-bg'}`}>
-                        <Sparkles size={16} strokeWidth={2} className="text-primary dark:text-accent"/>
-                        <span className="bg-gradient-to-r from-primary to-purple-600 bg-clip-text text-transparent">AI Features</span>
-                        <ChevronDown size={12} strokeWidth={2.5} className={`transition-transform ${activeMenu === 'ai-features' ? 'rotate-180' : ''}`}/>
-                    </button>
-                    {activeMenu === 'ai-features' && (
-                        <div className="absolute top-full left-0 mt-2 bg-white dark:bg-dark-card rounded-2xl shadow-xl border border-slate-100 dark:border-dark-border z-50 p-1.5 min-w-[160px] animate-in fade-in slide-in-from-top-2">
-                            <button onClick={() => { handleSummarize(); setActiveMenu(null); }} className="w-full flex items-center gap-2 px-2.5 py-2 text-left text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-white/5 rounded-lg transition-colors">
-                                <BookOpen size={14} className="text-emerald-500"/>
-                                Smart Summary
-                            </button>
-                            <button onClick={() => { handleEnhance(); setActiveMenu(null); }} className="w-full flex items-center gap-2 px-2.5 py-2 text-left text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-white/5 rounded-lg transition-colors">
-                                <Wand2 size={14} className="text-purple-500"/>
-                                Enhance Text
-                            </button>
-                            {isVideoFile && (
-                                <button onClick={() => { handleAnalyzeVideo(); setActiveMenu(null); }} className="w-full flex items-center gap-2 px-2.5 py-2 text-left text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-white/5 rounded-lg transition-colors">
-                                    <Video size={14} className="text-blue-500"/>
-                                    Visual Analysis
-                                </button>
-                            )}
-                        </div>
-                    )}
-                </div>
-
-                {/* Export Dropdown */}
-                <div className="relative">
-                    <button onClick={() => toggleMenu('export')} className={`flex items-center gap-1.5 px-3 py-2 rounded-2xl text-xs font-bold transition-all ${activeMenu === 'export' ? 'bg-primary/10 text-primary' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-dark-bg'}`}>
-                        <DownloadCloud size={16} strokeWidth={2} />
-                        <span>Export</span>
-                        <ChevronDown size={12} strokeWidth={2.5} className={`transition-transform ${activeMenu === 'export' ? 'rotate-180' : ''}`}/>
-                    </button>
-                    {activeMenu === 'export' && (
-                        <div className="absolute top-full right-0 mt-2 bg-white dark:bg-dark-card rounded-2xl shadow-xl border border-slate-100 dark:border-dark-border z-50 p-1.5 min-w-[150px] animate-in fade-in slide-in-from-top-2">
-                             <button onClick={() => handleExport('txt')} className="w-full flex items-center gap-2 px-2.5 py-2 text-left text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-white/5 rounded-lg transition-colors">
-                                <FileText size={14} className="text-slate-400"/>
-                                Text File (.txt)
-                             </button>
-                             <button onClick={() => handleExport('doc')} className="w-full flex items-center gap-2 px-2.5 py-2 text-left text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-white/5 rounded-lg transition-colors">
-                                <FileIcon size={14} className="text-blue-500"/>
-                                Word Doc (.doc)
-                             </button>
-                             <button onClick={() => handleExport('docx')} className="w-full flex items-center gap-2 px-2.5 py-2 text-left text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-white/5 rounded-lg transition-colors">
-                                <FileIcon size={14} className="text-blue-600"/>
-                                Word Modern (.docx)
-                             </button>
-                             <button onClick={() => handleExport('srt')} className="w-full flex items-center gap-2 px-2.5 py-2 text-left text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-white/5 rounded-lg transition-colors">
-                                <FileOutput size={14} className="text-orange-500"/>
-                                Subtitles (.srt)
-                             </button>
-                        </div>
-                    )}
-                </div>
             </div>
           </div>
         )}
@@ -834,75 +751,75 @@ const TranscriptionEditor: React.FC<TranscriptionEditorProps> = ({
           </div>
         </div>
 
-        {/* Dynamic Media Bar */}
-        <div className="flex-none border-t border-slate-200 dark:border-dark-border bg-gradient-to-b from-white to-slate-50 dark:from-dark-card dark:to-dark-bg p-4">
-           <div className="max-w-[816px] mx-auto">
-             {audioUrl && !isRecordingLive ? (
-               /* Has Audio - Show Playback */
-               <div className="flex items-center gap-4">
-                 <PlaybackControl audioUrl={audioUrl} onTimeUpdate={setPlaybackTime} />
-               </div>
-             ) : (
-               /* No Audio or Recording Live - Show Record/Upload Options */
-               <div className="flex flex-col gap-4">
-                 
-                 {/* Interim Transcript Display */}
-                 {isRecordingLive && interimTranscript && (
-                   <div className="px-6 py-3 rounded-2xl bg-primary/5 border border-primary/10 text-slate-600 dark:text-dark-muted text-sm italic animate-in fade-in slide-in-from-bottom-2">
-                     <span className="text-primary dark:text-accent font-bold mr-2">Deep Sense:</span>
-                     {interimTranscript}...
-                   </div>
-                 )}
+        {/* Dynamic Media Bar - Only visible in Edit mode when no audio */}
+        {isEditing && (
+          <div className={`flex-none border-t border-slate-200/50 dark:border-dark-border/50 bg-white/80 dark:bg-dark-card/80 backdrop-blur-sm transition-all duration-300 ${audioUrl && !isRecordingLive ? 'p-3' : 'p-4'}`}>
+            <div className="max-w-[816px] mx-auto">
+              {audioUrl && !isRecordingLive ? (
+                /* Has Audio - Show Playback */
+                <div className="flex items-center gap-4">
+                  <PlaybackControl audioUrl={audioUrl} onTimeUpdate={setPlaybackTime} />
+                </div>
+              ) : (
+                /* No Audio or Recording Live - Show Record/Upload Options */
+                <div className="flex flex-col gap-3">
+                  
+                  {/* Interim Transcript Display */}
+                  {isRecordingLive && interimTranscript && (
+                    <div className="px-4 py-2.5 rounded-xl bg-primary/5 border border-primary/10 text-slate-600 dark:text-dark-muted text-sm italic animate-in fade-in slide-in-from-bottom-2">
+                      <span className="text-primary dark:text-accent font-bold mr-2">Listening:</span>
+                      {interimTranscript}...
+                    </div>
+                  )}
 
-                 <div className="flex items-center justify-center gap-4">
-                   {/* Record Button */}
-                   <button 
-                     onClick={handleToggleLiveRecording}
-                     className={`btn-shimmer group flex items-center gap-3 px-8 py-3.5 rounded-[2rem] font-extrabold text-sm transition-all shadow-xl active:scale-[0.98] ${
-                       isRecordingLive 
-                         ? 'bg-red-500 text-white shadow-red-500/30' 
-                         : 'bg-emerald-500 text-white shadow-emerald-500/30'
-                     }`}
-                   >
-                     {isRecordingLive ? (
-                       <>
-                         <div className="flex items-center gap-1.5 mr-2">
-                           <span className="w-2 h-2 rounded-full bg-white animate-pulse"></span>
-                           <span className="w-2 h-4 rounded-full bg-white/60 animate-bounce [animation-delay:-0.2s]"></span>
-                           <span className="w-2 h-2 rounded-full bg-white/40 animate-pulse [animation-delay:0.4s]"></span>
-                         </div>
-                         <Square size={18} className="fill-current"/>
-                         <span>Stop Live Scribe</span>
-                       </>
-                     ) : (
-                       <>
-                         <div className="bg-white/20 p-1.5 rounded-xl group-hover:rotate-12 transition-transform">
-                           <Mic size={18}/>
-                         </div>
-                         <span>Record Voice Note</span>
-                       </>
-                     )}
-                   </button>
-                   
-                   {!isRecordingLive && (
-                     <>
-                        <span className="text-slate-300 dark:text-dark-border text-xs font-black uppercase tracking-widest">or</span>
+                  <div className="flex items-center justify-center gap-3">
+                    {/* Record Button - More subtle */}
+                    <button 
+                      onClick={handleToggleLiveRecording}
+                      className={`group flex items-center gap-2.5 px-5 py-2.5 rounded-xl font-bold text-sm transition-all active:scale-[0.98] ${
+                        isRecordingLive 
+                          ? 'bg-red-500 text-white shadow-lg shadow-red-500/20' 
+                          : 'bg-emerald-500 hover:bg-emerald-600 text-white shadow-md shadow-emerald-500/20'
+                      }`}
+                    >
+                      {isRecordingLive ? (
+                        <>
+                          <div className="flex items-center gap-1 mr-1">
+                            <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse"></span>
+                            <span className="w-1.5 h-3 rounded-full bg-white/60 animate-bounce [animation-delay:-0.2s]"></span>
+                            <span className="w-1.5 h-1.5 rounded-full bg-white/40 animate-pulse [animation-delay:0.4s]"></span>
+                          </div>
+                          <Square size={14} className="fill-current"/>
+                          <span>Stop</span>
+                        </>
+                      ) : (
+                        <>
+                          <Mic size={16}/>
+                          <span>Record Voice Note</span>
+                        </>
+                      )}
+                    </button>
+                    
+                    {!isRecordingLive && (
+                      <>
+                        <span className="text-slate-300 dark:text-dark-border text-[10px] font-bold uppercase tracking-widest">or</span>
                         
-                        {/* Upload Button */}
+                        {/* Upload Button - More subtle */}
                         <button 
                           onClick={onUploadClick}
-                          className="flex items-center gap-2.5 px-6 py-3.5 rounded-[2rem] bg-white dark:bg-dark-card text-slate-700 dark:text-slate-200 font-extrabold text-sm hover:bg-slate-50 dark:hover:bg-dark-bg transition-all border border-slate-200 dark:border-white/5 shadow-sm"
+                          className="group flex items-center gap-2 px-5 py-2.5 rounded-xl bg-slate-100 dark:bg-dark-bg text-slate-600 dark:text-slate-300 font-bold text-sm hover:bg-slate-200 dark:hover:bg-dark-border transition-all border border-slate-200/50 dark:border-white/5"
                         >
-                          <Upload size={18} className="text-primary dark:text-accent"/>
+                          <Upload size={16} className="text-primary dark:text-accent"/>
                           <span>Upload File</span>
                         </button>
-                     </>
-                   )}
-                 </div>
-               </div>
-             )}
-           </div>
-        </div>
+                      </>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* AI Sidebar */}
