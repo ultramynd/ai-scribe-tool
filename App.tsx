@@ -9,7 +9,6 @@ import {
 import AudioRecorder from './components/AudioRecorder';
 import FileUploader from './components/FileUploader';
 import UrlLoader from './components/UrlLoader';
-import LiveTranscriber from './components/LiveTranscriber';
 import TranscriptionEditor from './components/TranscriptionEditor';
 import { AudioSource, AudioFile, TranscriptionState } from './types';
 import { transcribeAudio, classifyContent } from './services/geminiService';
@@ -182,7 +181,7 @@ const App: React.FC = () => {
     setIsSavingToDrive(true);
     try {
       const metadata = {
-        name: `AI Scribe Transcription - ${new Date().toLocaleDateString()}`,
+        name: `Smart Editor Transcription - ${new Date().toLocaleDateString()}`,
         mimeType: 'application/vnd.google-apps.document'
       };
       const form = new FormData();
@@ -205,6 +204,27 @@ const App: React.FC = () => {
       alert('Error saving to Drive');
     } finally {
       setIsSavingToDrive(false);
+    }
+  };
+
+  const handleExportTxt = () => {
+    if (!transcription.text) return;
+    const blob = new Blob([transcription.text], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `Smart_Editor_Export_${new Date().toISOString().slice(0,10)}.txt`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const handleExportDocx = async () => {
+    if (!transcription.text) return;
+    try {
+      const { generateDocx } = await import('./utils/exportUtils');
+      await generateDocx(transcription.text, `Smart_Editor_Export_${new Date().toISOString().slice(0,10)}`);
+    } catch (err) {
+      alert('Failed to generate Word document');
     }
   };
 
@@ -425,22 +445,25 @@ const App: React.FC = () => {
                         setDriveSaved(true);
                         setTimeout(() => setDriveSaved(false), 2000);
                       }}
-                      className="w-full flex items-center gap-2 px-2.5 py-2 text-left text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-white/5 rounded-lg transition-colors"
+                      className="w-full flex items-center gap-2.5 px-3 py-2.5 text-left text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-white/5 rounded-xl transition-all group"
                     >
-                      <FileText size={14} className="text-slate-400"/>
+                      <div className="w-7 h-7 rounded-lg bg-slate-100 dark:bg-dark-border flex items-center justify-center group-hover:scale-110 transition-transform">
+                        <FileText size={14} className="text-slate-400 group-hover:text-primary"/>
+                      </div>
                       Markdown
                     </button>
                     <button 
                       onClick={() => {
-                        // Simple HTML conversion
                         const html = (transcription.text || '').replace(/\*\*(.*?)\*\*/g, '<b>$1</b>').replace(/\*(.*?)\*/g, '<i>$1</i>').replace(/\n/g, '<br>');
                         navigator.clipboard.writeText(html);
                         setDriveSaved(true);
                         setTimeout(() => setDriveSaved(false), 2000);
                       }}
-                      className="w-full flex items-center gap-2 px-2.5 py-2 text-left text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-white/5 rounded-lg transition-colors"
+                      className="w-full flex items-center gap-2.5 px-3 py-2.5 text-left text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-white/5 rounded-xl transition-all group"
                     >
-                      <Export size={14} weight="duotone" className="text-slate-400"/>
+                      <div className="w-7 h-7 rounded-lg bg-orange-100/50 dark:bg-orange-900/20 flex items-center justify-center group-hover:scale-110 transition-transform">
+                        <Export size={14} weight="duotone" className="text-orange-500"/>
+                      </div>
                       HTML
                     </button>
                     <button 
@@ -450,9 +473,11 @@ const App: React.FC = () => {
                         setDriveSaved(true);
                         setTimeout(() => setDriveSaved(false), 2000);
                       }}
-                      className="w-full flex items-center gap-2 px-2.5 py-2 text-left text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-white/5 rounded-lg transition-colors"
+                      className="w-full flex items-center gap-2.5 px-3 py-2.5 text-left text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-white/5 rounded-xl transition-all group"
                     >
-                      <FileText size={14} className="text-slate-400"/>
+                      <div className="w-7 h-7 rounded-lg bg-blue-100/50 dark:bg-blue-900/20 flex items-center justify-center group-hover:scale-110 transition-transform">
+                        <FileText size={14} className="text-blue-500"/>
+                      </div>
                       Plain Text
                     </button>
                   </div>
@@ -465,8 +490,9 @@ const App: React.FC = () => {
                   onClick={() => setShowAiSidebar(!showAiSidebar)}
                   className={`flex items-center gap-1.5 px-3 py-2 rounded-2xl text-xs font-bold transition-all ${showAiSidebar ? 'bg-primary/10 text-primary' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-dark-card'}`}
                 >
-                  <Sparkle size={16} weight="duotone" className="text-primary dark:text-accent"/>
-                  <span className="bg-gradient-to-r from-primary to-purple-600 bg-clip-text text-transparent">AI Features</span>
+                  <Sparkle size={16} weight="duotone" className="text-primary dark:text-accent animate-pulse"/>
+                  <span className="bg-gradient-to-r from-primary to-purple-600 bg-clip-text text-transparent">Smart Editor</span>
+                  <span className="px-1.5 py-0.5 rounded-md bg-primary/10 text-[8px] font-black tracking-tighter text-primary border border-primary/20 leading-none">BETA</span>
                 </button>
               </div>
 
@@ -482,23 +508,29 @@ const App: React.FC = () => {
                         <button 
                           onClick={handleSaveToDrive}
                           disabled={isSavingToDrive}
-                          className="w-full flex items-center gap-2.5 px-3 py-2.5 text-left text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-dark-bg rounded-lg transition-colors"
+                          className="w-full flex items-center gap-3 px-3 py-2.5 text-left text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-white/5 rounded-xl transition-all group"
                         >
-                          <FloppyDisk size={14} weight="duotone" className="text-emerald-500"/>
+                          <div className="w-7 h-7 rounded-lg bg-emerald-100 dark:bg-emerald-900/20 flex items-center justify-center group-hover:scale-110 transition-transform">
+                            <FloppyDisk size={14} weight="duotone" className="text-emerald-500"/>
+                          </div>
                           Save to Drive
                         </button>
                         <button 
-                          onClick={() => {}}
-                          className="w-full flex items-center gap-2.5 px-3 py-2.5 text-left text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-dark-bg rounded-lg transition-colors"
+                          onClick={handleExportTxt}
+                          className="w-full flex items-center gap-3 px-3 py-2.5 text-left text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-white/5 rounded-xl transition-all group"
                         >
-                          <FileText size={14} weight="duotone" className="text-slate-400"/>
+                          <div className="w-7 h-7 rounded-lg bg-slate-100 dark:bg-dark-border flex items-center justify-center group-hover:scale-110 transition-transform">
+                            <FileText size={14} weight="duotone" className="text-slate-400 group-hover:text-primary"/>
+                          </div>
                           Text File (.txt)
                         </button>
                         <button 
-                          onClick={() => {}}
-                          className="w-full flex items-center gap-2.5 px-3 py-2.5 text-left text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-dark-bg rounded-lg transition-colors"
+                          onClick={handleExportDocx}
+                          className="w-full flex items-center gap-3 px-3 py-2.5 text-left text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-white/5 rounded-xl transition-all group"
                         >
-                          <Export size={14} weight="duotone" className="text-blue-500"/>
+                          <div className="w-7 h-7 rounded-lg bg-blue-100/50 dark:bg-blue-900/20 flex items-center justify-center group-hover:scale-110 transition-transform">
+                            <Export size={14} weight="duotone" className="text-blue-500"/>
+                          </div>
                           Word Document (.docx)
                         </button>
                     </div>
@@ -715,10 +747,9 @@ const App: React.FC = () => {
               </p>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 max-w-6xl mx-auto">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8 max-w-5xl mx-auto">
               {[
-                { id: AudioSource.LIVE, icon: <Brain size={28} weight="duotone" />, title: "Live Intelligence", desc: "Real-time AI transcription as you speak.", color: "text-primary", bg: "bg-primary/5", accent: "primary" },
-                { id: AudioSource.MICROPHONE, icon: <Microphone size={28} weight="duotone" />, title: "Record Node", desc: "Capture voice notes or meetings directly.", color: "text-amber-500", bg: "bg-amber-500/5", accent: "amber-500" },
+                { id: AudioSource.MICROPHONE, icon: <Microphone size={28} weight="duotone" />, title: "Record Node", desc: "Capture voice notes or meetings with optional Live AI.", color: "text-amber-500", bg: "bg-amber-500/5", accent: "amber-500" },
                 { id: AudioSource.FILE, icon: <UploadSimple size={28} weight="duotone" />, title: "Upload Media", desc: "Transcribe MP3, WAV, or MP4 files.", color: "text-accent", bg: "bg-accent/5", accent: "accent" },
                 { id: AudioSource.URL, icon: <Link size={28} weight="duotone" />, title: "Cloud Import", desc: "Load from public URL or Google Drive.", color: "text-emerald-500", bg: "bg-emerald-500/5", accent: "emerald-500" },
               ].map((card) => (
@@ -801,21 +832,19 @@ const App: React.FC = () => {
                   </div>
 
                   <div className="flex-1 flex flex-col justify-center items-center relative z-10">
-                    {activeTab === AudioSource.LIVE && (
-                       <LiveTranscriber 
-                          onStop={(text) => {
-                             setTranscription({ isLoading: false, text, error: null });
-                             setContentType("Live Session");
-                          }}
-                          onCancel={() => setActiveTab(null)}
-                       />
-                    )}
-
                     {activeTab === AudioSource.MICROPHONE && (
                       <AudioRecorder 
-                        onRecordingComplete={(blob) => {
+                        onRecordingComplete={(blob, liveText) => {
                           setRecordedBlob(blob);
                           setMicUrl(URL.createObjectURL(blob));
+                          if (liveText) {
+                            setTranscription({ 
+                              isLoading: false, 
+                              text: `**Live Intelligence Transcription**\n\n---\n\n${liveText}`, 
+                              error: null 
+                            });
+                            setContentType("Live Session");
+                          }
                         }}
                         isTranscribing={false}
                       />
@@ -843,8 +872,7 @@ const App: React.FC = () => {
                   </div>
 
                   {/* Configuration & Action Area */}
-                  {activeTab !== AudioSource.LIVE && (
-                    <div className={`mt-10 transition-all duration-700 ${isReadyToTranscribe() ? 'opacity-100 translate-y-0' : 'opacity-30 translate-y-4 pointer-events-none'}`}>
+                  <div className={`mt-10 transition-all duration-700 ${isReadyToTranscribe() ? 'opacity-100 translate-y-0' : 'opacity-30 translate-y-4 pointer-events-none'}`}>
                      
                      <div className="flex flex-col gap-4 max-w-sm mx-auto">
                         <div className="flex items-center justify-center gap-3">
@@ -917,8 +945,7 @@ const App: React.FC = () => {
                         </button>
                      </div>
                     </div>
-                  )}
-               </div>
+                 </div>
             </div>
           </div>
         )}

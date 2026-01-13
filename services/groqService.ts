@@ -13,7 +13,7 @@ export const transcribeWithGroq = async (
 ): Promise<string> => {
   const apiKey = import.meta.env.VITE_GROQ_API_KEY;
 
-  if (!apiKey || apiKey === 'YOUR_GROQ_API_KEY_HERE') {
+  if (!apiKey) {
     throw new Error("Groq API Key is missing. Please add VITE_GROQ_API_KEY to your .env.local file.");
   }
 

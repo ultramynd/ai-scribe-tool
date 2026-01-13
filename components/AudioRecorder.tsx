@@ -1,9 +1,10 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Microphone, Stop, ArrowsClockwise, WarningCircle } from '@phosphor-icons/react';
+import { Microphone, Stop, ArrowsClockwise, WarningCircle, Brain, Sparkle, Spinner } from '@phosphor-icons/react';
 import { formatTime } from '../utils/audioUtils';
+import { startLiveTranscription } from '../services/webSpeechService';
 
 interface AudioRecorderProps {
-  onRecordingComplete: (blob: Blob) => void;
+  onRecordingComplete: (blob: Blob, liveText?: string) => void;
   isTranscribing: boolean;
 }
 
@@ -11,6 +12,12 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({ onRecordingComplete, isTr
   const [isRecording, setIsRecording] = useState(false);
   const [duration, setDuration] = useState(0);
   const [error, setError] = useState<string | null>(null);
+  
+  // Live Transcription State
+  const [isLiveEnabled, setIsLiveEnabled] = useState(false);
+  const [liveTranscript, setLiveTranscript] = useState('');
+  const [interimTranscript, setInterimTranscript] = useState('');
+  const stopLiveRef = useRef<(() => string) | null>(null);
   
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
@@ -92,6 +99,27 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({ onRecordingComplete, isTr
   const startRecording = async () => {
     setError(null);
     try {
+      if (isLiveEnabled) {
+        setLiveTranscript('');
+        setInterimTranscript('');
+        const { stop } = startLiveTranscription(
+          { language: 'en-US' },
+          (result) => {
+            if (result.isFinal) {
+              setLiveTranscript(result.text);
+              setInterimTranscript('');
+            } else {
+              setInterimTranscript(result.text.substring(liveTranscript.length));
+            }
+          },
+          (err) => {
+            console.error("Live transcription error:", err);
+            setError("Live connection issues. Still recording audio...");
+          }
+        );
+        stopLiveRef.current = stop;
+      }
+
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       streamRef.current = stream;
       const mediaRecorder = new MediaRecorder(stream);
@@ -104,7 +132,12 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({ onRecordingComplete, isTr
 
       mediaRecorder.onstop = () => {
         const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
-        onRecordingComplete(audioBlob);
+        let finalLiveText = undefined;
+        if (stopLiveRef.current) {
+          finalLiveText = stopLiveRef.current();
+          stopLiveRef.current = null;
+        }
+        onRecordingComplete(audioBlob, finalLiveText);
         stopVisualizer();
         if (streamRef.current) streamRef.current.getTracks().forEach(track => track.stop());
       };
@@ -140,6 +173,7 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({ onRecordingComplete, isTr
       if (timerIntervalRef.current !== null) window.clearInterval(timerIntervalRef.current);
       stopVisualizer();
       if (streamRef.current) streamRef.current.getTracks().forEach(track => track.stop());
+      if (stopLiveRef.current) stopLiveRef.current();
     };
   }, []);
 
@@ -168,6 +202,19 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({ onRecordingComplete, isTr
               <div className="text-[9px] font-black uppercase tracking-[0.25em] text-primary dark:text-accent mt-3 opacity-50">
                 {isRecording ? 'Capturing Audio...' : 'Voice Interface'}
               </div>
+
+              {/* Live Transcript Preview */}
+              {isRecording && isLiveEnabled && (
+                <div className="mt-6 w-full px-4 animate-in fade-in slide-in-from-top-2 duration-700">
+                  <div className="bg-white/50 dark:bg-dark-card/30 backdrop-blur-md rounded-2xl p-4 border border-white/40 dark:border-white/5 min-h-[60px] max-h-[100px] overflow-y-auto">
+                    <p className="text-[10px] font-sans leading-relaxed text-slate-800 dark:text-slate-200">
+                      {liveTranscript}
+                      <span className="text-slate-400 dark:text-dark-muted">{interimTranscript}</span>
+                      <span className="inline-block w-0.5 h-3 bg-primary dark:bg-accent ml-1 animate-pulse align-middle"></span>
+                    </p>
+                  </div>
+                </div>
+              )}
           </div>
       </div>
 
@@ -209,6 +256,19 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({ onRecordingComplete, isTr
             title="Reset"
           >
             <ArrowsClockwise size={18} weight="duotone" />
+          </button>
+        )}
+
+        {/* Live Intelligence Toggle */}
+        {!isRecording && duration === 0 && (
+          <button
+            onClick={() => setIsLiveEnabled(!isLiveEnabled)}
+            className={`flex flex-col items-center gap-2 group transition-all ${isLiveEnabled ? 'text-primary dark:text-accent' : 'text-slate-400'}`}
+          >
+            <div className={`w-12 h-12 rounded-2xl flex items-center justify-center border transition-all ${isLiveEnabled ? 'bg-primary/10 border-primary/20 shadow-lg shadow-primary/10' : 'bg-slate-100/50 dark:bg-white/5 border-transparent opacity-60'}`}>
+              <Brain size={22} weight={isLiveEnabled ? "fill" : "duotone"} className={isLiveEnabled ? "animate-pulse" : ""} />
+            </div>
+            <span className="text-[8px] font-black uppercase tracking-widest leading-none">Live AI</span>
           </button>
         )}
       </div>

@@ -68,7 +68,7 @@ const TranscriptionEditor: React.FC<TranscriptionEditorProps> = ({
   const [isSummarizing, setIsSummarizing] = useState(false);
   const [copied, setCopied] = useState(false);
   const [summary, setSummary] = useState<string | null>(null);
-  const [summaryTitle, setSummaryTitle] = useState("AI Summary");
+  const [summaryTitle, setSummaryTitle] = useState("Smart Summary");
   const [isEnhancing, setIsEnhancing] = useState(false);
 
   // Real-time Transcription State
@@ -679,7 +679,7 @@ const TranscriptionEditor: React.FC<TranscriptionEditorProps> = ({
                             </button>
                             <button onClick={() => { handleRemoveSpeakers(); setActiveMenu(null); }} className="w-full flex items-center gap-3 px-2.5 py-2.5 text-left text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-orange-50 dark:hover:bg-orange-900/10 hover:text-orange-600 rounded-xl transition-colors group">
                               <div className="w-7 h-7 rounded-lg bg-orange-100 dark:bg-orange-900/20 flex items-center justify-center group-hover:scale-110 transition-transform">
-                                <UserMinusPhosphor size={16} weight="duotone" className="text-orange-500"/>
+                                <UserMinus size={16} weight="duotone" className="text-orange-500"/>
                               </div>
                               <div>
                                 <span className="block">Strip Speakers</span>
@@ -853,7 +853,10 @@ const TranscriptionEditor: React.FC<TranscriptionEditorProps> = ({
                           <Sparkle size={18} weight="duotone" className="text-primary dark:text-accent" />
                       </div>
                       <div>
-                          <h3 className="text-sm font-bold text-slate-900 dark:text-white leading-none">AI Scribe</h3>
+                          <div className="flex items-center gap-1.5">
+                              <h3 className="text-sm font-bold text-slate-900 dark:text-white leading-none">Smart Editor</h3>
+                              <span className="px-1 py-0.5 rounded-md bg-primary/10 text-[7px] font-black tracking-tighter text-primary border border-primary/20 leading-none">BETA</span>
+                          </div>
                           <p className="text-[10px] text-slate-500 dark:text-dark-muted mt-1 uppercase tracking-wider font-bold">Assistant</p>
                       </div>
                   </div>
@@ -945,8 +948,8 @@ const TranscriptionEditor: React.FC<TranscriptionEditorProps> = ({
                       </div>
                   ) : (
                       <div className="h-full flex flex-col items-center justify-center text-center px-4">
-                          <div className="w-20 h-20 bg-slate-50 dark:bg-dark-bg rounded-[2.5rem] flex items-center justify-center mb-6 border border-slate-100 dark:border-dark-border shadow-inner">
-                              <MagicWand size={32} weight="duotone" className="text-slate-200 dark:text-dark-border" />
+                          <div className="w-20 h-20 bg-slate-50 dark:bg-dark-bg rounded-[2.5rem] flex items-center justify-center mb-6 border border-slate-100 dark:border-dark-border shadow-inner group">
+                              <Sparkle size={32} weight="duotone" className="text-primary/30 dark:text-accent/30 group-hover:scale-110 transition-transform duration-500" />
                           </div>
                           <h4 className="text-sm font-bold text-slate-800 dark:text-white mb-2">Ready to Assist</h4>
                           <p className="text-xs text-slate-400 dark:text-dark-muted leading-relaxed max-w-[180px]">

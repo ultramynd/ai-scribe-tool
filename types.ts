@@ -1,8 +1,7 @@
 export enum AudioSource {
   MICROPHONE = 'MICROPHONE',
   FILE = 'FILE',
-  URL = 'URL',
-  LIVE = 'LIVE'
+  URL = 'URL'
 }
 
 export interface TranscriptionState {
