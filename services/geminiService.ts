@@ -142,11 +142,12 @@ export const transcribeAudio = async (
       `;
 
       const rawPrompt = `
-        Task: Generate a high-accuracy, verbatim transcription.
+        Task: Generate a high-accuracy, 100% VERBATIM transcription.
         Guidelines:
         ${commonInstructions}
-        4. **Accuracy**: Capture every word, including stuttering (e.g., "I- I went") and fillers (um, uh) if they add context.
-        5. **Formatting**: Use clear paragraph breaks between speakers.
+        4. **Verbatim Accuracy**: Capture EVERY word. Do not summarize, do not "clean up" grammar, and do not remove stutters or fillers (um, ah, like).
+        5. **African Dialects/Pidgin**: High priority on maintaining cultural nuances. If the speaker says "I dey go", DO NOT change it to "I am going".
+        6. **Formatting**: Use clear paragraph breaks between speakers. Avoid massive blocks of text.
       `;
 
       const autoEditPrompt = `
@@ -341,10 +342,22 @@ export const classifyContent = async (text: string): Promise<string> => {
 
 export const summarizeText = async (text: string): Promise<string> => {
   const ai = new GoogleGenAI({ apiKey: import.meta.env.VITE_GEMINI_API_KEY });
-  const model = "gemini-3-pro-preview"; 
+  const model = "gemini-1.5-pro"; 
+  const prompt = `
+    Provide a comprehensive analysis of this transcript consisting of:
+    1. **Executive Summary**: A concise high-level overview (1-2 paragraphs).
+    2. **Key Moments**: A list of the most important segments with their [MM:SS] timestamps and a brief explanation of why they matter.
+    3. **Action Items/Next Steps**: If any were mentioned.
+
+    Use Markdown formatting for a professional look.
+    
+    Transcript:
+    ${text}
+  `;
   const response = await ai.models.generateContent({
     model,
-    contents: `Provide a concise executive summary of this transcript. Use bullet points.\n\n${text}`,
+    contents: prompt,
+    config: { thinkingConfig: { thinkingBudget: 1024 } }
   });
   return response.text || "Could not generate summary.";
 };
@@ -375,5 +388,81 @@ export const enhanceFormatting = async (text: string, contextType: string = "Gen
   `;
   
   const response = await ai.models.generateContent({ model, contents: prompt });
+  return response.text || text;
+};
+
+/**
+ * Extracts key moments from the transcript.
+ */
+export const extractKeyMoments = async (text: string): Promise<string> => {
+  const ai = new GoogleGenAI({ apiKey: import.meta.env.VITE_GEMINI_API_KEY });
+  const model = "gemini-1.5-pro";
+  
+  const prompt = `
+    Analyze this transcript and extract the most important "Key Moments". 
+    For each moment:
+    1. Identify the timestamp [MM:SS] if available.
+    2. Provide a brief, punchy title.
+    3. Explain why it is important (1 sentence).
+
+    Format the output as a structured Markdown list.
+    
+    Transcript:
+    ${text}
+  `;
+  
+  const response = await ai.models.generateContent({ 
+    model, 
+    contents: prompt,
+    config: { thinkingConfig: { thinkingBudget: 1024 } }
+  });
+  return response.text || "No key moments identified.";
+};
+
+/**
+ * Identifies the start and end of the main discussion.
+ */
+export const findDiscussionBounds = async (text: string): Promise<string> => {
+  const ai = new GoogleGenAI({ apiKey: import.meta.env.VITE_GEMINI_API_KEY });
+  const model = "gemini-1.5-flash";
+  
+  const prompt = `
+    Look at this transcript and identify exactly where the main discussion starts and ends. 
+    Ignore the introductory pleasantries, setup, or closing small talk.
+    
+    Return your finding in this exact format:
+    **Core Discussion Starts**: [MM:SS] - [Context]
+    **Core Discussion Ends**: [MM:SS] - [Context]
+    
+    Transcript Snippet:
+    ${text.substring(0, 5000)} ... ${text.substring(text.length - 2000)}
+  `;
+  
+  const response = await ai.models.generateContent({ model, contents: prompt });
+  return response.text || "Could not identify discussion bounds.";
+};
+
+/**
+ * Removes pleasantries and fluff, keeping only the core interview/discussion content.
+ */
+export const stripPleasantries = async (text: string): Promise<string> => {
+  const ai = new GoogleGenAI({ apiKey: import.meta.env.VITE_GEMINI_API_KEY });
+  const model = "gemini-1.5-pro";
+  
+  const prompt = `
+    You are a professional editor. Rewrite this transcript to remove all pleasantries, "small talk", filler intros (like "how are you today", "thank you for having me"), and outros that don't contribute to the core subject matter.
+    
+    Keep the speaker labels and timestamps exactly as they are. 
+    DO NOT summarize. This must be the original transcript, just "filtered" for high-density information.
+    
+    Transcript:
+    ${text}
+  `;
+  
+  const response = await ai.models.generateContent({ 
+    model, 
+    contents: prompt,
+    config: { thinkingConfig: { thinkingBudget: 2048 } }
+  });
   return response.text || text;
 };

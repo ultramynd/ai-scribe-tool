@@ -54,44 +54,51 @@ export const generateDoc = (text: string, filename: string) => {
  * Generates a proper .docx file using the docx library.
  */
 export const generateDocx = async (text: string, filename: string) => {
-  const lines = text.split('\n');
-  const children = [];
+  try {
+    const lines = text.split('\n');
+    const children = [];
 
-  for (const line of lines) {
-    if (!line.trim()) {
-      children.push(new Paragraph({ text: "" })); 
-      continue;
+    for (const line of lines) {
+      if (!line.trim()) {
+        children.push(new Paragraph({ 
+          children: [new TextRun("")] 
+        })); 
+        continue;
+      }
+
+      // Split by ** for bold detection
+      const parts = line.split(/(\*\*.*?\*\*)/g);
+      const textRuns = parts.map(part => {
+          if (part.startsWith('**') && part.endsWith('**')) {
+              return new TextRun({
+                  text: part.slice(2, -2),
+                  bold: true,
+              });
+          }
+          return new TextRun({ text: part });
+      });
+
+      children.push(new Paragraph({
+        children: textRuns,
+        spacing: {
+          after: 120, // spacing between paragraphs (twips)
+        },
+      }));
     }
 
-    // Split by ** for bold detection
-    const parts = line.split(/(\*\*.*?\*\*)/g);
-    const textRuns = parts.map(part => {
-        if (part.startsWith('**') && part.endsWith('**')) {
-            return new TextRun({
-                text: part.slice(2, -2),
-                bold: true,
-            });
-        }
-        return new TextRun({ text: part });
+    const doc = new Document({
+      sections: [{
+        properties: {},
+        children: children,
+      }],
     });
 
-    children.push(new Paragraph({
-      children: textRuns,
-      spacing: {
-        after: 120, // spacing between paragraphs (twips)
-      },
-    }));
+    const blob = await Packer.toBlob(doc);
+    downloadBlob(blob, `${filename}.docx`);
+  } catch (error) {
+    console.error("DOCX generation error:", error);
+    throw error;
   }
-
-  const doc = new Document({
-    sections: [{
-      properties: {},
-      children: children,
-    }],
-  });
-
-  const blob = await Packer.toBlob(doc);
-  downloadBlob(blob, `${filename}.docx`);
 };
 
 /**
