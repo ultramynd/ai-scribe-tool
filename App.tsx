@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { 
   Microphone, UploadSimple, Sparkle, FileText, Link, Spinner, Cpu, Info, 
   SignIn, SignOut, Users, User, ArrowLeft, ArrowRight, Plus, Checks, 
@@ -142,16 +142,8 @@ const App: React.FC = () => {
           
           const newProgress = Math.min(prev + increment, 99);
           
-          if (prev < 20 && newProgress >= 20) setLogLines(p => [...p, 'Uploading media buffer...']);
-          if (prev < 40 && newProgress >= 40) {
-            let message = 'Analyzing audio waveform...';
-            if (aiProvider === 'gemini') message = geminiModel === 'pro' ? 'Analyzing context (Deep Thinking)...' : 'Analyzing audio waveform...';
-            else if (aiProvider === 'groq') message = 'Groq Whisper V3 Active...';
-            setLogLines(p => [...p, message]);
-          }
-          if (prev < 50 && newProgress >= 50) setLogLines(p => [...p, aiProvider === 'groq' ? 'Processing at warp speed...' : 'Diarizing speakers (Voice Match)...']);
-          if (prev < 70 && newProgress >= 70) setLogLines(p => [...p, aiProvider === 'gemini' ? 'Generating tokens with Gemini...' : (aiProvider === 'groq' ? 'Finalizing transcription...' : 'Processing audio...')]);
-          if (prev < 85 && newProgress >= 85) setLogLines(p => [...p, aiProvider === 'gemini' ? 'Applying intelligent formatting...' : 'Cleaning up text...']);
+          // Technical logs now come from services, keep UI simple here
+          if (prev < 5 && newProgress >= 5) setLogLines(p => [...p, 'Warming up AI engine...']);
           
           return newProgress;
         });
@@ -224,6 +216,8 @@ const App: React.FC = () => {
   const handleTranscribe = async () => {
     setTranscription({ isLoading: true, text: null, error: null });
     setContentType(null);
+    const statusLog = (msg: string) => setLogLines(prev => [...prev.slice(-4), msg]);
+
     try {
       let mediaBlob: Blob | File | null = null;
       let mimeType = '';
@@ -265,7 +259,10 @@ const App: React.FC = () => {
         
       } else if (aiProvider === 'groq') {
         setLogLines(['Initializing Groq Whisper Session...']);
-        text = await transcribeWithGroq(mediaBlob!, { model: 'whisper-large-v3' });
+        text = await transcribeWithGroq(mediaBlob!, { 
+          model: 'whisper-large-v3',
+          onStatus: statusLog
+        });
         text = `**Groq Whisper Transcription**\n\n---\n\n${text}`;
         setContentType("High-Speed Audio");
       } else {
@@ -275,7 +272,8 @@ const App: React.FC = () => {
           mimeType, 
           isAutoEditEnabled, 
           isSpeakerDetectEnabled,
-          geminiModel === 'pro'
+          geminiModel === 'pro',
+          statusLog
         );
         
         // Classify in background

@@ -27,10 +27,17 @@ const getMimeTypeFromExtension = (filename: string): string | null => {
   return ext ? MIME_TYPE_MAP[ext] || null : null;
 };
 
+export type StatusCallback = (message: string) => void;
+
 /**
  * Helper to upload large files to Gemini API
  */
-const uploadFileToGemini = async (mediaFile: File | Blob, mimeType: string): Promise<string> => {
+const uploadFileToGemini = async (
+  mediaFile: File | Blob, 
+  mimeType: string, 
+  onStatus?: StatusCallback
+): Promise<string> => {
+  onStatus?.(`Initializing resumable upload for ${Math.round(mediaFile.size / 1024 / 1024)}MB file...`);
   const uploadUrl = `https://generativelanguage.googleapis.com/upload/v1beta/files?key=${import.meta.env.VITE_GEMINI_API_KEY}`;
   const displayName = mediaFile instanceof File ? mediaFile.name : 'uploaded_media';
   
@@ -56,6 +63,7 @@ const uploadFileToGemini = async (mediaFile: File | Blob, mimeType: string): Pro
   const uploadUrlHeader = initialResponse.headers.get('x-goog-upload-url');
   if (!uploadUrlHeader) throw new Error("Failed to get upload URL");
 
+  onStatus?.("Capturing upload slot (Protocol: Resumable)...");
   const uploadBlob = new Blob([mediaFile], { type: mimeType });
   const uploadResponse = await fetch(uploadUrlHeader, {
     method: 'POST',
@@ -74,10 +82,12 @@ const uploadFileToGemini = async (mediaFile: File | Blob, mimeType: string): Pro
   const fileState = fileInfo.file.state;
 
   if (fileState === 'PROCESSING') {
+     onStatus?.("Server-side processing (AIAudioEngine)...");
      let currentState = fileState;
      let retries = 0;
      while (currentState === 'PROCESSING' && retries < 30) {
          await new Promise(r => setTimeout(r, 2000));
+         onStatus?.(`Analyzing deep features (${retries + 1}/30)...`);
          const pollUrl = `https://generativelanguage.googleapis.com/v1beta/files/${fileInfo.file.name}?key=${import.meta.env.VITE_GEMINI_API_KEY}`;
          const pollResp = await fetch(pollUrl);
          const pollData = await pollResp.json();
@@ -98,153 +108,152 @@ export const transcribeAudio = async (
   mimeType: string, 
   autoEdit: boolean = false, 
   detectSpeakers: boolean = true,
-  useSmartModel: boolean = true
+  useSmartModel: boolean = true,
+  onStatus?: StatusCallback
 ): Promise<string> => {
-  // Debug: Verify API key is loaded from environment
-  console.log("[ScribeAI] API Key loaded:", !!import.meta.env.VITE_GEMINI_API_KEY);
+  const executeWithRetry = async (attempt: number = 0): Promise<string> => {
+    try {
+      if (!import.meta.env.VITE_GEMINI_API_KEY) {
+        throw new Error("API Key is missing. Please check your environment configuration.");
+      }
+      
+      const ai = new GoogleGenAI({ apiKey: import.meta.env.VITE_GEMINI_API_KEY });
+      onStatus?.(`Engine initialized: ${useSmartModel ? '1.5 Pro' : '1.5 Flash'}`);
   
-  if (!import.meta.env.VITE_GEMINI_API_KEY) {
-    throw new Error("API Key is missing. Please check your environment configuration.");
-  }
+      let finalMimeType = mimeType;
+      if (mediaFile instanceof File && mediaFile.name) {
+         const detectedMime = getMimeTypeFromExtension(mediaFile.name);
+         if (detectedMime) finalMimeType = detectedMime;
+      }
+      if (!finalMimeType || finalMimeType === 'application/octet-stream') {
+         finalMimeType = 'audio/mp3';
+      }
 
-  const ai = new GoogleGenAI({ apiKey: import.meta.env.VITE_GEMINI_API_KEY });
-  
-  let finalMimeType = mimeType;
+      const speakerInstruction = detectSpeakers 
+        ? `**Speaker Diarization**: Identify distinct speakers. Listen for names (e.g., "Hi John") and use them. If unknown, use "Speaker 1:", "Speaker 2:", etc.`
+        : `**Speaker Labels**: Use "Speaker 1:" labels.`;
 
-  if (mediaFile instanceof File && mediaFile.name) {
-     const detectedMime = getMimeTypeFromExtension(mediaFile.name);
-     if (detectedMime) {
-         finalMimeType = detectedMime;
-     }
-  }
+      const commonInstructions = `
+        1. ${speakerInstruction}
+        2. **Accents & Dialects**: The audio may contain West African accents, Pidgin English, or mixed languages. 
+           - Transcribe Pidgin/Dialect EXACTLY as spoken. DO NOT translate to standard English. 
+           - Use *italics* for non-English words or heavy Pidgin phrases.
+        3. **Timestamps**: Insert [MM:SS] timestamps at the start of every speaker turn.
+      `;
 
-  if (!finalMimeType || finalMimeType === 'application/octet-stream') {
-     finalMimeType = 'audio/mp3';
-  }
+      const rawPrompt = `
+        Task: Generate a high-accuracy, verbatim transcription.
+        Guidelines:
+        ${commonInstructions}
+        4. **Accuracy**: Capture every word, including stuttering (e.g., "I- I went") and fillers (um, uh) if they add context.
+        5. **Formatting**: Use clear paragraph breaks between speakers.
+      `;
 
-  const speakerInstruction = detectSpeakers 
-    ? `**Speaker Diarization**: Identify distinct speakers. Listen for names (e.g., "Hi John") and use them. If unknown, use "Speaker 1:", "Speaker 2:", etc.`
-    : `**Speaker Labels**: Use "Speaker 1:" labels.`;
+      const autoEditPrompt = `
+        Task: Generate an "Intelligent Verbatim" transcription.
+        Guidelines:
+        ${commonInstructions}
+        4. **Cleanup**: Lightly edit stuttering and excessive fillers (um, uh) to improve readability, BUT preserve the speaker's unique voice and phrasing.
+        5. **Formatting**: Highlight key terms in **bold**.
+      `;
 
-  const commonInstructions = `
-    1. ${speakerInstruction}
-    2. **Accents & Dialects**: The audio may contain West African accents, Pidgin English, or mixed languages. 
-       - Transcribe Pidgin/Dialect EXACTLY as spoken. DO NOT translate to standard English. 
-       - Use *italics* for non-English words or heavy Pidgin phrases.
-    3. **Timestamps**: Insert [MM:SS] timestamps at the start of every speaker turn.
-  `;
+      const modelName = useSmartModel ? 'gemini-1.5-pro' : 'gemini-1.5-flash';
+      const config = useSmartModel ? { thinkingConfig: { thinkingBudget: 2048 } } : undefined;
 
-  const rawPrompt = `
-    Task: Generate a high-accuracy, verbatim transcription.
-    Guidelines:
-    ${commonInstructions}
-    4. **Accuracy**: Capture every word, including stuttering (e.g., "I- I went") and fillers (um, uh) if they add context.
-    5. **Formatting**: Use clear paragraph breaks between speakers.
-  `;
+      let contentPart: any;
+      const MAX_INLINE_SIZE = 18 * 1024 * 1024; 
 
-  const autoEditPrompt = `
-    Task: Generate an "Intelligent Verbatim" transcription.
-    Guidelines:
-    ${commonInstructions}
-    4. **Cleanup**: Lightly edit stuttering and excessive fillers (um, uh) to improve readability, BUT preserve the speaker's unique voice and phrasing.
-    5. **Formatting**: Highlight key terms in **bold**.
-  `;
+      if (mediaFile.size < MAX_INLINE_SIZE) {
+        onStatus?.("Buffering audio for inline execution...");
+        const base64Data = await blobToBase64(mediaFile);
+        contentPart = {
+          inlineData: {
+            mimeType: finalMimeType,
+            data: base64Data
+          }
+        };
+      } else {
+        contentPart = {
+          fileData: {
+            mimeType: finalMimeType,
+            fileUri: await uploadFileToGemini(mediaFile, finalMimeType, onStatus)
+          }
+        };
+      }
 
-  // Select Model
-  const modelName = useSmartModel ? 'gemini-3-pro-preview' : 'gemini-3-flash-preview';
-  
-  const config = useSmartModel ? {
-    thinkingConfig: {
-      thinkingBudget: 2048 
+      onStatus?.("Generating transcription (Deep Inference)...");
+      const response = await ai.models.generateContent({
+        model: modelName,
+        contents: {
+          parts: [
+            contentPart,
+            { text: autoEdit ? autoEditPrompt : rawPrompt }
+          ]
+        },
+        config: config
+      });
+
+      if (response.text) {
+        onStatus?.("Transcription complete. Metadata cached.");
+        return response.text;
+      } else {
+        throw new Error("No transcription generated.");
+      }
+    } catch (error: any) {
+      if (attempt < 2 && (error.message.includes('429') || error.message.includes('503'))) {
+        onStatus?.(`AI busy (Rate Limit). Retrying in ${attempt + 2}s...`);
+        await new Promise(r => setTimeout(r, (attempt + 1) * 2000));
+        return executeWithRetry(attempt + 1);
+      }
+      throw error;
     }
-  } : undefined;
+  };
 
   try {
-    let contentPart: any;
-    const MAX_INLINE_SIZE = 18 * 1024 * 1024; 
-
-    if (mediaFile.size < MAX_INLINE_SIZE) {
-      const base64Data = await blobToBase64(mediaFile);
-      contentPart = {
-        inlineData: {
-          mimeType: finalMimeType,
-          data: base64Data
-        }
-      };
-    } else {
-      const fileUri = await uploadFileToGemini(mediaFile, finalMimeType);
-      contentPart = {
-        fileData: {
-          mimeType: finalMimeType,
-          fileUri: fileUri
-        }
-      };
-    }
-
-    const response = await ai.models.generateContent({
-      model: modelName,
-      contents: {
-        parts: [
-          contentPart,
-          {
-            text: autoEdit ? autoEditPrompt : rawPrompt
-          }
-        ]
-      },
-      config: config
-    });
-
-    if (response.text) {
-      return response.text;
-    } else {
-      throw new Error("No transcription generated.");
-    }
+    return await executeWithRetry();
   } catch (error: any) {
     console.error("Transcription error:", error);
-    
-    // Parse the error for user-friendly messages
     let userMessage = "An unexpected error occurred during transcription.";
     
     if (error?.message) {
       const msg = error.message.toLowerCase();
-      
-      // Check for JSON error response in the message
       if (error.message.includes('"error"')) {
         try {
           const jsonMatch = error.message.match(/\{[\s\S]*\}/);
           if (jsonMatch) {
             const parsed = JSON.parse(jsonMatch[0]);
             const apiError = parsed.error || parsed;
-            
-            if (apiError.status === 'INVALID_ARGUMENT' || apiError.message?.includes('API key not valid')) {
-              userMessage = "Invalid API Key. Please check your API key in the environment settings.";
-            } else if (apiError.status === 'RESOURCE_EXHAUSTED' || apiError.message?.includes('quota')) {
-              userMessage = "Rate limit exceeded. You've hit your daily/minute quota. Please wait and try again later.";
+            if (apiError.status === 'RESOURCE_EXHAUSTED' || apiError.message?.includes('quota')) {
+               userMessage = useSmartModel 
+                 ? "Gemini Pro Rate Limit hit (Free tier is 2 RPM). Please wait 60 seconds or switch to 'Flash' for 15 RPM."
+                 : "Rate limit exceeded. You've hit your Gemini Flash quota. Please wait a minute.";
+            } else if (apiError.status === 'INVALID_ARGUMENT' || apiError.message?.includes('API key not valid')) {
+               userMessage = "Invalid API Key. Please check your API key in the environment settings.";
             } else if (apiError.status === 'PERMISSION_DENIED') {
               userMessage = "Permission denied. Your API key may not have access to this model.";
             } else if (apiError.message) {
               userMessage = apiError.message;
             }
           }
-        } catch (parseErr) {
-          // If JSON parsing fails, fall through to string checks
-        }
+        } catch (e) {}
       }
       
-      // String-based fallback checks
-      if (msg.includes('api key not valid') || msg.includes('invalid_argument')) {
-        userMessage = "Invalid API Key. Please check your API key in the environment settings.";
-      } else if (msg.includes('quota') || msg.includes('rate limit') || msg.includes('resource_exhausted')) {
-        userMessage = "Rate limit exceeded. You've hit your daily/minute quota. Please wait and try again later.";
-      } else if (msg.includes('permission denied')) {
-        userMessage = "Permission denied. Your API key may not have access to this model.";
-      } else if (msg.includes('network') || msg.includes('fetch')) {
-        userMessage = "Network error. Please check your internet connection and try again.";
-      } else if (msg.includes('timeout')) {
-        userMessage = "Request timed out. The audio file may be too large or the server is busy.";
+      if (userMessage === "An unexpected error occurred during transcription.") {
+        if (msg.includes('api key not valid') || msg.includes('invalid_argument')) {
+          userMessage = "Invalid API Key. Please check your API key in the environment settings.";
+        } else if (msg.includes('quota') || msg.includes('rate limit') || msg.includes('resource_exhausted')) {
+          userMessage = useSmartModel 
+            ? "Gemini Pro Rate Limit hit. Please wait 60 seconds or switch to 'Flash'."
+            : "Rate limit exceeded. Please wait a minute.";
+        } else if (msg.includes('permission denied')) {
+          userMessage = "Permission denied. Your API key may not have access to this model.";
+        } else if (msg.includes('network') || msg.includes('fetch')) {
+          userMessage = "Network error. Please check your internet connection and try again.";
+        } else if (msg.includes('timeout')) {
+          userMessage = "Request timed out. The audio file may be too large or the server is busy.";
+        }
       }
     }
-    
     throw new Error(userMessage);
   }
 };

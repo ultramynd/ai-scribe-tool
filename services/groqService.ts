@@ -9,8 +9,11 @@ export const transcribeWithGroq = async (
     language?: string;
     prompt?: string;
     model?: string;
+    onStatus?: (message: string) => void;
   } = {}
 ): Promise<string> => {
+  const { onStatus } = options;
+  onStatus?.(`Initializing Groq engine (${options.model || 'whisper-large-v3'})...`);
   const apiKey = import.meta.env.VITE_GROQ_API_KEY;
 
   if (!apiKey) {
@@ -38,6 +41,7 @@ export const transcribeWithGroq = async (
     else if (type.includes('m4a')) filename = 'audio.m4a';
   }
 
+  onStatus?.(`Buffering audio payload (${sizeInMB.toFixed(1)}MB)...`);
   formData.append('file', mediaFile, filename);
   formData.append('model', options.model || 'whisper-large-v3');
   
@@ -52,6 +56,7 @@ export const transcribeWithGroq = async (
   formData.append('response_format', 'text');
 
   try {
+    onStatus?.("Dispatching to Groq edge network...");
     const response = await fetch('https://api.groq.com/openai/v1/audio/transcriptions', {
       method: 'POST',
       headers: {
@@ -59,6 +64,8 @@ export const transcribeWithGroq = async (
       },
       body: formData
     });
+
+    onStatus?.("Groq is processing at warp speed...");
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
