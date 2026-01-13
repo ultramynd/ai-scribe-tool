@@ -4,7 +4,7 @@ import {
   SignIn, SignOut, Users, User, ArrowLeft, ArrowRight, Plus, Checks, 
   FloppyDisk, Lightning, Terminal, Moon, Sun, WarningCircle, X, Brain, 
   SpeakerHigh, Eye, PencilSimple, Copy, CloudArrowDown, Export, Check,
-  CaretDown, List, Trash
+  CaretDown, List, Trash, Clock
 } from '@phosphor-icons/react';
 import AudioRecorder from './components/AudioRecorder';
 import FileUploader from './components/FileUploader';
@@ -64,8 +64,14 @@ const App: React.FC = () => {
   const [isEditorMode, setIsEditorMode] = useState(false); // Read vs Edit mode
   const [showAiSidebar, setShowAiSidebar] = useState(false); // AI features sidebar
   const [archiveItems, setArchiveItems] = useState<ArchiveItem[]>(() => {
-    const saved = localStorage.getItem('archive_items');
-    return saved ? JSON.parse(saved) : [];
+    try {
+      const saved = localStorage.getItem('archive_items');
+      const parsed = saved ? JSON.parse(saved) : [];
+      return Array.isArray(parsed) ? parsed : [];
+    } catch (e) {
+      console.error('Failed to parse archive items:', e);
+      return [];
+    }
   });
   const [showArchiveSidebar, setShowArchiveSidebar] = useState(false);
   const [isPickerOpen, setIsPickerOpen] = useState(false);
