@@ -37,10 +37,32 @@ const UrlLoader: React.FC<UrlLoaderProps> = ({ onFileLoaded, isLoading, googleAc
 
     gapi.load('picker', {
         callback: () => {
+            // High-end Media View
+            const audioView = new google.picker.DocsView(google.picker.ViewId.DOCS)
+                .setMimeTypes('audio/*')
+                .setLabel('Audio Files')
+                .setIncludeFolders(true);
+
+            const videoView = new google.picker.DocsView(google.picker.ViewId.DOCS)
+                .setMimeTypes('video/*')
+                .setLabel('Video Files')
+                .setIncludeFolders(true);
+
+            const recentView = new google.picker.DocsView(google.picker.ViewId.RECENTLY_PICKED)
+                .setMimeTypes('audio/*,video/*')
+                .setLabel('Recently Used');
+
             const picker = new google.picker.PickerBuilder()
-                .addView(new google.picker.DocsView().setMimeTypes('audio/*,video/*').setIncludeFolders(true))
+                .addView(audioView)
+                .addView(videoView)
+                .addView(recentView)
                 .setOAuthToken(googleAccessToken)
                 .setDeveloperKey(apiKey)
+                .enableFeature(google.picker.Feature.NAV_HIDDEN)
+                .enableFeature(google.picker.Feature.SUPPORT_DRIVES) // Professional 'Shared Drives' support
+                .setSize(1050, 700) // Much larger desktop-class view
+                .setOrigin(window.location.protocol + '//' + window.location.host)
+                .setTitle('Select Media for ScribeAI')
                 .setCallback((data: any) => {
                     if (data.action === google.picker.Action.PICKED) {
                         const doc = data.docs[0];
@@ -209,25 +231,52 @@ const UrlLoader: React.FC<UrlLoaderProps> = ({ onFileLoaded, isLoading, googleAc
                      )}
                   </div>
                 ) : (
-                 <button
-                   onClick={handleDrivePicker}
-                   disabled={isLoading || fetchStatus === 'loading'}
-                   className="w-full flex items-center justify-center gap-3 bg-white dark:bg-dark-bg border border-gray-300 dark:border-dark-border text-gray-700 dark:text-dark-text font-medium py-3 px-4 rounded-xl hover:bg-gray-50 dark:hover:bg-dark-border transition-all shadow-sm group"
-                 >
-                   {fetchStatus === 'loading' ? (
-                     <Spinner className="animate-spin text-primary dark:text-accent" size={20} weight="bold" />
-                   ) : (
-                     <svg className="w-5 h-5 group-hover:scale-110 transition-transform" viewBox="0 0 87.3 78" xmlns="http://www.w3.org/2000/svg">
-                        <path d="m6.6 66.85 3.85 6.65c.8 1.4 1.95 2.5 3.3 3.3l13.75-23.8h-27.5c0 1.55.4 3.1 1.2 4.5z" fill="#0066da"/>
-                        <path d="m43.65 25-13.75-23.8c-1.35.8-2.5 1.9-3.3 3.3l-25.4 44a9.06 9.06 0 0 0 -1.2 4.5h27.5z" fill="#00ac47"/>
-                        <path d="m73.55 76.8c1.35-.8 2.5-1.9 3.3-3.3l1.6-2.75 7.65-13.25c.8-1.4 1.2-2.95 1.2-4.5h-27.502l5.852 11.5z" fill="#ea4335"/>
-                        <path d="m43.65 25 13.75-23.8c-1.35-.8-2.9-1.2-4.5-1.2h-18.5c-1.6 0-3.15.4-4.5 1.2z" fill="#00832d"/>
-                        <path d="m59.8 53h-27.5l-13.75 23.8c1.35.8 2.9 1.2 4.5 1.2h50.5c1.6 0 3.15-.4 4.5-1.2z" fill="#2684fc"/>
-                        <path d="m73.4 26.5-12.7-22c-.8-1.4-1.95-2.5-3.3-3.3l-13.75 23.8 29.75 51.5c.8-1.4 1.2-2.95 1.2-4.5v-28.5c0-1.55-.4-3.1-1.2-4.5z" fill="#ffba00"/>
-                     </svg>
-                   )}
-                   <span>Browse Google Drive</span>
-                 </button>
+                  <button
+                    onClick={handleDrivePicker}
+                    disabled={isLoading || fetchStatus === 'loading'}
+                    className={`w-full overflow-hidden relative group transition-all duration-500 rounded-xl border ${
+                      fetchStatus === 'loading' 
+                        ? 'bg-slate-900 dark:bg-dark-card border-transparent py-4' 
+                        : 'bg-white dark:bg-white/5 border-gray-300 dark:border-white/10 py-3 hover:bg-gray-50 dark:hover:bg-white/10 shadow-sm'
+                    }`}
+                  >
+                    {fetchStatus === 'loading' ? (
+                      <div className="w-full px-6">
+                        <div className="flex items-center justify-between mb-2">
+                           <span className="text-[10px] font-black uppercase tracking-widest text-primary dark:text-accent animate-pulse">Importing...</span>
+                           <Spinner className="animate-spin text-primary dark:text-accent" size={14} weight="bold" />
+                        </div>
+                        <div className="h-1.5 w-full bg-white/10 dark:bg-white/5 rounded-full overflow-hidden">
+                           <div className="h-full bg-gradient-to-r from-primary to-accent animate-[loading_2s_infinite] w-full origin-left overflow-hidden relative">
+                              <div className="absolute inset-0 bg-white/30 animate-[shimmer_2s_infinite]"></div>
+                           </div>
+                        </div>
+                        <style>{`
+                           @keyframes loading {
+                              0% { transform: scaleX(0); }
+                              50% { transform: scaleX(0.5); }
+                              100% { transform: scaleX(1); }
+                           }
+                           @keyframes shimmer {
+                              0% { transform: translateX(-100%); }
+                              100% { transform: translateX(100%); }
+                           }
+                        `}</style>
+                      </div>
+                    ) : (
+                      <div className="flex items-center justify-center gap-3">
+                        <svg className="w-5 h-5 group-hover:scale-110 transition-transform" viewBox="0 0 87.3 78" xmlns="http://www.w3.org/2000/svg">
+                           <path d="m6.6 66.85 3.85 6.65c.8 1.4 1.95 2.5 3.3 3.3l13.75-23.8h-27.5c0 1.55.4 3.1 1.2 4.5z" fill="#0066da"/>
+                           <path d="m43.65 25-13.75-23.8c-1.35.8-2.5 1.9-3.3 3.3l-25.4 44a9.06 9.06 0 0 0 -1.2 4.5h27.5z" fill="#00ac47"/>
+                           <path d="m73.55 76.8c1.35-.8 2.5-1.9 3.3-3.3l1.6-2.75 7.65-13.25c.8-1.4 1.2-2.95 1.2-4.5h-27.502l5.852 11.5z" fill="#ea4335"/>
+                           <path d="m43.65 25 13.75-23.8c-1.35-.8-2.9-1.2-4.5-1.2h-18.5c-1.6 0-3.15.4-4.5 1.2z" fill="#00832d"/>
+                           <path d="m59.8 53h-27.5l-13.75 23.8c1.35.8 2.9 1.2 4.5 1.2h50.5c1.6 0 3.15-.4 4.5-1.2z" fill="#2684fc"/>
+                           <path d="m73.4 26.5-12.7-22c-.8-1.4-1.95-2.5-3.3-3.3l-13.75 23.8 29.75 51.5c.8-1.4 1.2-2.95 1.2-4.5v-28.5c0-1.55-.4-3.1-1.2-4.5z" fill="#ffba00"/>
+                        </svg>
+                        <span className="text-gray-700 dark:text-dark-text font-medium">Browse Google Drive</span>
+                      </div>
+                    )}
+                  </button>
                )}
             </div>
 

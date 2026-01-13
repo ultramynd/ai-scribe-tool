@@ -87,39 +87,27 @@ const App: React.FC = () => {
   }, [transcription.text]);
 
   useEffect(() => {
-    const loadScript = (src: string) => {
-      return new Promise<void>((resolve, reject) => {
-        if (document.querySelector(`script[src="${src}"]`)) { resolve(); return; }
-        const script = document.createElement('script');
-        script.src = src;
-        script.async = true;
-        script.defer = true;
-        script.onload = () => resolve();
-        script.onerror = reject;
-        document.body.appendChild(script);
-      });
-    };
-
-    Promise.all([
-      loadScript('https://apis.google.com/js/api.js'),
-      loadScript('https://accounts.google.com/gsi/client'),
-    ]).then(() => setDriveScriptsLoaded(true)).catch(err => console.error(err));
+    setDriveScriptsLoaded(true);
   }, []);
+
+  const tokenClientRef = useRef<any>(null);
 
   const handleGoogleLogin = () => {
     if (!googleClientId || !driveScriptsLoaded) return;
     setIsLoggingIn(true);
     const google = (window as any).google;
     try {
-      const tokenClient = google.accounts.oauth2.initTokenClient({
-        client_id: googleClientId,
-        scope: 'https://www.googleapis.com/auth/drive.readonly https://www.googleapis.com/auth/drive.file',
-        callback: (response: any) => {
-          setIsLoggingIn(false);
-          if (response.access_token) setGoogleAccessToken(response.access_token);
-        },
-      });
-      tokenClient.requestAccessToken({ prompt: 'consent' });
+      if (!tokenClientRef.current) {
+        tokenClientRef.current = google.accounts.oauth2.initTokenClient({
+          client_id: googleClientId,
+          scope: 'https://www.googleapis.com/auth/drive.readonly https://www.googleapis.com/auth/drive.file',
+          callback: (response: any) => {
+            setIsLoggingIn(false);
+            if (response.access_token) setGoogleAccessToken(response.access_token);
+          },
+        });
+      }
+      tokenClientRef.current.requestAccessToken({ prompt: 'consent' });
     } catch (e) {
       setIsLoggingIn(false);
     }
@@ -733,7 +721,7 @@ const App: React.FC = () => {
       <main className="max-w-5xl mx-auto px-6 py-16 w-full flex-1 flex flex-col z-10">
         
         {!activeTab ? (
-          <div className="flex flex-col flex-1 justify-center animate-in fade-in slide-in-from-bottom-6 duration-1000">
+          <div className="flex flex-col flex-1 justify-center animate-in fade-in slide-in-from-bottom-3 duration-300">
             <div className="text-center mb-20 space-y-6">
               <div className="inline-flex items-center gap-2.5 px-4 py-1.5 rounded-full bg-white/50 dark:bg-dark-card/40 backdrop-blur-md border border-white dark:border-white/5 shadow-sm mx-auto">
                 <div className="relative flex h-1.5 w-1.5">
@@ -809,7 +797,7 @@ const App: React.FC = () => {
             </div>
           </div>
         ) : (
-          <div className="animate-in fade-in zoom-in-95 duration-500 max-w-2xl mx-auto w-full">
+          <div className="animate-in fade-in zoom-in-95 duration-200 max-w-2xl mx-auto w-full">
             <button 
               onClick={() => safeNavigation(() => setActiveTab(null))}
               className="mb-8 flex items-center gap-3 text-slate-400 hover:text-primary dark:hover:text-accent font-bold text-sm transition-all group"
@@ -877,7 +865,7 @@ const App: React.FC = () => {
                   </div>
 
                   {/* Configuration & Action Area */}
-                  <div className={`mt-10 transition-all duration-700 ${isReadyToTranscribe() ? 'opacity-100 translate-y-0' : 'opacity-30 translate-y-4 pointer-events-none'}`}>
+                  <div className={`mt-10 transition-all duration-300 ${isReadyToTranscribe() ? 'opacity-100 translate-y-0' : 'opacity-30 translate-y-4 pointer-events-none'}`}>
                      
                      <div className="flex flex-col gap-4 max-w-sm mx-auto">
                         <div className="flex items-center justify-center gap-3">
