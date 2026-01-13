@@ -158,7 +158,7 @@ export const transcribeAudio = async (
         5. **Formatting**: Highlight key terms in **bold**.
       `;
 
-      const modelName = useSmartModel ? 'gemini-1.5-pro-002' : 'gemini-1.5-flash-002';
+      const modelName = useSmartModel ? 'gemini-pro-latest' : 'gemini-flash-latest';
       // Note: thinkingConfig is only for specific experimental models. Removing to ensure stability with 1.5 Pro.
       const config = undefined;
 
@@ -265,7 +265,7 @@ export const transcribeAudio = async (
  */
 export const analyzeVideoContent = async (mediaFile: File | Blob): Promise<string> => {
   const ai = new GoogleGenAI({ apiKey: import.meta.env.VITE_GEMINI_API_KEY });
-  const model = "gemini-1.5-pro-002";
+  const model = "gemini-pro-latest";
 
   let finalMimeType = mediaFile.type;
   if (mediaFile instanceof File && mediaFile.name) {
@@ -327,7 +327,7 @@ export const analyzeVideoContent = async (mediaFile: File | Blob): Promise<strin
  */
 export const classifyContent = async (text: string): Promise<string> => {
   const ai = new GoogleGenAI({ apiKey: import.meta.env.VITE_GEMINI_API_KEY });
-  const model = "gemini-1.5-flash-002";
+  const model = "gemini-flash-latest";
   const sample = text.substring(0, 2000);
   const prompt = `Classify this text into one category: Song, Podcast, Interview, Meeting, Lecture, Video, Voice Note, News. Return ONLY the category name.\n\nText:\n${sample}`;
 
@@ -341,7 +341,7 @@ export const classifyContent = async (text: string): Promise<string> => {
 
 export const summarizeText = async (text: string): Promise<string> => {
   const ai = new GoogleGenAI({ apiKey: import.meta.env.VITE_GEMINI_API_KEY });
-  const model = "gemini-1.5-pro-002"; 
+  const model = "gemini-pro-latest"; 
   const prompt = `
     Provide a comprehensive analysis of this transcript consisting of:
     1. **Executive Summary**: A concise high-level overview (1-2 paragraphs).
@@ -366,7 +366,7 @@ export const summarizeText = async (text: string): Promise<string> => {
  */
 export const enhanceFormatting = async (text: string, contextType: string = "General"): Promise<string> => {
   const ai = new GoogleGenAI({ apiKey: import.meta.env.VITE_GEMINI_API_KEY });
-  const model = "gemini-1.5-pro-002";
+  const model = "gemini-pro-latest";
   
   const prompt = `
     You are an expert editor. Improve the formatting of the following transcript.
@@ -395,7 +395,7 @@ export const enhanceFormatting = async (text: string, contextType: string = "Gen
  */
 export const extractKeyMoments = async (text: string): Promise<string> => {
   const ai = new GoogleGenAI({ apiKey: import.meta.env.VITE_GEMINI_API_KEY });
-  const model = "gemini-1.5-pro-002";
+  const model = "gemini-pro-latest";
   
   const prompt = `
     Analyze this transcript and extract the most important "Key Moments". 
@@ -423,7 +423,7 @@ export const extractKeyMoments = async (text: string): Promise<string> => {
  */
 export const findDiscussionBounds = async (text: string): Promise<string> => {
   const ai = new GoogleGenAI({ apiKey: import.meta.env.VITE_GEMINI_API_KEY });
-  const model = "gemini-1.5-flash-002";
+  const model = "gemini-flash-latest";
   
   const prompt = `
     Look at this transcript and identify exactly where the main discussion starts and ends. 
@@ -446,7 +446,7 @@ export const findDiscussionBounds = async (text: string): Promise<string> => {
  */
 export const stripPleasantries = async (text: string): Promise<string> => {
   const ai = new GoogleGenAI({ apiKey: import.meta.env.VITE_GEMINI_API_KEY });
-  const model = "gemini-1.5-pro-002";
+  const model = "gemini-pro-latest";
   
   const prompt = `
     You are a professional editor. Rewrite this transcript to remove all pleasantries, "small talk", filler intros (like "how are you today", "thank you for having me"), and outros that don't contribute to the core subject matter.
