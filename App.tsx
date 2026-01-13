@@ -1,11 +1,18 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Mic, Upload, Sparkles, FileText, Link, Sparkle, Loader2, Cpu, Info, LogIn, LogOut, Users, User, ArrowLeft, ArrowRight, Plus, CheckCheck, Save, Zap, Terminal, Moon, Sun, AlertTriangle, X, Brain, Volume2, Eye, Edit3, Copy, DownloadCloud, FileOutput, Check } from 'lucide-react';
+import { 
+  Microphone, UploadSimple, Sparkle, FileText, Link, Spinner, Cpu, Info, 
+  SignIn, SignOut, Users, User, ArrowLeft, ArrowRight, Plus, Checks, 
+  FloppyDisk, Lightning, Terminal, Moon, Sun, WarningCircle, X, Brain, 
+  SpeakerHigh, Eye, PencilSimple, Copy, CloudArrowDown, Export, Check,
+  CaretDown, List, Trash
+} from '@phosphor-icons/react';
 import AudioRecorder from './components/AudioRecorder';
 import FileUploader from './components/FileUploader';
 import UrlLoader from './components/UrlLoader';
 import TranscriptionEditor from './components/TranscriptionEditor';
 import { AudioSource, AudioFile, TranscriptionState } from './types';
 import { transcribeAudio, classifyContent } from './services/geminiService';
+import { transcribeWithGroq } from './services/groqService';
 import { transcribeWithWebSpeech, isWebSpeechSupported } from './services/webSpeechService';
 
 const App: React.FC = () => {
@@ -37,8 +44,8 @@ const App: React.FC = () => {
   // Config States
   const [isAutoEditEnabled, setIsAutoEditEnabled] = useState(true);
   const [isSpeakerDetectEnabled, setIsSpeakerDetectEnabled] = useState(true);
-  const [isSmartModelEnabled, setIsSmartModelEnabled] = useState(true);
-  const [useFallbackMode, setUseFallbackMode] = useState(false); // Browser-based transcription
+  const [aiProvider, setAiProvider] = useState<'gemini' | 'groq' | 'webspeech'>('gemini');
+  const [geminiModel, setGeminiModel] = useState<'flash' | 'pro'>('pro');
 
   // Auth States
   const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
@@ -143,19 +150,24 @@ const App: React.FC = () => {
           const newProgress = Math.min(prev + increment, 98);
           
           if (prev < 20 && newProgress >= 20) setLogLines(p => [...p, 'Uploading media buffer...']);
-          if (prev < 40 && newProgress >= 40) setLogLines(p => [...p, isSmartModelEnabled ? 'Analyzing context (Deep Thinking)...' : 'Analyzing audio waveform...']);
-          if (prev < 50 && newProgress >= 50) setLogLines(p => [...p, 'Diarizing speakers (Voice Match)...']);
-          if (prev < 70 && newProgress >= 70) setLogLines(p => [...p, 'Generating tokens with Gemini...']);
-          if (prev < 85 && newProgress >= 85) setLogLines(p => [...p, 'Applying intelligent formatting...']);
+          if (prev < 40 && newProgress >= 40) {
+            let message = 'Analyzing audio waveform...';
+            if (aiProvider === 'gemini') message = geminiModel === 'pro' ? 'Analyzing context (Deep Thinking)...' : 'Analyzing audio waveform...';
+            else if (aiProvider === 'groq') message = 'Groq Whisper V3 Active...';
+            setLogLines(p => [...p, message]);
+          }
+          if (prev < 50 && newProgress >= 50) setLogLines(p => [...p, aiProvider === 'groq' ? 'Processing at warp speed...' : 'Diarizing speakers (Voice Match)...']);
+          if (prev < 70 && newProgress >= 70) setLogLines(p => [...p, aiProvider === 'gemini' ? 'Generating tokens with Gemini...' : (aiProvider === 'groq' ? 'Finalizing transcription...' : 'Processing audio...')]);
+          if (prev < 85 && newProgress >= 85) setLogLines(p => [...p, aiProvider === 'gemini' ? 'Applying intelligent formatting...' : 'Cleaning up text...']);
           
           return newProgress;
         });
-      }, isSmartModelEnabled ? 200 : 150); // Slower progress for smart model
+      }, aiProvider === 'gemini' && geminiModel === 'pro' ? 200 : 120); // Groq/Gemini Flash are faster
     } else if (transcription.text) {
       setProgress(100);
     }
     return () => clearInterval(interval);
-  }, [transcription.isLoading, transcription.text, isSmartModelEnabled]);
+  }, [transcription.isLoading, transcription.text, aiProvider, geminiModel]);
 
   useEffect(() => {
     return () => { if (micUrl) URL.revokeObjectURL(micUrl); };
@@ -215,7 +227,7 @@ const App: React.FC = () => {
       let text: string;
       
       // Check if using fallback (browser-based) transcription
-      if (useFallbackMode) {
+      if (aiProvider === 'webspeech') {
         if (!isWebSpeechSupported()) {
           throw new Error("Web Speech API is not supported in your browser. Please use Chrome, Edge, or Safari.");
         }
@@ -237,14 +249,19 @@ const App: React.FC = () => {
         text = `**Browser Transcription** (Web Speech API)\n\n---\n\n${text}`;
         setContentType("Voice Note");
         
+      } else if (aiProvider === 'groq') {
+        setLogLines(['Initializing Groq Whisper Session...']);
+        text = await transcribeWithGroq(mediaBlob!, { model: 'whisper-large-v3' });
+        text = `**Groq Whisper Transcription**\n\n---\n\n${text}`;
+        setContentType("High-Speed Audio");
       } else {
-        // Use AI transcription
+        // Use Gemini transcription
         text = await transcribeAudio(
           mediaBlob!, 
           mimeType, 
           isAutoEditEnabled, 
           isSpeakerDetectEnabled,
-          isSmartModelEnabled
+          geminiModel === 'pro'
         );
         
         // Classify in background
@@ -332,7 +349,7 @@ const App: React.FC = () => {
           <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-in fade-in duration-200">
              <div className="bg-white dark:bg-dark-card border border-slate-200 dark:border-dark-border w-full max-w-sm rounded-2xl shadow-2xl p-6 relative">
                 <div className="w-12 h-12 bg-red-100 dark:bg-red-900/20 rounded-full flex items-center justify-center mb-4 text-red-600 dark:text-red-400">
-                   <AlertTriangle size={24} />
+                   <WarningCircle size={24} weight="duotone" />
                 </div>
                 <h3 className="text-xl font-bold text-slate-900 dark:text-white mb-2">Unsaved Changes</h3>
                 <p className="text-slate-500 dark:text-dark-muted mb-6 leading-relaxed">
@@ -363,7 +380,7 @@ const App: React.FC = () => {
             <div className="flex items-center gap-6">
               <div className="flex items-center gap-3 cursor-pointer group" onClick={() => safeNavigation(clearAll)}>
                 <div className="bg-gradient-to-tr from-primary to-purple-600 p-2.5 rounded-2xl text-white shadow-xl shadow-primary/20 group-hover:scale-110 group-hover:rotate-3 transition-all duration-500">
-                  <Zap size={20} fill="currentColor" className="text-white" />
+                  <Lightning size={20} weight="fill" className="text-white" />
                 </div>
                 <div className="text-xl font-extrabold tracking-tight text-slate-900 dark:text-white hidden sm:flex items-center gap-2">
                   <span>Scribe<span className="text-primary dark:text-accent">AI</span></span>
@@ -378,14 +395,14 @@ const App: React.FC = () => {
                   onClick={() => setIsEditorMode(false)}
                   className={`flex items-center gap-2 px-5 py-2 rounded-xl text-xs font-bold transition-all ${!isEditorMode ? 'bg-white dark:bg-dark-card text-primary dark:text-accent shadow-md' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}
                 >
-                  <Eye size={14}/>
+                  <Eye size={14} weight="duotone" />
                   <span className="hidden md:inline">Read</span>
                 </button>
                 <button 
                   onClick={() => setIsEditorMode(true)}
                   className={`flex items-center gap-2 px-5 py-2 rounded-xl text-xs font-bold transition-all ${isEditorMode ? 'bg-white dark:bg-dark-card text-primary dark:text-accent shadow-md' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}
                 >
-                  <Edit3 size={14}/>
+                  <PencilSimple size={14} weight="duotone" />
                   <span className="hidden md:inline">Edit</span>
                 </button>
               </div>
@@ -396,7 +413,7 @@ const App: React.FC = () => {
               {/* Copy As Dropdown */}
               <div className="relative group">
                 <button className="flex items-center gap-1.5 px-3 py-2 rounded-2xl text-xs font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-dark-card transition-all">
-                  <Copy size={16} strokeWidth={2} />
+                  <Copy size={16} weight="duotone" />
                   <span>Copy As</span>
                 </button>
                 <div className="absolute top-full left-0 mt-2 opacity-0 group-hover:opacity-100 pointer-events-none group-hover:pointer-events-auto transition-all duration-200 scale-95 group-hover:scale-100 origin-top-left z-50">
@@ -422,7 +439,7 @@ const App: React.FC = () => {
                       }}
                       className="w-full flex items-center gap-2 px-2.5 py-2 text-left text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-white/5 rounded-lg transition-colors"
                     >
-                      <FileOutput size={14} className="text-slate-400"/>
+                      <Export size={14} weight="duotone" className="text-slate-400"/>
                       HTML
                     </button>
                     <button 
@@ -447,7 +464,7 @@ const App: React.FC = () => {
                   onClick={() => setShowAiSidebar(!showAiSidebar)}
                   className={`flex items-center gap-1.5 px-3 py-2 rounded-2xl text-xs font-bold transition-all ${showAiSidebar ? 'bg-primary/10 text-primary' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-dark-card'}`}
                 >
-                  <Sparkles size={16} strokeWidth={2} className="text-primary dark:text-accent"/>
+                  <Sparkle size={16} weight="duotone" className="text-primary dark:text-accent"/>
                   <span className="bg-gradient-to-r from-primary to-purple-600 bg-clip-text text-transparent">AI Features</span>
                 </button>
               </div>
@@ -455,7 +472,7 @@ const App: React.FC = () => {
               {/* Export Dropdown */}
               <div className="relative group">
                 <button className="flex items-center gap-1.5 px-3 py-2 rounded-2xl bg-slate-900 dark:bg-white text-white dark:text-slate-900 text-xs font-bold hover:opacity-90 transition-all shadow-lg shadow-slate-900/10">
-                  <DownloadCloud size={16} strokeWidth={2}/>
+                  <CloudArrowDown size={16} weight="duotone" />
                   <span>Export</span>
                 </button>
                 
@@ -466,21 +483,21 @@ const App: React.FC = () => {
                           disabled={isSavingToDrive}
                           className="w-full flex items-center gap-2.5 px-3 py-2.5 text-left text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-dark-bg rounded-lg transition-colors"
                         >
-                          <Save size={14} className="text-emerald-500"/>
+                          <FloppyDisk size={14} weight="duotone" className="text-emerald-500"/>
                           Save to Drive
                         </button>
                         <button 
                           onClick={() => {}}
                           className="w-full flex items-center gap-2.5 px-3 py-2.5 text-left text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-dark-bg rounded-lg transition-colors"
                         >
-                          <FileText size={14} className="text-slate-400"/>
+                          <FileText size={14} weight="duotone" className="text-slate-400"/>
                           Text File (.txt)
                         </button>
                         <button 
                           onClick={() => {}}
                           className="w-full flex items-center gap-2.5 px-3 py-2.5 text-left text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-dark-bg rounded-lg transition-colors"
                         >
-                          <FileOutput size={14} className="text-blue-500"/>
+                          <Export size={14} weight="duotone" className="text-blue-500"/>
                           Word Document (.docx)
                         </button>
                     </div>
@@ -494,14 +511,14 @@ const App: React.FC = () => {
                 className="w-9 h-9 rounded-xl flex items-center justify-center text-slate-500 hover:text-primary hover:bg-slate-100 dark:hover:bg-dark-card transition-all"
                 title="Toggle Theme"
               >
-                {darkMode ? <Sun size={16} /> : <Moon size={16} />}
+                {darkMode ? <Sun size={16} weight="duotone" /> : <Moon size={16} weight="duotone" />}
               </button>
 
               <button 
                 onClick={() => safeNavigation(clearAll)}
                 className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-primary/10 text-primary dark:text-accent hover:bg-primary/20 transition-all font-semibold text-xs"
               >
-                <Plus size={14} />
+                <Plus size={14} weight="bold" />
                 New
               </button>
             </div>
@@ -559,7 +576,7 @@ const App: React.FC = () => {
                
                <div className="absolute inset-0 flex items-center justify-center">
                  <div className="w-24 h-24 bg-dark-bg rounded-full border border-primary/50 flex items-center justify-center shadow-[0_0_30px_rgba(113,0,150,0.3)]">
-                    <Sparkles size={32} className="text-accent animate-pulse" />
+                    <Sparkle size={32} weight="duotone" className="text-accent animate-pulse" />
                  </div>
                </div>
             </div>
@@ -567,8 +584,8 @@ const App: React.FC = () => {
             <div className="text-center mb-12">
               <h2 className="text-4xl font-bold bg-clip-text text-transparent bg-gradient-to-b from-white to-gray-400 mb-4 tracking-tight">Processing Media</h2>
               <div className="text-accent/80 font-mono text-xs uppercase tracking-widest flex items-center justify-center gap-2">
-                 <Cpu size={14} />
-                 <span>{isSmartModelEnabled ? 'Gemini 3 Pro + Thinking' : 'Gemini 3 Flash'}</span>
+                 <Cpu size={14} weight="duotone" />
+                 <span>{aiProvider === 'gemini' ? (geminiModel === 'pro' ? 'Gemini 3 Pro + Thinking' : 'Gemini 3 Flash') : (aiProvider === 'groq' ? 'Groq Whisper V3' : 'Browser WebSpeech')}</span>
               </div>
             </div>
 
@@ -627,7 +644,7 @@ const App: React.FC = () => {
         <div className="max-w-5xl mx-auto px-6 h-20 flex items-center justify-between text-slate-900 dark:text-white">
           <div className="flex items-center gap-3 cursor-pointer group" onClick={() => safeNavigation(clearAll)}>
             <div className="bg-gradient-to-tr from-primary to-purple-600 p-2.5 rounded-2xl text-white shadow-xl shadow-primary/20 group-hover:scale-110 group-hover:rotate-3 transition-all duration-500">
-              <Zap size={20} fill="currentColor" className="text-white" />
+              <Lightning size={20} weight="fill" className="text-white" />
             </div>
             <div className="flex flex-col">
               <div className="text-xl font-extrabold tracking-tight flex items-center gap-2 leading-none">
@@ -644,7 +661,7 @@ const App: React.FC = () => {
                onClick={() => setDarkMode(!darkMode)}
                className="w-10 h-10 rounded-2xl flex items-center justify-center hover:bg-white/50 dark:hover:bg-dark-card/50 hover:text-primary dark:hover:text-accent transition-all duration-300 border border-transparent hover:border-white/50 dark:hover:border-white/10"
              >
-               {darkMode ? <Sun size={20} /> : <Moon size={20} />}
+               {darkMode ? <Sun size={20} weight="duotone" /> : <Moon size={20} weight="duotone" />}
              </button>
 
              {driveScriptsLoaded && (
@@ -655,7 +672,7 @@ const App: React.FC = () => {
                      onClick={handleGoogleLogout}
                      className="p-1.5 text-slate-400 dark:text-dark-muted hover:text-red-500 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-xl transition-all"
                    >
-                     <LogOut size={16} />
+                     <SignOut size={16} weight="duotone" />
                    </button>
                  </div>
                ) : (
@@ -665,7 +682,7 @@ const App: React.FC = () => {
                       disabled={isLoggingIn}
                       className="flex items-center gap-2 text-xs font-bold text-slate-700 dark:text-dark-text hover:text-primary dark:hover:text-accent px-5 py-2.5 rounded-2xl bg-white/50 dark:bg-dark-card/50 border border-white/60 dark:border-white/5 hover:border-primary/30 transition-all shadow-sm"
                    >
-                     {isLoggingIn ? <Loader2 size={16} className="animate-spin" /> : <LogIn size={16} />}
+                     {isLoggingIn ? <Spinner size={16} weight="bold" className="animate-spin" /> : <SignIn size={16} weight="duotone" />}
                      <span>Sign In</span>
                    </button>
                  ) : null
@@ -699,9 +716,9 @@ const App: React.FC = () => {
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-6xl mx-auto">
               {[
-                { id: AudioSource.MICROPHONE, icon: <Mic size={28} />, title: "Record", desc: "Capture voice notes or meetings directly.", color: "text-primary", bg: "bg-primary/5", accent: "primary" },
-                { id: AudioSource.FILE, icon: <Upload size={28} />, title: "Upload", desc: "Transcribe MP3, WAV, or MP4 files.", color: "text-accent", bg: "bg-accent/5", accent: "accent" },
-                { id: AudioSource.URL, icon: <Link size={28} />, title: "Import", desc: "Load from public URL or Google Drive.", color: "text-emerald-500", bg: "bg-emerald-500/5", accent: "emerald-500" },
+                { id: AudioSource.MICROPHONE, icon: <Microphone size={28} weight="duotone" />, title: "Record", desc: "Capture voice notes or meetings directly.", color: "text-primary", bg: "bg-primary/5", accent: "primary" },
+                { id: AudioSource.FILE, icon: <UploadSimple size={28} weight="duotone" />, title: "Upload", desc: "Transcribe MP3, WAV, or MP4 files.", color: "text-accent", bg: "bg-accent/5", accent: "accent" },
+                { id: AudioSource.URL, icon: <Link size={28} weight="duotone" />, title: "Import", desc: "Load from public URL or Google Drive.", color: "text-emerald-500", bg: "bg-emerald-500/5", accent: "emerald-500" },
               ].map((card) => (
                 <button 
                   key={card.id}
@@ -716,7 +733,7 @@ const App: React.FC = () => {
                     {card.desc}
                   </p>
                   <div className={`${card.color} font-semibold text-sm flex items-center gap-1.5 transition-all duration-200 group-hover:gap-2.5`}>
-                    Start <ArrowRight size={14} className="transition-transform duration-200 group-hover:translate-x-0.5" />
+                    Start <ArrowRight size={14} weight="bold" className="transition-transform duration-200 group-hover:translate-x-0.5" />
                   </div>
                 </button>
               ))}
@@ -732,23 +749,23 @@ const App: React.FC = () => {
                 className="group flex items-center gap-4 px-2 py-2 pr-3 rounded-full bg-white/90 dark:bg-dark-card/80 backdrop-blur-xl border border-slate-200/80 dark:border-white/10 shadow-lg shadow-slate-900/[0.04] hover:shadow-xl hover:shadow-slate-900/[0.08] hover:-translate-y-0.5 transition-all duration-300 ease-out"
               >
                 <div className="w-10 h-10 bg-gradient-to-br from-primary to-purple-600 rounded-full flex items-center justify-center text-white shadow-md shadow-primary/25">
-                    <FileText size={18} />
+                    <FileText size={18} weight="duotone" />
                 </div>
                 <div className="flex flex-col items-start">
                     <span className="text-sm font-semibold text-slate-800 dark:text-white">Open Smart Editor</span>
                     <span className="text-[10px] text-slate-400 dark:text-dark-muted font-medium">Advanced Workspace</span>
                 </div>
                 <div className="ml-2 w-8 h-8 rounded-full bg-slate-100 dark:bg-dark-bg flex items-center justify-center text-slate-400 group-hover:bg-primary group-hover:text-white transition-all duration-200">
-                    <ArrowRight size={16} />
+                    <ArrowRight size={16} weight="bold" />
                 </div>
               </button>
               
               <div className="mt-5 flex items-center justify-center gap-6">
                  <div className="flex items-center gap-1.5 text-xs text-slate-400 dark:text-dark-muted">
-                    <Sparkles size={11} className="text-amber-500" /> Multi-Language
+                    <Sparkle size={11} weight="duotone" className="text-amber-500" /> Multi-Language
                  </div>
                  <div className="flex items-center gap-1.5 text-xs text-slate-400 dark:text-dark-muted">
-                    <Sparkle size={11} className="text-primary" /> Auto-Save
+                    <Sparkle size={11} weight="duotone" className="text-primary" /> Auto-Save
                  </div>
               </div>
             </div>
@@ -760,7 +777,7 @@ const App: React.FC = () => {
               className="mb-8 flex items-center gap-3 text-slate-400 hover:text-primary dark:hover:text-accent font-bold text-sm transition-all group"
             >
               <div className="p-2 rounded-xl bg-white/50 dark:bg-dark-card/50 border border-white/60 dark:border-white/5 shadow-sm group-hover:scale-110 transition-transform">
-                <ArrowLeft size={16} />
+                <ArrowRight size={16} weight="bold" />
               </div>
               <span className="uppercase tracking-widest text-[10px]">Back to Selection</span>
             </button>
@@ -840,20 +857,22 @@ const App: React.FC = () => {
                               className={`w-10 h-10 flex items-center justify-center rounded-2xl transition-all ${isSpeakerDetectEnabled ? 'bg-primary/10 text-primary border border-primary/20' : 'bg-slate-100/50 dark:bg-white/5 text-slate-300 border border-transparent'}`}
                               title="Speaker Detection"
                            >
-                              <Users size={16} />
+                              <Users size={16} weight="duotone" />
                            </button>
                         </div>
 
                         {/* Model Selection Bar */}
                         <div className="flex bg-slate-100/30 dark:bg-white/5 p-1 rounded-2xl border border-white/20 dark:border-white/5">
                             {[
-                              { id: 'free', icon: <Volume2 size={14} />, active: useFallbackMode, action: () => { setUseFallbackMode(true); setIsSmartModelEnabled(false); } },
-                              { id: 'fast', icon: <Zap size={14} />, active: !useFallbackMode && !isSmartModelEnabled, action: () => { setUseFallbackMode(false); setIsSmartModelEnabled(false); } },
-                              { id: 'pro', icon: <Brain size={14} />, active: !useFallbackMode && isSmartModelEnabled, action: () => { setUseFallbackMode(false); setIsSmartModelEnabled(true); } }
+                              { id: 'webspeech', icon: <Microphone size={14} weight="duotone" />, label: 'Free', active: aiProvider === 'webspeech', action: () => setAiProvider('webspeech') },
+                              { id: 'groq', icon: <Lightning size={14} weight="duotone" />, label: 'Groq', active: aiProvider === 'groq', action: () => setAiProvider('groq') },
+                              { id: 'flash', icon: <Sparkle size={14} weight="duotone" />, label: 'Flash', active: aiProvider === 'gemini' && geminiModel === 'flash', action: () => { setAiProvider('gemini'); setGeminiModel('flash'); } },
+                              { id: 'pro', icon: <Brain size={14} weight="duotone" />, label: 'Pro', active: aiProvider === 'gemini' && geminiModel === 'pro', action: () => { setAiProvider('gemini'); setGeminiModel('pro'); } }
                             ].map((m) => (
                               <button
                                 key={m.id}
                                 onClick={m.action}
+                                title={m.label}
                                 className={`flex-1 flex items-center justify-center py-2.5 rounded-xl transition-all ${m.active ? 'bg-white dark:bg-dark-card text-primary shadow-sm scale-[1.02]' : 'text-slate-400 hover:text-slate-600'}`}
                               >
                                 {m.icon}
@@ -864,15 +883,23 @@ const App: React.FC = () => {
                         <button
                           onClick={handleTranscribe}
                           disabled={!isReadyToTranscribe()}
-                          className={`group relative overflow-hidden rounded-[2rem] py-4 transition-all duration-500 active:scale-95 disabled:opacity-20 ${useFallbackMode ? 'bg-emerald-500' : (!isSmartModelEnabled ? 'bg-amber-500' : 'bg-slate-900 dark:bg-white')}`}
+                          className={`group relative overflow-hidden rounded-[2rem] py-4 transition-all duration-500 active:scale-95 disabled:opacity-20 ${
+                            aiProvider === 'webspeech' ? 'bg-emerald-500' : 
+                            aiProvider === 'groq' ? 'bg-orange-500' : 
+                            geminiModel === 'flash' ? 'bg-amber-500' : 'bg-slate-900 dark:bg-white'
+                          }`}
                         >
-                          <div className={`absolute inset-0 bg-gradient-to-r ${useFallbackMode ? 'from-emerald-500 to-teal-500' : (!isSmartModelEnabled ? 'from-amber-500 to-orange-500' : 'from-primary via-purple-600 to-accent')} opacity-0 group-hover:opacity-100 transition-opacity duration-500`}></div>
+                          <div className={`absolute inset-0 bg-gradient-to-r ${
+                            aiProvider === 'webspeech' ? 'from-emerald-500 to-teal-500' : 
+                            aiProvider === 'groq' ? 'from-orange-500 to-red-500' : 
+                            geminiModel === 'flash' ? 'from-amber-500 to-orange-500' : 'from-primary via-purple-600 to-accent'
+                          } opacity-0 group-hover:opacity-100 transition-opacity duration-500`}></div>
                           
                           <div className="relative z-10 flex items-center justify-center gap-3">
-                              <span className={`text-xs font-black uppercase tracking-[0.2em] ${(!useFallbackMode && isSmartModelEnabled) ? 'text-white dark:text-slate-900 group-hover:text-white' : 'text-white'}`}>
-                                 {useFallbackMode ? 'Initialize Free' : (isSmartModelEnabled ? 'Execute Pro' : 'Start Fast')}
+                              <span className={`text-xs font-black uppercase tracking-[0.2em] ${(aiProvider === 'gemini' && geminiModel === 'pro') ? 'text-white dark:text-slate-900 group-hover:text-white' : 'text-white'}`}>
+                                 {aiProvider === 'webspeech' ? 'Initialize Free' : (aiProvider === 'groq' ? 'Groq Transcribe' : (geminiModel === 'pro' ? 'Execute Pro' : 'Start Flash'))}
                               </span>
-                              <ArrowRight size={14} className={`transition-transform group-hover:translate-x-1 ${(!useFallbackMode && isSmartModelEnabled) ? 'text-white dark:text-slate-900 group-hover:text-white' : 'text-white'}`} />
+                              <ArrowRight size={14} weight="bold" className={`transition-transform group-hover:translate-x-1 ${(aiProvider === 'gemini' && geminiModel === 'pro') ? 'text-white dark:text-slate-900 group-hover:text-white' : 'text-white'}`} />
                           </div>
                         </button>
                      </div>
@@ -886,7 +913,7 @@ const App: React.FC = () => {
         {transcription.error && (
           <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 animate-in slide-in-from-bottom-5 fade-in">
             <div className="bg-red-50 dark:bg-red-900/20 text-red-900 dark:text-red-200 px-6 py-4 rounded-2xl border border-red-100 dark:border-red-800 shadow-2xl flex items-center gap-4">
-               <div className="bg-red-100 dark:bg-red-800/40 p-2 rounded-full text-red-600 dark:text-red-300"><Info size={20} /></div>
+               <div className="bg-red-100 dark:bg-red-800/40 p-2 rounded-full text-red-600 dark:text-red-300"><Info size={20} weight="duotone" /></div>
                <div>
                   <h4 className="font-bold text-sm">Transcription Failed</h4>
                   <p className="text-xs opacity-80 mt-0.5">{transcription.error}</p>

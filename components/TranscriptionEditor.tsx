@@ -7,8 +7,12 @@ import {
   Search, Wrench, Trash2, AlignLeft, Type, Replace, MoreVertical,
   ChevronDown, UserMinus, Clock, Minimize2, Tag, Loader2, Video,
   Heading1, Heading2, Heading3, Palette, Eraser, MoreHorizontal,
-  ArrowRight, Sparkle, Mic, Upload, Square, Play, Pause, AlertTriangle
+  ArrowRight, Mic, Upload, Square, Play, Pause, AlertTriangle
 } from 'lucide-react';
+import { 
+  Sparkle, MagicWand, Trash, UserMinus as UserMinusPhosphor, 
+  TextAlignLeft, Timer, Warning 
+} from '@phosphor-icons/react';
 import PlaybackControl from './PlaybackControl';
 import { generateTxt, generateDoc, generateDocx, generateSrt } from '../utils/exportUtils';
 import { summarizeText, enhanceFormatting, analyzeVideoContent } from '../services/geminiService';
@@ -660,7 +664,7 @@ const TranscriptionEditor: React.FC<TranscriptionEditorProps> = ({
                 {/* Tools Dropdown */}
                 <div className="relative">
                     <button onClick={() => toggleMenu('tools')} className={`flex items-center gap-1 px-3 py-1.5 rounded-2xl text-xs font-semibold transition-all ${activeMenu === 'tools' ? 'bg-primary/10 text-primary' : 'text-slate-500 hover:bg-slate-100 dark:hover:bg-dark-bg'}`}>
-                       <Sparkle size={16} strokeWidth={2} />
+                       <MagicWand size={16} weight="duotone" />
                        <ChevronDown size={12} strokeWidth={2.5} className={`transition-transform ${activeMenu === 'tools' ? 'rotate-180' : ''}`}/>
                     </button>
                     {activeMenu === 'tools' && (
@@ -668,7 +672,7 @@ const TranscriptionEditor: React.FC<TranscriptionEditorProps> = ({
                             <p className="px-2.5 py-1.5 text-[10px] font-bold text-slate-400 dark:text-dark-muted uppercase tracking-wider">Clean Up Tools</p>
                             <button onClick={() => { handleRemoveTimestamps(); setActiveMenu(null); }} className="w-full flex items-center gap-3 px-2.5 py-2.5 text-left text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-red-50 dark:hover:bg-red-900/10 hover:text-red-600 rounded-xl transition-colors group">
                               <div className="w-7 h-7 rounded-lg bg-red-100 dark:bg-red-900/20 flex items-center justify-center group-hover:scale-110 transition-transform">
-                                <Trash2 size={14} className="text-red-500"/>
+                                <Timer size={16} weight="duotone" className="text-red-500"/>
                               </div>
                               <div>
                                 <span className="block">Clear Timestamps</span>
@@ -677,7 +681,7 @@ const TranscriptionEditor: React.FC<TranscriptionEditorProps> = ({
                             </button>
                             <button onClick={() => { handleRemoveSpeakers(); setActiveMenu(null); }} className="w-full flex items-center gap-3 px-2.5 py-2.5 text-left text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-orange-50 dark:hover:bg-orange-900/10 hover:text-orange-600 rounded-xl transition-colors group">
                               <div className="w-7 h-7 rounded-lg bg-orange-100 dark:bg-orange-900/20 flex items-center justify-center group-hover:scale-110 transition-transform">
-                                <UserMinus size={14} className="text-orange-500"/>
+                                <UserMinusPhosphor size={16} weight="duotone" className="text-orange-500"/>
                               </div>
                               <div>
                                 <span className="block">Strip Speakers</span>
@@ -686,7 +690,7 @@ const TranscriptionEditor: React.FC<TranscriptionEditorProps> = ({
                             </button>
                             <button onClick={() => { handleCompactText(); setActiveMenu(null); }} className="w-full flex items-center gap-3 px-2.5 py-2.5 text-left text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-blue-50 dark:hover:bg-blue-900/10 hover:text-blue-600 rounded-xl transition-colors group">
                               <div className="w-7 h-7 rounded-lg bg-blue-100 dark:bg-blue-900/20 flex items-center justify-center group-hover:scale-110 transition-transform">
-                                <AlignLeft size={14} className="text-blue-500"/>
+                                <TextAlignLeft size={16} weight="duotone" className="text-blue-500"/>
                               </div>
                               <div>
                                 <span className="block">Compact Flow</span>
@@ -871,7 +875,7 @@ const TranscriptionEditor: React.FC<TranscriptionEditorProps> = ({
                       : "bg-slate-50 dark:bg-dark-bg border-slate-100 dark:border-dark-border text-slate-600 dark:text-dark-muted hover:border-primary/30 dark:hover:border-accent/40 hover:bg-white dark:hover:bg-dark-card"
                   }`}
                 >
-                  <Sparkle size={20} />
+                  <Sparkle size={20} weight="duotone" />
                   <span className="text-[11px] font-bold">Enhance</span>
                 </button>
                 <button 

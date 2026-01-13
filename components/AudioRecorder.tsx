@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Mic, Square, RefreshCw, AlertCircle, BarChart2 } from 'lucide-react';
+import { Microphone, Stop, ArrowsClockwise, WarningCircle } from '@phosphor-icons/react';
 import { formatTime } from '../utils/audioUtils';
 
 interface AudioRecorderProps {
@@ -173,7 +173,7 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({ onRecordingComplete, isTr
 
       {error && (
         <div className="mb-6 px-4 py-2 bg-red-500/10 border border-red-500/20 text-red-500 text-[10px] font-black uppercase tracking-widest rounded-full flex items-center gap-2 animate-bounce">
-          <AlertCircle size={14} /> {error}
+          <WarningCircle size={14} weight="duotone" /> {error}
         </div>
       )}
 
@@ -187,7 +187,7 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({ onRecordingComplete, isTr
           >
             <div className="absolute inset-0 rounded-full bg-gradient-to-tr from-primary to-accent opacity-0 group-hover:opacity-40 transition-opacity blur-xl"></div>
             <div className="relative z-10">
-                <Mic size={28} />
+                <Microphone size={28} weight="duotone" />
             </div>
           </button>
         ) : (
@@ -196,7 +196,7 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({ onRecordingComplete, isTr
             className="flex items-center justify-center w-20 h-20 rounded-full bg-red-500 text-white shadow-2xl shadow-red-500/40 transition-all hover:scale-105 active:scale-95 group"
           >
             <div className="w-7 h-7 rounded-lg bg-white/20 group-hover:scale-90 transition-transform flex items-center justify-center">
-                <Square size={20} fill="currentColor" />
+                <Stop size={20} weight="fill" />
             </div>
           </button>
         )}
@@ -208,7 +208,7 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({ onRecordingComplete, isTr
             className="flex items-center justify-center w-12 h-12 rounded-2xl bg-white/50 dark:bg-dark-bg/50 border border-slate-200 dark:border-white/5 text-slate-400 hover:text-primary transition-all shadow-sm active:scale-95"
             title="Reset"
           >
-            <RefreshCw size={18} />
+            <ArrowsClockwise size={18} weight="duotone" />
           </button>
         )}
       </div>

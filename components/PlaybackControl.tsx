@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Play, Pause, Download, Rewind, FastForward, Settings2, AlertCircle } from 'lucide-react';
+import { Play, Pause, WarningCircle } from '@phosphor-icons/react';
 import { formatTime } from '../utils/audioUtils';
 
 interface PlaybackControlProps {
@@ -104,7 +104,7 @@ const PlaybackControl: React.FC<PlaybackControlProps> = ({ audioUrl, minimal = f
         <div className={`${minimal ? 'flex items-center gap-3 py-1' : 'bg-white/80 dark:bg-dark-card/80 backdrop-blur-md rounded-full p-3 border border-slate-200/50 dark:border-dark-border shadow-2xl shadow-primary/10 flex items-center gap-4'}`}>
             <div className="flex items-center gap-3 px-2 w-full text-slate-400 dark:text-dark-muted">
                 <div className="w-8 h-8 rounded-full bg-slate-100 dark:bg-dark-bg flex items-center justify-center flex-shrink-0">
-                    <AlertCircle size={16} />
+                    <WarningCircle size={16} weight="duotone" />
                 </div>
                 <div className="flex flex-col">
                     <span className="text-xs font-bold text-slate-600 dark:text-dark-text">Preview Unavailable</span>
@@ -126,7 +126,7 @@ const PlaybackControl: React.FC<PlaybackControlProps> = ({ audioUrl, minimal = f
         onClick={togglePlay}
         className={`${minimal ? 'w-8 h-8' : 'w-12 h-12'} flex items-center justify-center rounded-full bg-primary text-white hover:bg-primary/90 transition-all shrink-0 shadow-lg shadow-primary/30 active:scale-95`}
       >
-        {isPlaying ? <Pause size={minimal ? 14 : 20} fill="currentColor" /> : <Play size={minimal ? 14 : 20} fill="currentColor" className="ml-1" />}
+        {isPlaying ? <Pause size={minimal ? 14 : 20} weight="fill" /> : <Play size={minimal ? 14 : 20} weight="fill" className="ml-1" />}
       </button>
 
       {/* Main Controls */}

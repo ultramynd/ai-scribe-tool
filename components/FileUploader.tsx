@@ -1,5 +1,5 @@
 import React, { useCallback, useState, useEffect } from 'react';
-import { UploadCloud, FileAudio, FileVideo, X, AlertCircle } from 'lucide-react';
+import { CloudArrowUp, FileAudio, FileVideo, X, WarningCircle } from '@phosphor-icons/react';
 import { AudioFile } from '../types';
 
 interface FileUploaderProps {
@@ -48,7 +48,7 @@ const FileUploader: React.FC<FileUploaderProps> = ({ onFileSelected, selectedFil
           />
           <div className="flex flex-col items-center justify-center text-center">
             <div className="w-14 h-14 sm:w-16 sm:h-16 bg-primary/10 text-primary dark:text-accent rounded-full flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
-              <UploadCloud size={28} className="sm:w-8 sm:h-8" />
+              <CloudArrowUp size={28} weight="duotone" className="sm:w-8 sm:h-8" />
             </div>
             <h3 className="text-base sm:text-lg font-semibold text-gray-700 dark:text-dark-text mb-1">Click to upload</h3>
             <p className="text-xs sm:text-sm text-gray-500 dark:text-dark-muted">Audio (MP3, WAV) or Video (MP4, WebM)</p>
@@ -60,7 +60,7 @@ const FileUploader: React.FC<FileUploaderProps> = ({ onFileSelected, selectedFil
           <div className="flex items-start justify-between mb-4">
             <div className="flex items-center gap-3 sm:gap-4 overflow-hidden">
               <div className="w-10 h-10 sm:w-12 sm:h-12 bg-primary/10 text-primary dark:text-accent rounded-xl flex-shrink-0 flex items-center justify-center">
-                {isVideo ? <FileVideo size={20} className="sm:w-6 sm:h-6" /> : <FileAudio size={20} className="sm:w-6 sm:h-6" />}
+                {isVideo ? <FileVideo size={20} weight="duotone" className="sm:w-6 sm:h-6" /> : <FileAudio size={20} weight="duotone" className="sm:w-6 sm:h-6" />}
               </div>
               <div className="min-w-0">
                 <p className="text-sm font-medium text-gray-900 dark:text-dark-text truncate">
@@ -76,7 +76,7 @@ const FileUploader: React.FC<FileUploaderProps> = ({ onFileSelected, selectedFil
                 onClick={onClear}
                 className="text-gray-400 hover:text-red-500 dark:hover:text-red-400 transition-colors p-1"
               >
-                <X size={18} className="sm:w-5 sm:h-5" />
+                <X size={18} weight="bold" className="sm:w-5 sm:h-5" />
               </button>
             )}
           </div>
@@ -101,7 +101,7 @@ const FileUploader: React.FC<FileUploaderProps> = ({ onFileSelected, selectedFil
                   )
               ) : (
                   <div className="flex flex-col items-center justify-center h-24 bg-gray-100 dark:bg-dark-card/50 text-gray-400 dark:text-dark-muted gap-2 rounded-lg">
-                     <AlertCircle size={20} />
+                     <WarningCircle size={20} weight="duotone" />
                      <span className="text-xs font-medium">Preview not available for this format</span>
                      <span className="text-[10px] opacity-70">Transcription will still work</span>
                   </div>
