@@ -307,7 +307,7 @@ const App: React.FC = () => {
       text = await transcribeAudio(
         mediaBlob!, 
         mimeType, 
-        isAutoEditEnabled, 
+        true, // autoEdit = true (Always Polish in Polish mode)
         isSpeakerDetectEnabled, 
         isDeepThinking, // useSmartModel = true if Thinking is on
         onStatus

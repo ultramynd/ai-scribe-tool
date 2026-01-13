@@ -131,7 +131,7 @@ export const transcribeAudio = async (
 
       const speakerInstruction = detectSpeakers 
         ? `**Speaker Diarization**: Identify distinct speakers. Listen for names (e.g., "Hi John") and use them. If unknown, use "Speaker 1:", "Speaker 2:", etc.`
-        : `**Speaker Labels**: Use "Speaker 1:" labels.`;
+        : `**No Speaker Labels**: Do not use speaker labels (e.g., "Speaker 1"). Format the text as a continuous transcript with paragraph breaks.`;
 
       const commonInstructions = `
         1. ${speakerInstruction}
