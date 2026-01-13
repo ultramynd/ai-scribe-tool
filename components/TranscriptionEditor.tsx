@@ -7,7 +7,7 @@ import {
   Search, Wrench, Trash2, AlignLeft, Type, Replace, MoreVertical,
   ChevronDown, UserMinus, Clock, Minimize2, Tag, Loader2, Video,
   Heading1, Heading2, Heading3, Palette, Eraser, MoreHorizontal,
-  ArrowRight, Wand2, Mic, Upload, Square, Play, Pause
+  ArrowRight, Wand2, Mic, Upload, Square, Play, Pause, AlertTriangle
 } from 'lucide-react';
 import PlaybackControl from './PlaybackControl';
 import { generateTxt, generateDoc, generateDocx, generateSrt } from '../utils/exportUtils';
@@ -85,6 +85,9 @@ const TranscriptionEditor: React.FC<TranscriptionEditorProps> = ({
   const [toolbarPosition, setToolbarPosition] = useState<{ x: number; y: number } | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const dragStartRef = useRef<{ x: number; y: number; posX: number; posY: number } | null>(null);
+
+  // Toast Notification State
+  const [toast, setToast] = useState<{ message: string; type: 'error' | 'warning' | 'info' } | null>(null);
 
   // Refs
   const contentEditableRef = useRef<HTMLDivElement>(null);
@@ -183,7 +186,8 @@ const TranscriptionEditor: React.FC<TranscriptionEditorProps> = ({
 
   const handleToggleLiveRecording = () => {
     if (!recognitionRef.current) {
-      alert("Speech recognition is not supported in this browser.");
+      setToast({ message: "Speech recognition is not supported in this browser. Try Chrome, Edge, or Safari.", type: 'warning' });
+      setTimeout(() => setToast(null), 5000);
       return;
     }
 
@@ -974,6 +978,32 @@ const TranscriptionEditor: React.FC<TranscriptionEditorProps> = ({
                   ) : null}
               </div>
           </div>
+      )}
+
+      {/* Toast Notification */}
+      {toast && (
+        <div className="fixed top-6 left-1/2 -translate-x-1/2 z-[100] animate-in fade-in slide-in-from-top-4 duration-300">
+          <div className={`flex items-center gap-3 px-5 py-3.5 rounded-2xl shadow-2xl backdrop-blur-xl border ${
+            toast.type === 'error' 
+              ? 'bg-red-500/90 text-white border-red-400/20' 
+              : toast.type === 'warning'
+              ? 'bg-amber-500/90 text-white border-amber-400/20'
+              : 'bg-slate-800/90 text-white border-white/10'
+          }`}>
+            <div className={`w-8 h-8 rounded-xl flex items-center justify-center ${
+              toast.type === 'error' ? 'bg-red-600' : toast.type === 'warning' ? 'bg-amber-600' : 'bg-slate-700'
+            }`}>
+              <AlertTriangle size={16} />
+            </div>
+            <p className="text-sm font-semibold max-w-xs">{toast.message}</p>
+            <button 
+              onClick={() => setToast(null)}
+              className="ml-2 p-1.5 rounded-lg hover:bg-white/20 transition-colors"
+            >
+              <X size={14} />
+            </button>
+          </div>
+        </div>
       )}
 
       {/* Inline Recording Status Bar */}

@@ -100,6 +100,9 @@ export const transcribeAudio = async (
   detectSpeakers: boolean = true,
   useSmartModel: boolean = true
 ): Promise<string> => {
+  // Debug: Verify API key is loaded from environment
+  console.log("[ScribeAI] API Key loaded:", !!import.meta.env.VITE_GEMINI_API_KEY);
+  
   if (!import.meta.env.VITE_GEMINI_API_KEY) {
     throw new Error("API Key is missing. Please check your environment configuration.");
   }

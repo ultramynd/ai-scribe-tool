@@ -41,7 +41,7 @@ const App: React.FC = () => {
   const [useFallbackMode, setUseFallbackMode] = useState(false); // Browser-based transcription
 
   // Auth States
-  const googleClientId = process.env.GOOGLE_CLIENT_ID;
+  const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
   const [driveScriptsLoaded, setDriveScriptsLoaded] = useState(false);
   const [isSavingToDrive, setIsSavingToDrive] = useState(false);
   const [driveSaved, setDriveSaved] = useState(false);

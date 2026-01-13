@@ -25,7 +25,7 @@ const UrlLoader: React.FC<UrlLoaderProps> = ({ onFileLoaded, isLoading, googleAc
       return;
     }
     
-    const apiKey = process.env.API_KEY;
+    const apiKey = import.meta.env.VITE_GOOGLE_API_KEY;
     const gapi = (window as any).gapi;
     const google = (window as any).google;
 
