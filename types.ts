@@ -16,3 +16,16 @@ export interface AudioFile {
   base64: string | null;
   mimeType: string | null;
 }
+
+export type ArchiveStatus = 'loading' | 'complete' | 'error';
+
+export interface ArchiveItem {
+  id: string;
+  name: string;
+  text: string;
+  date: string;
+  status: ArchiveStatus;
+  progress: number;
+  error?: string;
+  audioUrl?: string | null;
+}

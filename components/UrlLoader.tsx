@@ -2,21 +2,27 @@ import React, { useState } from 'react';
 import { Link, WarningCircle, ArrowRight, CheckCircle, Spinner, YoutubeLogo, Info, DownloadSimple, FileAudio, Lock } from '@phosphor-icons/react';
 import { getDriveId } from '../utils/audioUtils';
 import { AudioFile } from '../types';
+import GoogleFilePicker from './GoogleFilePicker';
 
 interface UrlLoaderProps {
   onFileLoaded: (file: AudioFile) => void;
   isLoading: boolean;
   googleAccessToken?: string | null;
-  clientId?: string;
-  onGoogleLogin?: () => void;
-  isLoggingIn?: boolean;
+  clientId: string | null;
+  onGoogleLogin: () => void;
+  isLoggingIn: boolean;
+  onAttachDrive?: () => void;
 }
 
-const UrlLoader: React.FC<UrlLoaderProps> = ({ onFileLoaded, isLoading, googleAccessToken, clientId, onGoogleLogin, isLoggingIn }) => {
+const UrlLoader: React.FC<UrlLoaderProps> = ({ onFileLoaded, isLoading, googleAccessToken, clientId,  onGoogleLogin,
+  isLoggingIn,
+  onAttachDrive
+}) => {
   const [url, setUrl] = useState('');
   const [fetchStatus, setFetchStatus] = useState<'idle' | 'loading' | 'error' | 'success'>('idle');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [driveId, setDriveId] = useState<string | null>(null);
+  const [isDrivePickerOpen, setIsDrivePickerOpen] = useState(false);
 
   const handleDrivePicker = () => {
     if (!googleAccessToken) {
@@ -24,55 +30,7 @@ const UrlLoader: React.FC<UrlLoaderProps> = ({ onFileLoaded, isLoading, googleAc
       setFetchStatus('error');
       return;
     }
-    
-    const apiKey = import.meta.env.VITE_GOOGLE_API_KEY;
-    const gapi = (window as any).gapi;
-    const google = (window as any).google;
-
-    if (!gapi || !google) {
-        setErrorMessage("Google integration is initializing. Please try again in a few seconds.");
-        setFetchStatus('error');
-        return;
-    }
-
-    gapi.load('picker', {
-        callback: () => {
-            // High-end Media View
-            const audioView = new google.picker.DocsView(google.picker.ViewId.DOCS)
-                .setMimeTypes('audio/*')
-                .setLabel('Audio Files')
-                .setIncludeFolders(true);
-
-            const videoView = new google.picker.DocsView(google.picker.ViewId.DOCS)
-                .setMimeTypes('video/*')
-                .setLabel('Video Files')
-                .setIncludeFolders(true);
-
-            const recentView = new google.picker.DocsView(google.picker.ViewId.RECENTLY_PICKED)
-                .setMimeTypes('audio/*,video/*')
-                .setLabel('Recently Used');
-
-            const picker = new google.picker.PickerBuilder()
-                .addView(audioView)
-                .addView(videoView)
-                .addView(recentView)
-                .setOAuthToken(googleAccessToken)
-                .setDeveloperKey(apiKey)
-                .enableFeature(google.picker.Feature.NAV_HIDDEN)
-                .enableFeature(google.picker.Feature.SUPPORT_DRIVES) // Professional 'Shared Drives' support
-                .setSize(1050, 700) // Much larger desktop-class view
-                .setOrigin(window.location.protocol + '//' + window.location.host)
-                .setTitle('Select Media for ScribeAI')
-                .setCallback((data: any) => {
-                    if (data.action === google.picker.Action.PICKED) {
-                        const doc = data.docs[0];
-                        fetchDriveFile(doc.id, googleAccessToken, doc.name, doc.mimeType);
-                    }
-                })
-                .build();
-            picker.setVisible(true);
-        }
-    });
+    onAttachDrive?.();
   };
 
   const fetchDriveFile = async (fileId: string, token: string, fileName?: string, mimeType?: string) => {

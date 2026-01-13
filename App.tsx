@@ -14,6 +14,9 @@ import { AudioSource, AudioFile, TranscriptionState } from './types';
 import { transcribeAudio, classifyContent } from './services/geminiService';
 import { transcribeWithGroq } from './services/groqService';
 import { transcribeWithWebSpeech, isWebSpeechSupported } from './services/webSpeechService';
+import ArchiveSidebar from './components/ArchiveSidebar';
+import { ArchiveItem } from './types';
+import GoogleFilePicker from './components/GoogleFilePicker';
 
 const App: React.FC = () => {
   // Navigation State
@@ -60,6 +63,14 @@ const App: React.FC = () => {
   const [logLines, setLogLines] = useState<string[]>([]);
   const [isEditorMode, setIsEditorMode] = useState(false); // Read vs Edit mode
   const [showAiSidebar, setShowAiSidebar] = useState(false); // AI features sidebar
+  const [archiveItems, setArchiveItems] = useState<ArchiveItem[]>(() => {
+    const saved = localStorage.getItem('archive_items');
+    return saved ? JSON.parse(saved) : [];
+  });
+  const [showArchiveSidebar, setShowArchiveSidebar] = useState(false);
+  const [isPickerOpen, setIsPickerOpen] = useState(false);
+  const [pickerCallback, setPickerCallback] = useState<((file: AudioFile) => void) | null>(null);
+  const [isFetchingDrive, setIsFetchingDrive] = useState(false);
 
   // --- Effects & Handlers ---
 
@@ -72,6 +83,10 @@ const App: React.FC = () => {
       localStorage.setItem('theme', 'light');
     }
   }, [darkMode]);
+
+  useEffect(() => {
+    localStorage.setItem('archive_items', JSON.stringify(archiveItems));
+  }, [archiveItems]);
 
   // Prevent accidental browser close/refresh
   useEffect(() => {
@@ -232,54 +247,19 @@ const App: React.FC = () => {
         mimeType = uploadedFile.file.type || ''; 
       }
       
-      let text: string;
+      const text = await executeTranscription(mediaBlob!, mimeType, statusLog);
       
-      // Check if using fallback (browser-based) transcription
-      if (aiProvider === 'webspeech') {
-        if (!isWebSpeechSupported()) {
-          throw new Error("Web Speech API is not supported in your browser. Please use Chrome, Edge, or Safari.");
-        }
-        
-        setLogLines(['Starting browser-based transcription...']);
-        
-        // Transcribe using Web Speech API
-        text = await transcribeWithWebSpeech(
-          mediaBlob!,
-          { language: 'en-US' },
-          (result) => {
-            if (result.isFinal) {
-              setLogLines(prev => [...prev.slice(-3), `✓ ${result.text.substring(0, 50)}...`]);
-            }
-          }
-        );
-        
-        // Format the output with basic speaker labeling
-        text = `**Browser Transcription** (Web Speech API)\n\n---\n\n${text}`;
-        setContentType("Voice Note");
-        
-      } else if (aiProvider === 'groq') {
-        setLogLines(['Initializing Groq Whisper Session...']);
-        text = await transcribeWithGroq(mediaBlob!, { 
-          model: 'whisper-large-v3',
-          onStatus: statusLog
-        });
-        text = `**Groq Whisper Transcription**\n\n---\n\n${text}`;
-        setContentType("High-Speed Audio");
-      } else {
-        // Use Gemini transcription
-        text = await transcribeAudio(
-          mediaBlob!, 
-          mimeType, 
-          isAutoEditEnabled, 
-          isSpeakerDetectEnabled,
-          geminiModel === 'pro',
-          statusLog
-        );
-        
-        // Classify in background
-        classifyContent(text).then(type => setContentType(type));
-      }
-      
+      // Auto-save to archive when a main transcription finishes
+      const id = Math.random().toString(36).substring(7);
+      setArchiveItems(prev => [{
+        id,
+        name: uploadedFile?.file?.name || (activeTab === AudioSource.MICROPHONE ? 'Voice Recording' : 'Untitled'),
+        text,
+        date: new Date().toLocaleString(),
+        status: 'complete',
+        progress: 100
+      }, ...prev]);
+
       setTranscription({ isLoading: false, text, error: null });
       
     } catch (err: any) {
@@ -288,6 +268,58 @@ const App: React.FC = () => {
         text: null, 
         error: err.message || "An unexpected error occurred." 
       });
+    }
+  };
+
+  const executeTranscription = async (mediaBlob: Blob | File, mimeType: string, onStatus?: (msg: string) => void): Promise<string> => {
+    let text: string;
+    
+    if (aiProvider === 'webspeech') {
+      if (!isWebSpeechSupported()) throw new Error("Web Speech API not supported.");
+      text = await transcribeWithWebSpeech(mediaBlob!, { language: 'en-US' }, (result) => {
+        if (result.isFinal) onStatus?.(`✓ ${result.text.substring(0, 30)}...`);
+      });
+      text = `**Browser Transcription**\n\n${text}`;
+    } else if (aiProvider === 'groq') {
+      text = await transcribeWithGroq(mediaBlob!, { model: 'whisper-large-v3', onStatus });
+      text = `**Groq Whisper Transcription**\n\n${text}`;
+    } else {
+      text = await transcribeAudio(mediaBlob!, mimeType, isAutoEditEnabled, isSpeakerDetectEnabled, geminiModel === 'pro', onStatus);
+      // Background classification
+      classifyContent(text).then(type => setContentType(type));
+    }
+    return text;
+  };
+
+  const handleBackgroundTranscribe = async (file: AudioFile) => {
+    const id = Math.random().toString(36).substring(7);
+    const newItem: ArchiveItem = {
+      id,
+      name: file.file?.name || 'Untitled Transcription',
+      text: '',
+      date: new Date().toLocaleString(),
+      status: 'loading',
+      progress: 0,
+      audioUrl: file.previewUrl
+    };
+
+    setArchiveItems(prev => [newItem, ...prev]);
+    setShowArchiveSidebar(true);
+
+    try {
+      const text = await executeTranscription(file.file!, file.file?.type || '', (msg) => {
+        setArchiveItems(prev => prev.map(item => 
+          item.id === id ? { ...item, progress: Math.min(item.progress + 10, 95) } : item
+        ));
+      });
+
+      setArchiveItems(prev => prev.map(item => 
+        item.id === id ? { ...item, text, status: 'complete', progress: 100 } : item
+      ));
+    } catch (err: any) {
+      setArchiveItems(prev => prev.map(item => 
+        item.id === id ? { ...item, status: 'error', error: err.message } : item
+      ));
     }
   };
 
@@ -324,6 +356,55 @@ const App: React.FC = () => {
     else clearAll(); // Default if logic fails
     setShowExitConfirm(false);
     setPendingAction(null);
+  };
+
+  const handleArchiveSelect = (item: ArchiveItem) => {
+    safeNavigation(() => {
+        setTranscription({ isLoading: false, text: item.text, error: null });
+        setIsEditorMode(true);
+        setShowArchiveSidebar(false);
+    });
+  };
+
+  const handleArchiveDelete = (id: string) => {
+    setArchiveItems(prev => prev.filter(item => item.id !== id));
+  };
+
+  const handlePickDriveFile = async (file: { id: string; name: string; mimeType: string }) => {
+    setIsPickerOpen(false);
+    if (!googleAccessToken) return;
+    
+    setIsFetchingDrive(true);
+    try {
+      // Reuse logic from UrlLoader - we should move this to a utility if possible
+      // For now, I'll implement a basic version or call handleBackgroundTranscribe with a placeholder
+      // Actually, I'll implement fetchDriveFile here too
+      const response = await fetch(`https://www.googleapis.com/drive/v3/files/${file.id}?alt=media`, {
+        headers: { Authorization: `Bearer ${googleAccessToken}` }
+      });
+      if (!response.ok) throw new Error('Drive fetch failed');
+      const blob = await response.blob();
+      const audioFile: AudioFile = {
+        file: new File([blob], file.name, { type: file.mimeType }),
+        previewUrl: URL.createObjectURL(blob),
+        base64: null,
+        mimeType: file.mimeType
+      };
+
+      if (pickerCallback) {
+        pickerCallback(audioFile);
+      } else {
+        // Default: Load into main session
+        setUploadedFile(audioFile);
+        setActiveTab(AudioSource.URL);
+        setTimeout(handleTranscribe, 100);
+      }
+    } catch (err) {
+      alert("Failed to download from Drive. Please check permissions.");
+    } finally {
+      setIsFetchingDrive(false);
+      setPickerCallback(null);
+    }
   };
 
   const getAudioUrl = () => {
@@ -528,6 +609,14 @@ const App: React.FC = () => {
                 </div>
               </div>
 
+              <button 
+                onClick={() => setShowArchiveSidebar(true)}
+                className="w-9 h-9 rounded-xl flex items-center justify-center text-slate-500 hover:text-primary hover:bg-slate-100 dark:hover:bg-dark-card transition-all"
+                title="Open Archive"
+              >
+                <Clock size={16} weight="duotone" />
+              </button>
+
               <div className="w-px h-5 bg-slate-200 dark:bg-dark-border mx-1"></div>
 
               <button 
@@ -566,6 +655,13 @@ const App: React.FC = () => {
               onAiSidebarToggle={() => setShowAiSidebar(!showAiSidebar)}
               onStartRecording={() => safeNavigation(() => { clearAll(); setActiveTab(AudioSource.MICROPHONE); })}
               onUploadClick={() => safeNavigation(() => { clearAll(); setActiveTab(AudioSource.FILE); })}
+              googleAccessToken={googleAccessToken}
+              onBackgroundTranscribe={handleBackgroundTranscribe}
+              onAttachDrive={() => {
+                  if (!googleAccessToken) { handleGoogleLogin(); return; }
+                  setPickerCallback(() => (file: AudioFile) => handleBackgroundTranscribe(file));
+                  setIsPickerOpen(true);
+               }}
               onStartUpload={(file) => {
                 setUploadedFile(file);
                 setActiveTab(AudioSource.FILE);
@@ -679,7 +775,20 @@ const App: React.FC = () => {
             </div>
           </div>
           
+          
           <div className="flex items-center gap-4">
+             {/* Archive Button */}
+             <button 
+               onClick={() => setShowArchiveSidebar(true)}
+               className="flex items-center gap-2 text-xs font-bold text-slate-500 hover:text-primary dark:hover:text-accent px-4 py-2.5 rounded-2xl bg-white/50 dark:bg-dark-card/50 border border-white/60 dark:border-white/5 transition-all shadow-sm"
+             >
+               <Clock size={18} weight="duotone" />
+               <span className="hidden sm:inline">Archive</span>
+               {archiveItems.length > 0 && (
+                 <span className="flex h-2 w-2 rounded-full bg-primary animate-pulse"></span>
+               )}
+             </button>
+
              {/* Theme Toggle */}
              <button 
                onClick={() => setDarkMode(!darkMode)}
@@ -956,6 +1065,36 @@ const App: React.FC = () => {
         )}
 
       </main>
+      <ArchiveSidebar 
+        isOpen={showArchiveSidebar}
+        onClose={() => setShowArchiveSidebar(false)}
+        items={archiveItems}
+        onSelectItem={handleArchiveSelect}
+        onDeleteItem={handleArchiveDelete}
+      />
+
+      {googleAccessToken && (
+        <GoogleFilePicker 
+          isOpen={isPickerOpen}
+          accessToken={googleAccessToken}
+          onClose={() => setIsPickerOpen(false)}
+          onSelect={handlePickDriveFile}
+        />
+      )}
+
+      {isFetchingDrive && (
+        <div className="fixed inset-0 z-[100] bg-slate-900/40 backdrop-blur-md flex items-center justify-center">
+          <div className="bg-white dark:bg-dark-card p-10 rounded-[3rem] shadow-2xl flex flex-col items-center gap-6 animate-in zoom-in-95">
+             <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center text-primary animate-spin">
+                <Spinner size={32} weight="bold" />
+             </div>
+             <div className="text-center">
+                <p className="text-xl font-bold text-slate-900 dark:text-white">Importing from Drive</p>
+                <p className="text-sm text-slate-500 dark:text-dark-muted mt-2">Processing secure download...</p>
+             </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

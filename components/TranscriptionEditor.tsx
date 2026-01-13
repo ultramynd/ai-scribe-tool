@@ -35,6 +35,9 @@ interface TranscriptionEditorProps {
   onUploadClick?: () => void;
   onStartUpload?: (file: AudioFile) => void;
   isRecording?: boolean;
+  googleAccessToken?: string | null;
+  onBackgroundTranscribe?: (file: AudioFile) => void;
+  onAttachDrive?: () => void;
 }
 
 type ActiveMenu = 'formatting' | 'tools' | 'export' | 'search' | 'ai-features' | 'copy-as' | null;
@@ -53,7 +56,10 @@ const TranscriptionEditor: React.FC<TranscriptionEditorProps> = ({
   onStopRecording,
   onUploadClick,
   onStartUpload,
-  isRecording = false
+  isRecording = false,
+  googleAccessToken,
+  onBackgroundTranscribe,
+  onAttachDrive
 }) => {
   // --- State ---
   const [history, setHistory] = useState<string[]>([initialText]);
@@ -962,8 +968,18 @@ const TranscriptionEditor: React.FC<TranscriptionEditorProps> = ({
                       <div>
                           <div className="flex items-center gap-1.5">
                               <h3 className="text-sm font-bold text-slate-900 dark:text-white leading-none">Smart Assistant</h3>
-                              <span className="px-1 py-0.5 rounded-md bg-primary/10 text-[7px] font-black tracking-tighter text-primary border border-primary/20 leading-none">PRO</span>
+                              <span className="px-1.5 py-0.5 rounded-md bg-primary/10 text-[8px] font-black tracking-tighter text-primary border border-primary/20 leading-none">BETA</span>
                           </div>
+                          {googleAccessToken && (
+                            <button 
+                              onClick={onAttachDrive}
+                              className="flex items-center gap-1.5 px-3 py-2 rounded-2xl text-xs font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-dark-card transition-all"
+                              title="Attach another file for background transcription"
+                            >
+                              <CloudArrowDown size={16} weight="duotone" className="text-emerald-500"/>
+                              <span>Attach from Google</span>
+                            </button>
+                          )}
                           <p className="text-[10px] text-slate-500 dark:text-dark-muted mt-1 uppercase tracking-wider font-bold">Document Intelligence</p>
                       </div>
                   </div>
