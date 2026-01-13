@@ -33,7 +33,7 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({ onRecordingComplete, isTr
     audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
     const source = audioContextRef.current.createMediaStreamSource(stream);
     analyserRef.current = audioContextRef.current.createAnalyser();
-    analyserRef.current.fftSize = 64; 
+    analyserRef.current.fftSize = 32; // Reduced from 64 for less processing
     source.connect(analyserRef.current);
 
     const bufferLength = analyserRef.current.frequencyBinCount;
@@ -42,9 +42,15 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({ onRecordingComplete, isTr
     const canvasCtx = canvas.getContext('2d');
     if (!canvasCtx) return;
 
-    const draw = () => {
+    let lastDrawTime = 0;
+    const draw = (timestamp: number) => {
       if (!analyserRef.current) return;
       animationFrameRef.current = requestAnimationFrame(draw);
+      
+      // Cap visualizer at ~30fps to save CPU for transcription/recording
+      if (timestamp - lastDrawTime < 33) return;
+      lastDrawTime = timestamp;
+
       analyserRef.current.getByteFrequencyData(dataArray);
 
       canvasCtx.clearRect(0, 0, canvas.width, canvas.height);

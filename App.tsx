@@ -143,11 +143,16 @@ const App: React.FC = () => {
       interval = setInterval(() => {
         setProgress((prev) => {
           let increment = 0;
-          if (prev < 30) increment = Math.random() * 2;
-          else if (prev < 60) increment = Math.random() * 1;
-          else if (prev < 90) increment = 0.2;
           
-          const newProgress = Math.min(prev + increment, 98);
+          // Speed settings based on provider
+          const isFast = aiProvider === 'groq' || (aiProvider === 'gemini' && geminiModel === 'flash');
+          const speedFactor = isFast ? 3.5 : 1.2;
+
+          if (prev < 40) increment = Math.random() * (2.5 * speedFactor);
+          else if (prev < 70) increment = Math.random() * (1.5 * speedFactor);
+          else if (prev < 90) increment = 0.5 * speedFactor;
+          
+          const newProgress = Math.min(prev + increment, 99);
           
           if (prev < 20 && newProgress >= 20) setLogLines(p => [...p, 'Uploading media buffer...']);
           if (prev < 40 && newProgress >= 40) {
@@ -162,7 +167,7 @@ const App: React.FC = () => {
           
           return newProgress;
         });
-      }, aiProvider === 'gemini' && geminiModel === 'pro' ? 200 : 120); // Groq/Gemini Flash are faster
+      }, aiProvider === 'groq' ? 40 : (geminiModel === 'flash' ? 60 : 150)); // Significant speed boost for Groq/Flash
     } else if (transcription.text) {
       setProgress(100);
     }
