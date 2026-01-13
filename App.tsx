@@ -55,8 +55,14 @@ const App: React.FC = () => {
   const [driveScriptsLoaded, setDriveScriptsLoaded] = useState(false);
   const [isSavingToDrive, setIsSavingToDrive] = useState(false);
   const [driveSaved, setDriveSaved] = useState(false);
-  const [googleAccessToken, setGoogleAccessToken] = useState<string | null>(null);
+  const [googleAccessToken, setGoogleAccessToken] = useState<string | null>(() => localStorage.getItem('google_access_token'));
   const [isLoggingIn, setIsLoggingIn] = useState(false);
+
+  // Persist Token
+  useEffect(() => {
+    if (googleAccessToken) localStorage.setItem('google_access_token', googleAccessToken);
+    else localStorage.removeItem('google_access_token');
+  }, [googleAccessToken]);
 
   // UI States
   const [progress, setProgress] = useState(0);
