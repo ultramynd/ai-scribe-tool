@@ -618,27 +618,27 @@ const TranscriptionEditor: React.FC<TranscriptionEditorProps> = ({
                 <div className="w-px h-5 bg-slate-200 dark:bg-dark-border"></div>
                 
                 {/* Undo/Redo */}
-                <button onClick={handleUndo} disabled={historyIndex === 0} className="w-8 h-8 rounded-xl flex items-center justify-center text-slate-400 hover:text-primary hover:bg-slate-100 dark:hover:bg-dark-bg disabled:opacity-30 disabled:hover:text-slate-400 disabled:hover:bg-transparent transition-all" title="Undo"><Undo size={15}/></button>
-                <button onClick={handleRedo} disabled={historyIndex === history.length - 1} className="w-8 h-8 rounded-xl flex items-center justify-center text-slate-400 hover:text-primary hover:bg-slate-100 dark:hover:bg-dark-bg disabled:opacity-30 disabled:hover:text-slate-400 disabled:hover:bg-transparent transition-all" title="Redo"><Redo size={15}/></button>
+                <button onClick={handleUndo} disabled={historyIndex === 0} className="w-8 h-8 rounded-2xl flex items-center justify-center text-slate-400 hover:text-primary hover:bg-slate-100 dark:hover:bg-dark-bg disabled:opacity-30 disabled:hover:text-slate-400 disabled:hover:bg-transparent transition-all" title="Undo"><Undo size={16} strokeWidth={2}/></button>
+                <button onClick={handleRedo} disabled={historyIndex === history.length - 1} className="w-8 h-8 rounded-2xl flex items-center justify-center text-slate-400 hover:text-primary hover:bg-slate-100 dark:hover:bg-dark-bg disabled:opacity-30 disabled:hover:text-slate-400 disabled:hover:bg-transparent transition-all" title="Redo"><Redo size={16} strokeWidth={2}/></button>
 
                 <div className="w-px h-5 bg-slate-200 dark:bg-dark-border mx-1"></div>
 
                 {/* Format Group */}
-                <button onClick={() => execCmd('bold')} className="w-8 h-8 rounded-xl flex items-center justify-center text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-dark-bg hover:text-primary transition-all font-bold text-sm" title="Bold">B</button>
-                <button onClick={() => execCmd('italic')} className="w-8 h-8 rounded-xl flex items-center justify-center text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-dark-bg hover:text-primary transition-all italic text-sm" title="Italic">I</button>
-                <button onClick={() => execCmd('underline')} className="w-8 h-8 rounded-xl flex items-center justify-center text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-dark-bg hover:text-primary transition-all underline text-sm" title="Underline">U</button>
-                <button onClick={() => execCmd('strikeThrough')} className="w-8 h-8 rounded-xl flex items-center justify-center text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-dark-bg hover:text-primary transition-all line-through text-sm" title="Strikethrough">S</button>
+                <button onClick={() => execCmd('bold')} className="w-8 h-8 rounded-2xl flex items-center justify-center text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-dark-bg hover:text-primary transition-all font-bold text-sm" title="Bold">B</button>
+                <button onClick={() => execCmd('italic')} className="w-8 h-8 rounded-2xl flex items-center justify-center text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-dark-bg hover:text-primary transition-all italic text-sm" title="Italic">I</button>
+                <button onClick={() => execCmd('underline')} className="w-8 h-8 rounded-2xl flex items-center justify-center text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-dark-bg hover:text-primary transition-all underline text-sm" title="Underline">U</button>
+                <button onClick={() => execCmd('strikeThrough')} className="w-8 h-8 rounded-2xl flex items-center justify-center text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-dark-bg hover:text-primary transition-all line-through text-sm" title="Strikethrough">S</button>
 
                 <div className="w-px h-5 bg-slate-200 dark:bg-dark-border mx-1"></div>
 
                 {/* Heading Dropdown */}
                 <div className="relative">
-                    <button onClick={() => toggleMenu('formatting')} className={`flex items-center gap-1 px-3 py-1.5 rounded-xl text-xs font-semibold transition-all ${activeMenu === 'formatting' ? 'bg-primary/10 text-primary' : 'text-slate-500 hover:bg-slate-100 dark:hover:bg-dark-bg'}`}>
-                       <Type size={14} />
-                       <ChevronDown size={11} className={`transition-transform ${activeMenu === 'formatting' ? 'rotate-180' : ''}`}/>
+                    <button onClick={() => toggleMenu('formatting')} className={`flex items-center gap-1 px-3 py-1.5 rounded-2xl text-xs font-semibold transition-all ${activeMenu === 'formatting' ? 'bg-primary/10 text-primary' : 'text-slate-500 hover:bg-slate-100 dark:hover:bg-dark-bg'}`}>
+                       <Type size={16} strokeWidth={2} />
+                       <ChevronDown size={12} strokeWidth={2.5} className={`transition-transform ${activeMenu === 'formatting' ? 'rotate-180' : ''}`}/>
                     </button>
                     {activeMenu === 'formatting' && (
-                        <div className="absolute top-full left-0 mt-2 bg-white dark:bg-dark-card rounded-xl shadow-xl border border-slate-100 dark:border-dark-border z-50 p-1.5 min-w-[140px] animate-in fade-in slide-in-from-top-2">
+                        <div className="absolute top-full left-0 mt-2 bg-white dark:bg-dark-card rounded-2xl shadow-xl border border-slate-100 dark:border-dark-border z-50 p-1.5 min-w-[140px] animate-in fade-in slide-in-from-top-2">
                            {['H1', 'H2', 'H3', 'P'].map((tag) => (
                              <button 
                                key={tag}
@@ -655,12 +655,12 @@ const TranscriptionEditor: React.FC<TranscriptionEditorProps> = ({
 
                 {/* Tools Dropdown */}
                 <div className="relative">
-                    <button onClick={() => toggleMenu('tools')} className={`flex items-center gap-1 px-3 py-1.5 rounded-xl text-xs font-semibold transition-all ${activeMenu === 'tools' ? 'bg-primary/10 text-primary' : 'text-slate-500 hover:bg-slate-100 dark:hover:bg-dark-bg'}`}>
-                       <Wand2 size={14} />
-                       <ChevronDown size={11} className={`transition-transform ${activeMenu === 'tools' ? 'rotate-180' : ''}`}/>
+                    <button onClick={() => toggleMenu('tools')} className={`flex items-center gap-1 px-3 py-1.5 rounded-2xl text-xs font-semibold transition-all ${activeMenu === 'tools' ? 'bg-primary/10 text-primary' : 'text-slate-500 hover:bg-slate-100 dark:hover:bg-dark-bg'}`}>
+                       <Wand2 size={16} strokeWidth={2} />
+                       <ChevronDown size={12} strokeWidth={2.5} className={`transition-transform ${activeMenu === 'tools' ? 'rotate-180' : ''}`}/>
                     </button>
                     {activeMenu === 'tools' && (
-                        <div className="absolute top-full left-0 mt-2 bg-white dark:bg-dark-card rounded-xl shadow-xl border border-slate-100 dark:border-dark-border z-50 p-1.5 min-w-[160px] animate-in fade-in slide-in-from-top-2">
+                        <div className="absolute top-full left-0 mt-2 bg-white dark:bg-dark-card rounded-2xl shadow-xl border border-slate-100 dark:border-dark-border z-50 p-1.5 min-w-[160px] animate-in fade-in slide-in-from-top-2">
                             <button onClick={() => { handleRemoveTimestamps(); setActiveMenu(null); }} className="w-full flex items-center gap-2 px-2.5 py-2 text-left text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-red-50 dark:hover:bg-red-900/10 hover:text-red-600 rounded-lg transition-colors">
                               <Clock size={14} className="text-red-500"/>
                               Clear Timestamps
@@ -681,11 +681,11 @@ const TranscriptionEditor: React.FC<TranscriptionEditorProps> = ({
 
                 {/* Search */}
                 <div className="relative">
-                    <button onClick={() => toggleMenu('search')} className={`w-8 h-8 rounded-xl flex items-center justify-center transition-all ${activeMenu === 'search' ? 'bg-primary/10 text-primary' : 'text-slate-500 hover:bg-slate-100 dark:hover:bg-dark-bg'}`} title="Find & Replace">
-                       <Search size={15} />
+                    <button onClick={() => toggleMenu('search')} className={`w-8 h-8 rounded-2xl flex items-center justify-center transition-all ${activeMenu === 'search' ? 'bg-primary/10 text-primary' : 'text-slate-500 hover:bg-slate-100 dark:hover:bg-dark-bg'}`} title="Find & Replace">
+                       <Search size={16} strokeWidth={2} />
                     </button>
                     {activeMenu === 'search' && (
-                        <div className="absolute top-full right-0 mt-2 bg-white dark:bg-dark-card rounded-xl shadow-xl border border-slate-100 dark:border-dark-border z-50 p-3 w-64 animate-in fade-in slide-in-from-top-2">
+                        <div className="absolute top-full right-0 mt-2 bg-white dark:bg-dark-card rounded-2xl shadow-xl border border-slate-100 dark:border-dark-border z-50 p-3 w-64 animate-in fade-in slide-in-from-top-2">
                             <div className="relative mb-2">
                                 <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400"/>
                                 <input value={searchTerm} onChange={e => setSearchTerm(e.target.value)} placeholder="Find..." className="w-full text-xs pl-8 pr-3 py-2 rounded-lg border border-slate-200 dark:border-dark-border bg-slate-50 dark:bg-dark-bg focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all font-medium"/>
@@ -703,13 +703,13 @@ const TranscriptionEditor: React.FC<TranscriptionEditorProps> = ({
 
                 {/* Copy As Dropdown */}
                 <div className="relative">
-                    <button onClick={() => toggleMenu('copy-as')} className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${activeMenu === 'copy-as' ? 'bg-primary/10 text-primary' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-dark-bg'}`}>
-                        <Copy size={14} />
+                    <button onClick={() => toggleMenu('copy-as')} className={`flex items-center gap-1.5 px-3 py-2 rounded-2xl text-xs font-bold transition-all ${activeMenu === 'copy-as' ? 'bg-primary/10 text-primary' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-dark-bg'}`}>
+                        <Copy size={16} strokeWidth={2} />
                         <span>Copy As</span>
-                        <ChevronDown size={11} className={`transition-transform ${activeMenu === 'copy-as' ? 'rotate-180' : ''}`}/>
+                        <ChevronDown size={12} strokeWidth={2.5} className={`transition-transform ${activeMenu === 'copy-as' ? 'rotate-180' : ''}`}/>
                     </button>
                     {activeMenu === 'copy-as' && (
-                        <div className="absolute top-full left-0 mt-2 bg-white dark:bg-dark-card rounded-xl shadow-xl border border-slate-100 dark:border-dark-border z-50 p-1.5 min-w-[140px] animate-in fade-in slide-in-from-top-2">
+                        <div className="absolute top-full left-0 mt-2 bg-white dark:bg-dark-card rounded-2xl shadow-xl border border-slate-100 dark:border-dark-border z-50 p-1.5 min-w-[140px] animate-in fade-in slide-in-from-top-2">
                             <button onClick={() => { handleCopy(); setActiveMenu(null); }} className="w-full flex items-center gap-2 px-2.5 py-2 text-left text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-white/5 rounded-lg transition-colors">
                                 <FileIcon size={14} className="text-slate-400"/>
                                 Markdown
@@ -728,13 +728,13 @@ const TranscriptionEditor: React.FC<TranscriptionEditorProps> = ({
 
                 {/* AI Features Dropdown */}
                 <div className="relative">
-                    <button onClick={() => toggleMenu('ai-features')} className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${activeMenu === 'ai-features' ? 'bg-primary/10 text-primary' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-dark-bg'}`}>
-                        <Sparkles size={14} className="text-primary dark:text-accent"/>
+                    <button onClick={() => toggleMenu('ai-features')} className={`flex items-center gap-1.5 px-3 py-2 rounded-2xl text-xs font-bold transition-all ${activeMenu === 'ai-features' ? 'bg-primary/10 text-primary' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-dark-bg'}`}>
+                        <Sparkles size={16} strokeWidth={2} className="text-primary dark:text-accent"/>
                         <span className="bg-gradient-to-r from-primary to-purple-600 bg-clip-text text-transparent">AI Features</span>
-                        <ChevronDown size={11} className={`transition-transform ${activeMenu === 'ai-features' ? 'rotate-180' : ''}`}/>
+                        <ChevronDown size={12} strokeWidth={2.5} className={`transition-transform ${activeMenu === 'ai-features' ? 'rotate-180' : ''}`}/>
                     </button>
                     {activeMenu === 'ai-features' && (
-                        <div className="absolute top-full left-0 mt-2 bg-white dark:bg-dark-card rounded-xl shadow-xl border border-slate-100 dark:border-dark-border z-50 p-1.5 min-w-[160px] animate-in fade-in slide-in-from-top-2">
+                        <div className="absolute top-full left-0 mt-2 bg-white dark:bg-dark-card rounded-2xl shadow-xl border border-slate-100 dark:border-dark-border z-50 p-1.5 min-w-[160px] animate-in fade-in slide-in-from-top-2">
                             <button onClick={() => { handleSummarize(); setActiveMenu(null); }} className="w-full flex items-center gap-2 px-2.5 py-2 text-left text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-white/5 rounded-lg transition-colors">
                                 <BookOpen size={14} className="text-emerald-500"/>
                                 Smart Summary
@@ -755,13 +755,13 @@ const TranscriptionEditor: React.FC<TranscriptionEditorProps> = ({
 
                 {/* Export Dropdown */}
                 <div className="relative">
-                    <button onClick={() => toggleMenu('export')} className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${activeMenu === 'export' ? 'bg-primary/10 text-primary' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-dark-bg'}`}>
-                        <DownloadCloud size={14} />
+                    <button onClick={() => toggleMenu('export')} className={`flex items-center gap-1.5 px-3 py-2 rounded-2xl text-xs font-bold transition-all ${activeMenu === 'export' ? 'bg-primary/10 text-primary' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-dark-bg'}`}>
+                        <DownloadCloud size={16} strokeWidth={2} />
                         <span>Export</span>
-                        <ChevronDown size={11} className={`transition-transform ${activeMenu === 'export' ? 'rotate-180' : ''}`}/>
+                        <ChevronDown size={12} strokeWidth={2.5} className={`transition-transform ${activeMenu === 'export' ? 'rotate-180' : ''}`}/>
                     </button>
                     {activeMenu === 'export' && (
-                        <div className="absolute top-full right-0 mt-2 bg-white dark:bg-dark-card rounded-xl shadow-xl border border-slate-100 dark:border-dark-border z-50 p-1.5 min-w-[150px] animate-in fade-in slide-in-from-top-2">
+                        <div className="absolute top-full right-0 mt-2 bg-white dark:bg-dark-card rounded-2xl shadow-xl border border-slate-100 dark:border-dark-border z-50 p-1.5 min-w-[150px] animate-in fade-in slide-in-from-top-2">
                              <button onClick={() => handleExport('txt')} className="w-full flex items-center gap-2 px-2.5 py-2 text-left text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-white/5 rounded-lg transition-colors">
                                 <FileText size={14} className="text-slate-400"/>
                                 Text File (.txt)
