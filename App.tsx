@@ -12,7 +12,7 @@ import UrlLoader from './components/UrlLoader';
 import TranscriptionEditor from './components/TranscriptionEditor';
 import { AudioSource, AudioFile, TranscriptionState } from './types';
 import { transcribeAudio, classifyContent } from './services/geminiService';
-import { transcribeWithGroq } from './services/groqService';
+// import { transcribeWithGroq } from './services/groqService'; 
 import { transcribeWithWebSpeech, isWebSpeechSupported } from './services/webSpeechService';
 import ArchiveSidebar from './components/ArchiveSidebar';
 import { ArchiveItem } from './types';
@@ -427,8 +427,12 @@ const App: React.FC = () => {
         setActiveTab(AudioSource.URL);
         setTimeout(handleTranscribe, 100);
       }
-    } catch (err) {
-      alert("Failed to download from Drive. Please check permissions.");
+    } catch (err: any) {
+      console.error("Drive Fetch Error:", err);
+      // More specific error message
+      let msg = "Failed to download from Drive.";
+      if (err.message) msg += ` (${err.message})`;
+      alert(msg + " Please ensure the file is shared or you have permission.");
     } finally {
       setIsFetchingDrive(false);
       setPickerCallback(null);
