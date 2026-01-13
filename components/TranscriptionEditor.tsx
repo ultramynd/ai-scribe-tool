@@ -96,6 +96,11 @@ const TranscriptionEditor: React.FC<TranscriptionEditorProps> = ({
   const [isDragging, setIsDragging] = useState(false);
   const dragStartRef = useRef<{ x: number; y: number; posX: number; posY: number } | null>(null);
 
+  // Draggable Summary Card State
+  const [summaryPosition, setSummaryPosition] = useState<{ x: number; y: number } | null>(null);
+  const [isDraggingSummary, setIsDraggingSummary] = useState(false);
+  const summaryDragStartRef = useRef<{ x: number; y: number; posX: number; posY: number } | null>(null);
+
   // Toast Notification State
   const [toast, setToast] = useState<{ message: string; type: 'error' | 'warning' | 'info' } | null>(null);
 
@@ -145,6 +150,35 @@ const TranscriptionEditor: React.FC<TranscriptionEditorProps> = ({
       document.removeEventListener('mouseup', handleMouseUp);
     };
   }, [isDragging]);
+
+  // Handle draggable Summary Card mouse events
+  useEffect(() => {
+    const handleMouseMove = (e: MouseEvent) => {
+      if (isDraggingSummary && summaryDragStartRef.current) {
+        const deltaX = e.clientX - summaryDragStartRef.current.x;
+        const deltaY = e.clientY - summaryDragStartRef.current.y;
+        setSummaryPosition({
+          x: summaryDragStartRef.current.posX + deltaX,
+          y: summaryDragStartRef.current.posY + deltaY
+        });
+      }
+    };
+
+    const handleMouseUp = () => {
+      setIsDraggingSummary(false);
+      summaryDragStartRef.current = null;
+    };
+
+    if (isDraggingSummary) {
+      document.addEventListener('mousemove', handleMouseMove);
+      document.addEventListener('mouseup', handleMouseUp);
+    }
+
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, [isDraggingSummary]);
 
   // --- Real-time Transcription Setup ---
 
@@ -1176,9 +1210,36 @@ const TranscriptionEditor: React.FC<TranscriptionEditorProps> = ({
 
       {/* Legacy sidebar for when AI sidebar is not open but we have a summary */}
       {showSummarySidebar && !showAiSidebar && (
-          <div className="absolute right-4 top-16 bottom-24 w-80 bg-white/95 dark:bg-dark-card/95 backdrop-blur-xl shadow-2xl border border-slate-200 dark:border-dark-border rounded-2xl p-5 flex flex-col animate-in slide-in-from-right-10 duration-300 z-50">
-              <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-sm font-bold text-slate-800 dark:text-dark-text flex items-center gap-2">
+          <div 
+            className={`absolute w-80 bg-white/95 dark:bg-dark-card/95 backdrop-blur-xl shadow-2xl border border-slate-200 dark:border-dark-border rounded-2xl p-5 flex flex-col animate-in slide-in-from-right-10 duration-300 z-50 ${!summaryPosition ? 'right-4 top-16 bottom-24' : ''}`}
+            style={summaryPosition ? {
+              left: summaryPosition.x,
+              top: summaryPosition.y,
+              right: 'auto',
+              bottom: 'auto',
+              height: 'auto',
+              maxHeight: '80vh'
+            } : {}}
+          >
+              <div 
+                className={`flex items-center justify-between mb-4 cursor-grab active:cursor-grabbing select-none ${isDraggingSummary ? 'cursor-grabbing' : ''}`}
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  setIsDraggingSummary(true);
+                  // Find the draggable container (this div's parent is relative, this div is absolute)
+                  // We want the div that has the 'absolute' class, which is the direct parent of this header
+                  const rect = (e.currentTarget.closest('.absolute') as HTMLElement)?.getBoundingClientRect();
+                  if (rect) {
+                    summaryDragStartRef.current = {
+                      x: e.clientX,
+                      y: e.clientY,
+                      posX: rect.left,
+                      posY: rect.top
+                    };
+                  }
+                }}
+              >
+                  <h3 className="text-sm font-bold text-slate-800 dark:text-dark-text flex items-center gap-2 pointer-events-none">
                       {summaryTitle === "Visual Analysis" ? <VideoCamera className="text-primary dark:text-accent" size={16} weight="duotone" /> : 
                        summaryTitle === "Smart Suggestions" ? <MagicWand className="text-primary dark:text-accent" size={16} weight="duotone" /> :
                        <BookOpen className="text-primary dark:text-accent" size={16} weight="duotone" />}
