@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Mic, Upload, Sparkles, FileText, Link, Wand2, Loader2, Cpu, Info, LogIn, LogOut, Users, User, ArrowLeft, ArrowRight, Plus, CheckCheck, Save, Zap, Terminal, Moon, Sun, AlertTriangle, X, Brain, Volume2, Eye, Edit3, Copy, DownloadCloud, FileOutput, Check } from 'lucide-react';
+import { Mic, Upload, Sparkles, FileText, Link, Sparkle, Loader2, Cpu, Info, LogIn, LogOut, Users, User, ArrowLeft, ArrowRight, Plus, CheckCheck, Save, Zap, Terminal, Moon, Sun, AlertTriangle, X, Brain, Volume2, Eye, Edit3, Copy, DownloadCloud, FileOutput, Check } from 'lucide-react';
 import AudioRecorder from './components/AudioRecorder';
 import FileUploader from './components/FileUploader';
 import UrlLoader from './components/UrlLoader';
@@ -748,7 +748,7 @@ const App: React.FC = () => {
                     <Sparkles size={11} className="text-amber-500" /> Multi-Language
                  </div>
                  <div className="flex items-center gap-1.5 text-xs text-slate-400 dark:text-dark-muted">
-                    <Wand2 size={11} className="text-primary" /> Auto-Save
+                    <Sparkle size={11} className="text-primary" /> Auto-Save
                  </div>
               </div>
             </div>
