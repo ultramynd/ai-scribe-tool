@@ -1277,7 +1277,7 @@ const TranscriptionEditor: React.FC<TranscriptionEditorProps> = ({
 
       {/* Toast Notification */}
       {toast && (
-        <div className="fixed top-6 left-1/2 -translate-x-1/2 z-[100] animate-in fade-in slide-in-from-top-4 duration-300">
+        <div className="fixed top-24 left-1/2 -translate-x-1/2 z-[9999] animate-in fade-in slide-in-from-top-4 duration-300">
           <div className={`flex items-center gap-3 px-5 py-3.5 rounded-2xl shadow-2xl backdrop-blur-xl border ${
             toast.type === 'error' 
               ? 'bg-red-500/90 text-white border-red-400/20' 
