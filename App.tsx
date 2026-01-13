@@ -9,6 +9,7 @@ import {
 import AudioRecorder from './components/AudioRecorder';
 import FileUploader from './components/FileUploader';
 import UrlLoader from './components/UrlLoader';
+import LiveTranscriber from './components/LiveTranscriber';
 import TranscriptionEditor from './components/TranscriptionEditor';
 import { AudioSource, AudioFile, TranscriptionState } from './types';
 import { transcribeAudio, classifyContent } from './services/geminiService';
@@ -714,11 +715,12 @@ const App: React.FC = () => {
               </p>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-6xl mx-auto">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 max-w-6xl mx-auto">
               {[
-                { id: AudioSource.MICROPHONE, icon: <Microphone size={28} weight="duotone" />, title: "Record", desc: "Capture voice notes or meetings directly.", color: "text-primary", bg: "bg-primary/5", accent: "primary" },
-                { id: AudioSource.FILE, icon: <UploadSimple size={28} weight="duotone" />, title: "Upload", desc: "Transcribe MP3, WAV, or MP4 files.", color: "text-accent", bg: "bg-accent/5", accent: "accent" },
-                { id: AudioSource.URL, icon: <Link size={28} weight="duotone" />, title: "Import", desc: "Load from public URL or Google Drive.", color: "text-emerald-500", bg: "bg-emerald-500/5", accent: "emerald-500" },
+                { id: AudioSource.LIVE, icon: <Brain size={28} weight="duotone" />, title: "Live Intelligence", desc: "Real-time AI transcription as you speak.", color: "text-primary", bg: "bg-primary/5", accent: "primary" },
+                { id: AudioSource.MICROPHONE, icon: <Microphone size={28} weight="duotone" />, title: "Record Node", desc: "Capture voice notes or meetings directly.", color: "text-amber-500", bg: "bg-amber-500/5", accent: "amber-500" },
+                { id: AudioSource.FILE, icon: <UploadSimple size={28} weight="duotone" />, title: "Upload Media", desc: "Transcribe MP3, WAV, or MP4 files.", color: "text-accent", bg: "bg-accent/5", accent: "accent" },
+                { id: AudioSource.URL, icon: <Link size={28} weight="duotone" />, title: "Cloud Import", desc: "Load from public URL or Google Drive.", color: "text-emerald-500", bg: "bg-emerald-500/5", accent: "emerald-500" },
               ].map((card) => (
                 <button 
                   key={card.id}
@@ -799,6 +801,16 @@ const App: React.FC = () => {
                   </div>
 
                   <div className="flex-1 flex flex-col justify-center items-center relative z-10">
+                    {activeTab === AudioSource.LIVE && (
+                       <LiveTranscriber 
+                          onStop={(text) => {
+                             setTranscription({ isLoading: false, text, error: null });
+                             setContentType("Live Session");
+                          }}
+                          onCancel={() => setActiveTab(null)}
+                       />
+                    )}
+
                     {activeTab === AudioSource.MICROPHONE && (
                       <AudioRecorder 
                         onRecordingComplete={(blob) => {
@@ -831,7 +843,8 @@ const App: React.FC = () => {
                   </div>
 
                   {/* Configuration & Action Area */}
-                  <div className={`mt-10 transition-all duration-700 ${isReadyToTranscribe() ? 'opacity-100 translate-y-0' : 'opacity-30 translate-y-4 pointer-events-none'}`}>
+                  {activeTab !== AudioSource.LIVE && (
+                    <div className={`mt-10 transition-all duration-700 ${isReadyToTranscribe() ? 'opacity-100 translate-y-0' : 'opacity-30 translate-y-4 pointer-events-none'}`}>
                      
                      <div className="flex flex-col gap-4 max-w-sm mx-auto">
                         <div className="flex items-center justify-center gap-3">
@@ -903,7 +916,8 @@ const App: React.FC = () => {
                           </div>
                         </button>
                      </div>
-                  </div>
+                    </div>
+                  )}
                </div>
             </div>
           </div>

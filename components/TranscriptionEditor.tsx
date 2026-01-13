@@ -1,17 +1,15 @@
 import React, { useState, useEffect, useRef } from 'react';
 import ReactMarkdown from 'react-markdown';
 import { 
-  Edit3, Eye, Undo, Redo, Bold, Italic, Underline, Strikethrough,
-  DownloadCloud, FileText, FileIcon, FileType, FileOutput, 
-  Sparkles, Sparkles as WandIcon, BookOpen, X, CheckCheck, Copy, Check, 
-  Search, Wrench, Trash2, AlignLeft, Type, Replace, MoreVertical,
-  ChevronDown, UserMinus, Clock, Minimize2, Tag, Loader2, Video,
-  Heading1, Heading2, Heading3, Palette, Eraser, MoreHorizontal,
-  ArrowRight, Mic, Upload, Square, Play, Pause, AlertTriangle
-} from 'lucide-react';
-import { 
-  Sparkle, MagicWand, Trash, UserMinus as UserMinusPhosphor, 
-  TextAlignLeft, Timer, Warning 
+  PencilSimple, Eye, ArrowArcLeft, ArrowArcRight, TextB, TextItalic, 
+  TextUnderline, TextStrikethrough, CloudArrowDown, FileText, File, 
+  FileCode, Export, Sparkle, BookOpen, X, Checks, Copy, Check, 
+  MagnifyingGlass, Wrench, Trash, TextAlignLeft, TextT, ArrowsClockwise, 
+  DotsThreeVertical, CaretDown, UserMinus, Clock, ArrowsIn, Tag, 
+  Spinner, VideoCamera, TextHOne, TextHTwo, TextHThree, Palette, 
+  Eraser, DotsThree, ArrowRight, Microphone, UploadSimple, Stop, 
+  Play, Pause, WarningCircle, MagicWand, Timer, Warning, CaretUp,
+  List, Repeat
 } from '@phosphor-icons/react';
 import PlaybackControl from './PlaybackControl';
 import { generateTxt, generateDoc, generateDocx, generateSrt } from '../utils/exportUtils';
@@ -626,8 +624,8 @@ const TranscriptionEditor: React.FC<TranscriptionEditorProps> = ({
                 <div className="w-px h-5 bg-slate-200 dark:bg-dark-border"></div>
                 
                 {/* Undo/Redo */}
-                <button onClick={handleUndo} disabled={historyIndex === 0} className="w-8 h-8 rounded-2xl flex items-center justify-center text-slate-400 hover:text-primary hover:bg-slate-100 dark:hover:bg-dark-bg disabled:opacity-30 disabled:hover:text-slate-400 disabled:hover:bg-transparent transition-all" title="Undo"><Undo size={16} strokeWidth={2}/></button>
-                <button onClick={handleRedo} disabled={historyIndex === history.length - 1} className="w-8 h-8 rounded-2xl flex items-center justify-center text-slate-400 hover:text-primary hover:bg-slate-100 dark:hover:bg-dark-bg disabled:opacity-30 disabled:hover:text-slate-400 disabled:hover:bg-transparent transition-all" title="Redo"><Redo size={16} strokeWidth={2}/></button>
+                <button onClick={handleUndo} disabled={historyIndex === 0} className="w-8 h-8 rounded-2xl flex items-center justify-center text-slate-400 hover:text-primary hover:bg-slate-100 dark:hover:bg-dark-bg disabled:opacity-30 disabled:hover:text-slate-400 disabled:hover:bg-transparent transition-all" title="Undo"><ArrowArcLeft size={16} weight="bold"/></button>
+                <button onClick={handleRedo} disabled={historyIndex === history.length - 1} className="w-8 h-8 rounded-2xl flex items-center justify-center text-slate-400 hover:text-primary hover:bg-slate-100 dark:hover:bg-dark-bg disabled:opacity-30 disabled:hover:text-slate-400 disabled:hover:bg-transparent transition-all" title="Redo"><ArrowArcRight size={16} weight="bold"/></button>
 
                 <div className="w-px h-5 bg-slate-200 dark:bg-dark-border mx-1"></div>
 
@@ -642,8 +640,8 @@ const TranscriptionEditor: React.FC<TranscriptionEditorProps> = ({
                 {/* Heading Dropdown */}
                 <div className="relative">
                     <button onClick={() => toggleMenu('formatting')} className={`flex items-center gap-1 px-3 py-1.5 rounded-2xl text-xs font-semibold transition-all ${activeMenu === 'formatting' ? 'bg-primary/10 text-primary' : 'text-slate-500 hover:bg-slate-100 dark:hover:bg-dark-bg'}`}>
-                       <Type size={16} strokeWidth={2} />
-                       <ChevronDown size={12} strokeWidth={2.5} className={`transition-transform ${activeMenu === 'formatting' ? 'rotate-180' : ''}`}/>
+                       <TextT size={16} weight="bold" />
+                       <CaretDown size={12} weight="bold" className={`transition-transform ${activeMenu === 'formatting' ? 'rotate-180' : ''}`}/>
                     </button>
                     {activeMenu === 'formatting' && (
                         <div className="absolute top-full left-0 mt-2 bg-white dark:bg-dark-card rounded-2xl shadow-xl border border-slate-100 dark:border-dark-border z-50 p-1.5 min-w-[140px] animate-in fade-in slide-in-from-top-2">
@@ -665,7 +663,7 @@ const TranscriptionEditor: React.FC<TranscriptionEditorProps> = ({
                 <div className="relative">
                     <button onClick={() => toggleMenu('tools')} className={`flex items-center gap-1 px-3 py-1.5 rounded-2xl text-xs font-semibold transition-all ${activeMenu === 'tools' ? 'bg-primary/10 text-primary' : 'text-slate-500 hover:bg-slate-100 dark:hover:bg-dark-bg'}`}>
                        <MagicWand size={16} weight="duotone" />
-                       <ChevronDown size={12} strokeWidth={2.5} className={`transition-transform ${activeMenu === 'tools' ? 'rotate-180' : ''}`}/>
+                       <CaretDown size={12} weight="bold" className={`transition-transform ${activeMenu === 'tools' ? 'rotate-180' : ''}`}/>
                     </button>
                     {activeMenu === 'tools' && (
                         <div className="absolute top-full left-0 mt-2 bg-white dark:bg-dark-card rounded-2xl shadow-xl border border-slate-100 dark:border-dark-border z-50 p-2 min-w-[180px] animate-in fade-in slide-in-from-top-2">
@@ -706,16 +704,16 @@ const TranscriptionEditor: React.FC<TranscriptionEditorProps> = ({
                 {/* Search */}
                 <div className="relative">
                     <button onClick={() => toggleMenu('search')} className={`w-8 h-8 rounded-2xl flex items-center justify-center transition-all ${activeMenu === 'search' ? 'bg-primary/10 text-primary' : 'text-slate-500 hover:bg-slate-100 dark:hover:bg-dark-bg'}`} title="Find & Replace">
-                       <Search size={16} strokeWidth={2} />
+                       <MagnifyingGlass size={16} weight="bold" />
                     </button>
                     {activeMenu === 'search' && (
                         <div className="absolute top-full right-0 mt-2 bg-white dark:bg-dark-card rounded-2xl shadow-xl border border-slate-100 dark:border-dark-border z-50 p-3 w-64 animate-in fade-in slide-in-from-top-2">
                             <div className="relative mb-2">
-                                <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400"/>
+                                <MagnifyingGlass size={13} weight="bold" className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400"/>
                                 <input value={searchTerm} onChange={e => setSearchTerm(e.target.value)} placeholder="Find..." className="w-full text-xs pl-8 pr-3 py-2 rounded-lg border border-slate-200 dark:border-dark-border bg-slate-50 dark:bg-dark-bg focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all font-medium"/>
                             </div>
                             <div className="relative mb-3">
-                                <Replace size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400"/>
+                                <Repeat size={13} weight="bold" className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400"/>
                                 <input value={replaceTerm} onChange={e => setReplaceTerm(e.target.value)} placeholder="Replace..." className="w-full text-xs pl-8 pr-3 py-2 rounded-lg border border-slate-200 dark:border-dark-border bg-slate-50 dark:bg-dark-bg focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all font-medium"/>
                             </div>
                             <button onClick={() => { handleSearchReplace(); setActiveMenu(null); }} className="w-full bg-primary hover:bg-primary/90 text-white text-xs font-semibold py-2 rounded-lg transition-all">Replace All</button>
@@ -737,7 +735,7 @@ const TranscriptionEditor: React.FC<TranscriptionEditorProps> = ({
                {contentType && (
                  <div className="mb-6 flex justify-start">
                     <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-primary/5 border border-primary/10 text-[10px] font-bold uppercase tracking-wider text-primary dark:text-accent">
-                       <Tag size={10} />
+                       <Tag size={10} weight="bold" />
                        {contentType}
                     </div>
                  </div>
@@ -813,12 +811,12 @@ const TranscriptionEditor: React.FC<TranscriptionEditorProps> = ({
                             <span className="w-1.5 h-3 rounded-full bg-white/60 animate-bounce [animation-delay:-0.2s]"></span>
                             <span className="w-1.5 h-1.5 rounded-full bg-white/40 animate-pulse [animation-delay:0.4s]"></span>
                           </div>
-                          <Square size={14} className="fill-current"/>
+                          <Stop size={14} weight="fill" className="fill-current"/>
                           <span>Stop</span>
                         </>
                       ) : (
                         <>
-                          <Mic size={16}/>
+                          <Microphone size={16} weight="duotone" />
                           <span>Record Voice Note</span>
                         </>
                       )}
@@ -833,7 +831,7 @@ const TranscriptionEditor: React.FC<TranscriptionEditorProps> = ({
                           onClick={onUploadClick}
                           className="group flex items-center gap-2 px-5 py-2.5 rounded-xl bg-slate-100 dark:bg-dark-bg text-slate-600 dark:text-slate-300 font-bold text-sm hover:bg-slate-200 dark:hover:bg-dark-border transition-all border border-slate-200/50 dark:border-white/5"
                         >
-                          <Upload size={16} className="text-primary dark:text-accent"/>
+                          <UploadSimple size={16} weight="bold" className="text-primary dark:text-accent"/>
                           <span>Upload File</span>
                         </button>
                       </>
@@ -852,7 +850,7 @@ const TranscriptionEditor: React.FC<TranscriptionEditorProps> = ({
               <div className="flex items-center justify-between p-4 border-b border-slate-100 dark:border-dark-border bg-slate-50/50 dark:bg-dark-bg/50">
                   <div className="flex items-center gap-2.5">
                       <div className="bg-primary/10 dark:bg-accent/10 p-2 rounded-xl">
-                          <Sparkles size={18} className="text-primary dark:text-accent" />
+                          <Sparkle size={18} weight="duotone" className="text-primary dark:text-accent" />
                       </div>
                       <div>
                           <h3 className="text-sm font-bold text-slate-900 dark:text-white leading-none">AI Scribe</h3>
@@ -860,7 +858,7 @@ const TranscriptionEditor: React.FC<TranscriptionEditorProps> = ({
                       </div>
                   </div>
                   <button onClick={onAiSidebarToggle} className="p-2 rounded-xl hover:bg-slate-200 dark:hover:bg-dark-border text-slate-400 dark:hover:text-white transition-colors">
-                      <X size={18} />
+                      <X size={18} weight="bold" />
                   </button>
               </div>
               
@@ -887,7 +885,7 @@ const TranscriptionEditor: React.FC<TranscriptionEditorProps> = ({
                       : "bg-slate-50 dark:bg-dark-bg border-slate-100 dark:border-dark-border text-slate-600 dark:text-dark-muted hover:border-emerald-500/30 hover:bg-white dark:hover:bg-dark-card"
                   }`}
                 >
-                  <BookOpen size={20} />
+                  <BookOpen size={20} weight="duotone" />
                   <span className="text-[11px] font-bold">Summary</span>
                 </button>
                 {isVideoFile && (
@@ -896,7 +894,7 @@ const TranscriptionEditor: React.FC<TranscriptionEditorProps> = ({
                     disabled={isSummarizing} 
                     className="col-span-2 flex items-center justify-center gap-2 p-2.5 rounded-2xl bg-slate-50 dark:bg-dark-bg border border-slate-100 dark:border-dark-border text-slate-600 dark:text-dark-muted hover:border-accent/30 hover:bg-white dark:hover:bg-dark-card transition-all"
                   >
-                    <Video size={16} />
+                    <VideoCamera size={16} weight="duotone" />
                     <span className="text-[11px] font-bold">Analyze Video Content</span>
                   </button>
                 )}
@@ -907,8 +905,8 @@ const TranscriptionEditor: React.FC<TranscriptionEditorProps> = ({
                   {isSummarizing ? (
                       <div className="flex flex-col items-center justify-center h-full gap-4 text-slate-400">
                           <div className="relative">
-                              <Loader2 size={40} className="animate-spin text-primary" />
-                              <Sparkles size={16} className="absolute -top-1 -right-1 text-accent animate-pulse" />
+                              <Spinner size={40} weight="bold" className="animate-spin text-primary" />
+                              <Sparkle size={16} weight="duotone" className="absolute -top-1 -right-1 text-accent animate-pulse" />
                           </div>
                           <div className="text-center">
                               <p className="text-xs font-bold text-slate-700 dark:text-dark-text capitalize">AI is thinking...</p>
@@ -925,7 +923,7 @@ const TranscriptionEditor: React.FC<TranscriptionEditorProps> = ({
                                     className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-dark-border text-slate-400 hover:text-primary transition-all"
                                     title="Copy to clipboard"
                                 >
-                                    {copied ? <Check size={14} className="text-emerald-500" /> : <Copy size={14} />}
+                                    {copied ? <Check size={14} weight="bold" className="text-emerald-500" /> : <Copy size={14} weight="duotone" />}
                                 </button>
                             </div>
                         </div>
@@ -940,7 +938,7 @@ const TranscriptionEditor: React.FC<TranscriptionEditorProps> = ({
                                     onClick={handleApplyEnhancement}
                                     className="w-full bg-gradient-to-tr from-primary to-purple-600 hover:brightness-110 text-white font-bold py-3.5 rounded-2xl text-[13px] flex items-center justify-center gap-2 shadow-xl shadow-primary/20 transition-all active:scale-[0.98]"
                                 >
-                                    <CheckCheck size={18} /> Apply Changes to Document
+                                    <Checks size={18} weight="bold" /> Apply Changes to Document
                                 </button>
                             </div>
                         )}
@@ -948,7 +946,7 @@ const TranscriptionEditor: React.FC<TranscriptionEditorProps> = ({
                   ) : (
                       <div className="h-full flex flex-col items-center justify-center text-center px-4">
                           <div className="w-20 h-20 bg-slate-50 dark:bg-dark-bg rounded-[2.5rem] flex items-center justify-center mb-6 border border-slate-100 dark:border-dark-border shadow-inner">
-                              <WandIcon size={32} className="text-slate-200 dark:text-dark-border" />
+                              <MagicWand size={32} weight="duotone" className="text-slate-200 dark:text-dark-border" />
                           </div>
                           <h4 className="text-sm font-bold text-slate-800 dark:text-white mb-2">Ready to Assist</h4>
                           <p className="text-xs text-slate-400 dark:text-dark-muted leading-relaxed max-w-[180px]">
@@ -965,20 +963,20 @@ const TranscriptionEditor: React.FC<TranscriptionEditorProps> = ({
           <div className="absolute right-4 top-16 bottom-24 w-80 bg-white/95 dark:bg-dark-card/95 backdrop-blur-xl shadow-2xl border border-slate-200 dark:border-dark-border rounded-2xl p-5 flex flex-col animate-in slide-in-from-right-10 duration-300 z-50">
               <div className="flex items-center justify-between mb-4">
                   <h3 className="text-sm font-bold text-slate-800 dark:text-dark-text flex items-center gap-2">
-                      {summaryTitle === "Visual Analysis" ? <Video className="text-primary dark:text-accent" size={16} /> : 
-                       summaryTitle === "Smart Suggestions" ? <WandIcon className="text-primary dark:text-accent" size={16} /> :
-                       <BookOpen className="text-primary dark:text-accent" size={16} />}
+                      {summaryTitle === "Visual Analysis" ? <VideoCamera className="text-primary dark:text-accent" size={16} weight="duotone" /> : 
+                       summaryTitle === "Smart Suggestions" ? <MagicWand className="text-primary dark:text-accent" size={16} weight="duotone" /> :
+                       <BookOpen className="text-primary dark:text-accent" size={16} weight="duotone" />}
                       {summaryTitle}
                   </h3>
                   <button onClick={() => setShowSummarySidebar(false)} className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-dark-border text-slate-400">
-                      <X size={16} />
+                      <X size={16} weight="bold" />
                   </button>
               </div>
               
               <div className="flex-1 overflow-y-auto custom-scrollbar">
                   {isSummarizing ? (
                       <div className="flex flex-col items-center justify-center h-40 gap-3 text-slate-400">
-                          <Loader2 size={28} className="animate-spin text-primary" />
+                          <Spinner size={28} weight="bold" className="animate-spin text-primary" />
                           <span className="text-xs">AI Processing...</span>
                       </div>
                   ) : summary ? (
@@ -991,7 +989,7 @@ const TranscriptionEditor: React.FC<TranscriptionEditorProps> = ({
                                 onClick={handleApplyEnhancement}
                                 className="w-full mt-4 bg-primary hover:bg-primary/90 text-white font-bold py-2.5 rounded-lg text-xs"
                             >
-                                <CheckCheck size={14} /> Apply Suggestions
+                                <Checks size={14} weight="bold" /> Apply Suggestions
                             </button>
                         )}
                       </>
@@ -1013,14 +1011,14 @@ const TranscriptionEditor: React.FC<TranscriptionEditorProps> = ({
             <div className={`w-8 h-8 rounded-xl flex items-center justify-center ${
               toast.type === 'error' ? 'bg-red-600' : toast.type === 'warning' ? 'bg-amber-600' : 'bg-slate-700'
             }`}>
-              <AlertTriangle size={16} />
+              <WarningCircle size={16} weight="duotone" />
             </div>
             <p className="text-sm font-semibold max-w-xs">{toast.message}</p>
             <button 
               onClick={() => setToast(null)}
               className="ml-2 p-1.5 rounded-lg hover:bg-white/20 transition-colors"
             >
-              <X size={14} />
+              <X size={14} weight="bold" />
             </button>
           </div>
         </div>
