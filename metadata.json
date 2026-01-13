@@ -1,0 +1,7 @@
+{
+  "name": "AI Scribe Tool",
+  "description": "Professional audio and video transcription application powered by Gemini 3 Flash Preview. Features real-time microphone recording, video file support, and cloud integration.",
+  "requestFramePermissions": [
+    "microphone"
+  ]
+}
