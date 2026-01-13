@@ -47,8 +47,8 @@ const App: React.FC = () => {
   // Config States
   const [isAutoEditEnabled, setIsAutoEditEnabled] = useState(true);
   const [isSpeakerDetectEnabled, setIsSpeakerDetectEnabled] = useState(true);
-  const [aiProvider, setAiProvider] = useState<'gemini' | 'groq' | 'webspeech'>('gemini');
-  const [geminiModel, setGeminiModel] = useState<'flash' | 'pro'>('pro');
+  const [transcriptionMode, setTranscriptionMode] = useState<'verbatim' | 'polish'>('polish');
+  const [isDeepThinking, setIsDeepThinking] = useState(false);
 
   // Auth States
   const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
@@ -153,9 +153,11 @@ const App: React.FC = () => {
         setProgress((prev) => {
           let increment = 0;
           
-          // Speed settings based on provider
-          const isFast = aiProvider === 'groq' || (aiProvider === 'gemini' && geminiModel === 'flash');
-          const speedFactor = isFast ? 3.5 : 1.2;
+          // Speed simulation
+          let speedFactor = 1.0;
+          if (transcriptionMode === 'verbatim') speedFactor = 3.5; // Groq is fast
+          else if (!isDeepThinking) speedFactor = 2.0; // Flash is moderately fast
+          else speedFactor = 0.8; // Pro/Thinking is slower
 
           if (prev < 40) increment = Math.random() * (2.5 * speedFactor);
           else if (prev < 70) increment = Math.random() * (1.5 * speedFactor);
@@ -164,16 +166,16 @@ const App: React.FC = () => {
           const newProgress = Math.min(prev + increment, 99);
           
           // Technical logs now come from services, keep UI simple here
-          if (prev < 5 && newProgress >= 5) setLogLines(p => [...p, 'Warming up AI engine...']);
+          if (prev < 5 && newProgress >= 5) setLogLines(p => [...p, 'Initializing AI Engine...']);
           
           return newProgress;
         });
-      }, aiProvider === 'groq' ? 40 : (geminiModel === 'flash' ? 60 : 150)); // Significant speed boost for Groq/Flash
+      }, 100);
     } else if (transcription.text) {
       setProgress(100);
     }
     return () => clearInterval(interval);
-  }, [transcription.isLoading, transcription.text, aiProvider, geminiModel]);
+  }, [transcription.isLoading, transcription.text, transcriptionMode, isDeepThinking]);
 
   useEffect(() => {
     return () => { if (micUrl) URL.revokeObjectURL(micUrl); };
@@ -280,17 +282,38 @@ const App: React.FC = () => {
   const executeTranscription = async (mediaBlob: Blob | File, mimeType: string, onStatus?: (msg: string) => void): Promise<string> => {
     let text: string;
     
-    if (aiProvider === 'webspeech') {
-      if (!isWebSpeechSupported()) throw new Error("Web Speech API not supported.");
-      text = await transcribeWithWebSpeech(mediaBlob!, { language: 'en-US' }, (result) => {
-        if (result.isFinal) onStatus?.(`✓ ${result.text.substring(0, 30)}...`);
-      });
-      text = `**Browser Transcription**\n\n${text}`;
-    } else if (aiProvider === 'groq') {
-      text = await transcribeWithGroq(mediaBlob!, { model: 'whisper-large-v3', onStatus });
-      text = `**Groq Whisper Transcription**\n\n${text}`;
-    } else {
-      text = await transcribeAudio(mediaBlob!, mimeType, isAutoEditEnabled, isSpeakerDetectEnabled, geminiModel === 'pro', onStatus);
+    // VERBATIM MODE: Use Groq (Whisper Large V3) for speed and literal accuracy
+    if (transcriptionMode === 'verbatim') {
+      try {
+        text = await transcribeWithGroq(mediaBlob!, { model: 'whisper-large-v3', onStatus });
+        text = `**Verbatim Transcript**\n\n${text}`;
+      } catch (err) {
+        // Fallback to WebSpeech if Groq fails or API key missing, but warn user
+        console.warn("Groq failed, trying WebSpeech", err);
+        if (isWebSpeechSupported()) {
+           onStatus?.("Verbatim engine busy, switching to local backup...");
+           text = await transcribeWithWebSpeech(mediaBlob!, { language: 'en-US' }, (result) => {
+             if (result.isFinal) onStatus?.(`✓ ${result.text.substring(0, 30)}...`);
+           });
+           text = `**Browser Transcription** (Offline Fallback)\n\n${text}`;
+        } else {
+           throw err;
+        }
+      }
+    } 
+    // POLISH MODE: Use Gemini (Flash for Speed, Pro for Thinking/Quality)
+    else {
+      // Logic: If Deep Thinking is ON, use Pro. Else use Flash.
+      // We maps "isDeepThinking" to "useSmartModel" (Pro)
+      text = await transcribeAudio(
+        mediaBlob!, 
+        mimeType, 
+        isAutoEditEnabled, 
+        isSpeakerDetectEnabled, 
+        isDeepThinking, // useSmartModel = true if Thinking is on
+        onStatus
+      );
+      
       // Background classification
       classifyContent(text).then(type => setContentType(type));
     }
@@ -711,7 +734,7 @@ const App: React.FC = () => {
               <h2 className="text-4xl font-bold bg-clip-text text-transparent bg-gradient-to-b from-white to-gray-400 mb-4 tracking-tight">Processing Media</h2>
               <div className="text-accent/80 font-mono text-xs uppercase tracking-widest flex items-center justify-center gap-2">
                  <Cpu size={14} weight="duotone" />
-                 <span>{aiProvider === 'gemini' ? (geminiModel === 'pro' ? 'Gemini 3 Pro + Thinking' : 'Gemini 3 Flash') : (aiProvider === 'groq' ? 'Groq Whisper V3' : 'Browser WebSpeech')}</span>
+                 <span>{transcriptionMode === 'verbatim' ? 'High-Velocity Engine' : (isDeepThinking ? 'Deep Reasoning Engine' : 'Fast Semantic Engine')}</span>
               </div>
             </div>
 
@@ -1008,45 +1031,59 @@ const App: React.FC = () => {
                            </button>
                         </div>
 
-                        {/* Model Selection Bar */}
+                        {/* Model Selection Bar - Abstracted */}
                         <div className="flex bg-slate-100/30 dark:bg-white/5 p-1 rounded-2xl border border-white/20 dark:border-white/5">
-                            {[
-                              { id: 'webspeech', icon: <Microphone size={14} weight="duotone" />, label: 'Free', active: aiProvider === 'webspeech', action: () => setAiProvider('webspeech') },
-                              { id: 'groq', icon: <Lightning size={14} weight="duotone" />, label: 'Groq', active: aiProvider === 'groq', action: () => setAiProvider('groq') },
-                              { id: 'flash', icon: <Sparkle size={14} weight="duotone" />, label: 'Flash', active: aiProvider === 'gemini' && geminiModel === 'flash', action: () => { setAiProvider('gemini'); setGeminiModel('flash'); } },
-                              { id: 'pro', icon: <Brain size={14} weight="duotone" />, label: 'Pro', active: aiProvider === 'gemini' && geminiModel === 'pro', action: () => { setAiProvider('gemini'); setGeminiModel('pro'); } }
-                            ].map((m) => (
-                              <button
-                                key={m.id}
-                                onClick={m.action}
-                                title={m.label}
-                                className={`flex-1 flex items-center justify-center py-2.5 rounded-xl transition-all ${m.active ? 'bg-white dark:bg-dark-card text-primary shadow-sm scale-[1.02]' : 'text-slate-400 hover:text-slate-600'}`}
-                              >
-                                {m.icon}
-                              </button>
-                            ))}
+                            <button
+                              onClick={() => setTranscriptionMode('verbatim')}
+                              className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl transition-all ${transcriptionMode === 'verbatim' ? 'bg-white dark:bg-dark-card text-primary shadow-sm scale-[1.02]' : 'text-slate-400 hover:text-slate-600'}`}
+                            >
+                              <Lightning size={16} weight={transcriptionMode === 'verbatim' ? 'fill' : 'duotone'} />
+                              <span className="text-xs font-bold">Verbatim</span>
+                            </button>
+                            <button
+                              onClick={() => setTranscriptionMode('polish')}
+                              className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl transition-all ${transcriptionMode === 'polish' ? 'bg-white dark:bg-dark-card text-primary shadow-sm scale-[1.02]' : 'text-slate-400 hover:text-slate-600'}`}
+                            >
+                              <Sparkle size={16} weight={transcriptionMode === 'polish' ? 'fill' : 'duotone'} />
+                              <span className="text-xs font-bold">Polish</span>
+                            </button>
                         </div>
+
+                        {/* Additional Toggles */}
+                        {transcriptionMode === 'polish' && (
+                          <div className="flex flex-col gap-2 animate-in slide-in-from-top-2 fade-in">
+                             <label className="flex items-center gap-3 p-3 rounded-xl bg-slate-50 dark:bg-dark-card/30 border border-slate-100 dark:border-white/5 cursor-pointer group hover:border-primary/20 transition-all">
+                                <div className={`w-5 h-5 rounded-md border flex items-center justify-center transition-all ${isDeepThinking ? 'bg-primary border-primary text-white' : 'border-slate-300 dark:border-white/20 bg-white dark:bg-transparent'}`}>
+                                  {isDeepThinking && <Check size={12} weight="bold" />}
+                                </div>
+                                <input type="checkbox" className="hidden" checked={isDeepThinking} onChange={(e) => setIsDeepThinking(e.target.checked)} />
+                                <div className="flex-1">
+                                   <div className="flex items-center gap-2">
+                                      <Brain size={14} weight="duotone" className="text-purple-500"/>
+                                      <span className="text-xs font-bold text-slate-700 dark:text-white">Deep Thinking</span>
+                                   </div>
+                                   <p className="text-[9px] text-slate-400 dark:text-dark-muted font-medium mt-0.5">Slower, but higher reasoning capability.</p>
+                                </div>
+                             </label>
+                          </div>
+                        )}
 
                         <button
                           onClick={handleTranscribe}
                           disabled={!isReadyToTranscribe()}
                           className={`group relative overflow-hidden rounded-[2rem] py-4 transition-all duration-500 active:scale-95 disabled:opacity-20 ${
-                            aiProvider === 'webspeech' ? 'bg-emerald-500' : 
-                            aiProvider === 'groq' ? 'bg-orange-500' : 
-                            geminiModel === 'flash' ? 'bg-amber-500' : 'bg-slate-900 dark:bg-white'
+                            transcriptionMode === 'verbatim' ? 'bg-orange-500' : 'bg-slate-900 dark:bg-white'
                           }`}
                         >
                           <div className={`absolute inset-0 bg-gradient-to-r ${
-                            aiProvider === 'webspeech' ? 'from-emerald-500 to-teal-500' : 
-                            aiProvider === 'groq' ? 'from-orange-500 to-red-500' : 
-                            geminiModel === 'flash' ? 'from-amber-500 to-orange-500' : 'from-primary via-purple-600 to-accent'
+                             transcriptionMode === 'verbatim' ? 'from-orange-500 to-red-500' : 'from-primary via-purple-600 to-accent'
                           } opacity-0 group-hover:opacity-100 transition-opacity duration-500`}></div>
                           
                           <div className="relative z-10 flex items-center justify-center gap-3">
-                              <span className={`text-xs font-black uppercase tracking-[0.2em] ${(aiProvider === 'gemini' && geminiModel === 'pro') ? 'text-white dark:text-slate-900 group-hover:text-white' : 'text-white'}`}>
-                                 {aiProvider === 'webspeech' ? 'Initialize Free' : (aiProvider === 'groq' ? 'Groq Transcribe' : (geminiModel === 'pro' ? 'Execute Pro' : 'Start Flash'))}
+                              <span className="text-xs font-black uppercase tracking-[0.2em] text-white dark:text-slate-900 group-hover:text-white">
+                                 {transcriptionMode === 'verbatim' ? 'Start Transcription' : (isDeepThinking ? 'Start Deep Analysis' : 'Start Intelligent Mode')}
                               </span>
-                              <ArrowRight size={14} weight="bold" className={`transition-transform group-hover:translate-x-1 ${(aiProvider === 'gemini' && geminiModel === 'pro') ? 'text-white dark:text-slate-900 group-hover:text-white' : 'text-white'}`} />
+                              <ArrowRight size={14} weight="bold" className="text-white dark:text-slate-900 group-hover:text-white transition-transform group-hover:translate-x-1" />
                           </div>
                         </button>
                      </div>
