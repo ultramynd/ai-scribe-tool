@@ -1259,6 +1259,7 @@ const TranscriptionEditor: React.FC<TranscriptionEditorProps> = ({
               rounded-none md:rounded-2xl p-5 flex flex-col 
               animate-in slide-in-from-bottom md:slide-in-from-right-10 duration-300 
               z-[60] md:z-50 md:resize overflow-hidden 
+              group
               ${!summaryPosition ? 'md:right-4 md:top-16 md:bottom-24' : ''}
             `}
             style={summaryPosition ? {
@@ -1270,12 +1271,12 @@ const TranscriptionEditor: React.FC<TranscriptionEditorProps> = ({
               maxHeight: '80vh'
             } : {}}
           >
+              {/* Drag Handle at Top - Subtle, shows on hover */}
               <div 
-                className={`flex items-center justify-between mb-4 cursor-grab active:cursor-grabbing select-none ${isDraggingSummary ? 'cursor-grabbing' : ''}`}
+                className="flex justify-center py-1 cursor-grab active:cursor-grabbing select-none -mt-2 mb-1 opacity-0 group-hover:opacity-100 transition-opacity"
                 onMouseDown={(e) => {
                   e.preventDefault();
                   setIsDraggingSummary(true);
-                  // Find the draggable container (this div's parent is relative, this div is absolute)
                   const rect = (e.currentTarget.closest('.absolute') as HTMLElement)?.getBoundingClientRect();
                   if (rect) {
                     summaryDragStartRef.current = {
@@ -1287,15 +1288,17 @@ const TranscriptionEditor: React.FC<TranscriptionEditorProps> = ({
                   }
                 }}
               >
-                  <div className="flex items-center gap-2 pointer-events-none">
-                      <DotsSixVertical size={16} weight="bold" className="text-slate-300 dark:text-slate-600" />
-                      <h3 className="text-sm font-bold text-slate-800 dark:text-dark-text flex items-center gap-2">
-                          {summaryTitle === "Visual Analysis" ? <VideoCamera className="text-primary dark:text-accent" size={16} weight="duotone" /> : 
-                           summaryTitle === "Smart Suggestions" ? <MagicWand className="text-primary dark:text-accent" size={16} weight="duotone" /> :
-                           <BookOpen className="text-primary dark:text-accent" size={16} weight="duotone" />}
-                          {summaryTitle}
-                      </h3>
-                  </div>
+                <div className="w-8 h-1 bg-slate-300 dark:bg-slate-600 rounded-full"></div>
+              </div>
+
+              {/* Header */}
+              <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-sm font-bold text-slate-800 dark:text-dark-text flex items-center gap-2">
+                      {summaryTitle === "Visual Analysis" ? <VideoCamera className="text-primary dark:text-accent" size={16} weight="duotone" /> : 
+                       summaryTitle === "Smart Suggestions" ? <MagicWand className="text-primary dark:text-accent" size={16} weight="duotone" /> :
+                       <BookOpen className="text-primary dark:text-accent" size={16} weight="duotone" />}
+                      {summaryTitle}
+                  </h3>
                   <div className="flex items-center gap-2">
                     <button 
                       onClick={() => setIsPreviewMode(!isPreviewMode)} 
