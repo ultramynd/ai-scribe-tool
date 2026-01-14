@@ -606,72 +606,59 @@ const App: React.FC = () => {
             
             {/* Right: Actions */}
             <div className="flex items-center gap-2">
-              {/* Copy As Dropdown */}
-              <div className="relative group">
-                <button className="flex items-center gap-1.5 px-3 py-2 rounded-2xl text-xs font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-dark-card transition-all">
-                  <Copy size={16} weight="duotone" />
-                  <span>Copy As</span>
-                </button>
-                <div className="absolute top-full left-0 mt-2 opacity-0 group-hover:opacity-100 pointer-events-none group-hover:pointer-events-auto transition-all duration-200 scale-95 group-hover:scale-100 origin-top-left z-50">
-                  <div className="bg-white dark:bg-dark-card rounded-2xl shadow-xl border border-slate-100 dark:border-dark-border p-1.5 min-w-[140px]">
-                    <button 
-                      onClick={() => {
-                        navigator.clipboard.writeText(transcription.text || '');
-                        setDriveSaved(true);
-                        setTimeout(() => setDriveSaved(false), 2000);
-                      }}
-                      className="w-full flex items-center gap-2.5 px-3 py-2.5 text-left text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-white/5 rounded-xl transition-all group"
-                    >
-                      <div className="w-7 h-7 rounded-lg bg-slate-100 dark:bg-dark-border flex items-center justify-center group-hover:scale-110 transition-transform">
-                        <FileText size={14} className="text-slate-400 group-hover:text-primary"/>
-                      </div>
-                      Markdown
-                    </button>
-                    <button 
-                      onClick={() => {
-                        const html = (transcription.text || '').replace(/\*\*(.*?)\*\*/g, '<b>$1</b>').replace(/\*(.*?)\*/g, '<i>$1</i>').replace(/\n/g, '<br>');
-                        navigator.clipboard.writeText(html);
-                        setDriveSaved(true);
-                        setTimeout(() => setDriveSaved(false), 2000);
-                      }}
-                      className="w-full flex items-center gap-2.5 px-3 py-2.5 text-left text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-white/5 rounded-xl transition-all group"
-                    >
-                      <div className="w-7 h-7 rounded-lg bg-orange-100/50 dark:bg-orange-900/20 flex items-center justify-center group-hover:scale-110 transition-transform">
-                        <Export size={14} weight="duotone" className="text-orange-500"/>
-                      </div>
-                      HTML
-                    </button>
-                    <button 
-                      onClick={() => {
-                        const plain = (transcription.text || '').replace(/[*_#\[\]]/g, '');
-                        navigator.clipboard.writeText(plain);
-                        setDriveSaved(true);
-                        setTimeout(() => setDriveSaved(false), 2000);
-                      }}
-                      className="w-full flex items-center gap-2.5 px-3 py-2.5 text-left text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-white/5 rounded-xl transition-all group"
-                    >
-                      <div className="w-7 h-7 rounded-lg bg-blue-100/50 dark:bg-blue-900/20 flex items-center justify-center group-hover:scale-110 transition-transform">
-                        <FileText size={14} className="text-blue-500"/>
-                      </div>
-                      Plain Text
-                    </button>
+              {/* Desktop Desktop Tools (Consolidated for small screens) */}
+              <div className="hidden lg:flex items-center gap-1">
+                {/* Copy As Dropdown */}
+                <div className="relative group">
+                  <button className="flex items-center gap-1.5 px-3 py-2 rounded-2xl text-xs font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-dark-card transition-all">
+                    <Copy size={16} weight="duotone" />
+                    <span>Copy As</span>
+                  </button>
+                  <div className="absolute top-full left-0 mt-2 opacity-0 group-hover:opacity-100 pointer-events-none group-hover:pointer-events-auto transition-all duration-200 scale-95 group-hover:scale-100 origin-top-left z-50">
+                    <div className="bg-white dark:bg-dark-card rounded-2xl shadow-xl border border-slate-100 dark:border-dark-border p-1.5 min-w-[140px]">
+                      <button 
+                        onClick={() => {
+                          navigator.clipboard.writeText(transcription.text || '');
+                          setDriveSaved(true);
+                          setTimeout(() => setDriveSaved(false), 2000);
+                        }}
+                        className="w-full flex items-center gap-2.5 px-3 py-2.5 text-left text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-white/5 rounded-xl transition-all group"
+                      >
+                        <div className="w-7 h-7 rounded-lg bg-purple-100/50 dark:bg-purple-900/20 flex items-center justify-center group-hover:scale-110 transition-transform">
+                          <Check size={14} className="text-primary dark:text-accent"/>
+                        </div>
+                        Everything
+                      </button>
+                      <button 
+                        onClick={() => {
+                          const html = (transcription.text || '').replace(/\*\*(.*?)\*\*/g, '<b>$1</b>').replace(/\*(.*?)\*/g, '<i>$1</i>').replace(/\n/g, '<br>');
+                          navigator.clipboard.writeText(html);
+                          setDriveSaved(true);
+                          setTimeout(() => setDriveSaved(false), 2000);
+                        }}
+                        className="w-full flex items-center gap-2.5 px-3 py-2.5 text-left text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-white/5 rounded-xl transition-all group"
+                      >
+                        <div className="w-7 h-7 rounded-lg bg-orange-100/50 dark:bg-orange-900/20 flex items-center justify-center group-hover:scale-110 transition-transform">
+                          <Export size={14} weight="duotone" className="text-orange-500"/>
+                        </div>
+                        HTML
+                      </button>
+                    </div>
                   </div>
                 </div>
-              </div>
 
-              {/* AI Features Dropdown */}
-              <div className="relative group">
+                {/* Smart Editor Side trigger */}
                 <button 
                   onClick={() => setShowAiSidebar(!showAiSidebar)}
-                  className={`flex items-center gap-1.5 px-3 py-2 rounded-2xl text-xs font-bold transition-all ${showAiSidebar ? 'bg-primary/10 text-primary' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-dark-card'}`}
+                  className={`flex items-center gap-1.5 px-3 py-2 rounded-2xl text-xs font-bold transition-all ${showAiSidebar ? 'text-primary dark:text-accent bg-primary/5' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-dark-card'}`}
                 >
-                  <Sparkle size={16} weight="duotone" className="text-primary dark:text-accent animate-pulse"/>
-                  <span className="bg-gradient-to-r from-primary to-purple-600 bg-clip-text text-transparent">Smart Editor</span>
+                  <Sparkle size={16} weight="duotone" className="text-primary dark:text-accent"/>
+                  <span>Smart Editor</span>
                   <span className="px-1.5 py-0.5 rounded-md bg-primary/10 text-[8px] font-black tracking-tighter text-primary border border-primary/20 leading-none">BETA</span>
                 </button>
               </div>
 
-              {/* Export Dropdown */}
+              {/* Export Button (Primary Tool) */}
               <div className="relative group">
                 <button className="flex items-center gap-1.5 px-3 py-2 rounded-2xl bg-slate-900 dark:bg-white text-white dark:text-slate-900 text-xs font-bold hover:opacity-90 transition-all shadow-lg shadow-slate-900/10">
                   <CloudArrowDown size={16} weight="duotone" />
@@ -679,7 +666,29 @@ const App: React.FC = () => {
                 </button>
                 
                 <div className="absolute top-full right-0 mt-2 opacity-0 group-hover:opacity-100 pointer-events-none group-hover:pointer-events-auto transition-all duration-200 scale-95 group-hover:scale-100 origin-top-right z-50">
-                    <div className="bg-white dark:bg-dark-card rounded-2xl shadow-xl border border-slate-100 dark:border-dark-border p-1.5 min-w-[160px]">
+                    <div className="bg-white dark:bg-dark-card rounded-2xl shadow-xl border border-slate-100 dark:border-dark-border p-1.5 min-w-[170px]">
+                        {/* Mobile/Small Screen Tools (Inside Export or Tools Menu) */}
+                        <div className="lg:hidden pb-1 mb-1 border-b border-slate-100 dark:border-dark-border">
+                          <button 
+                            onClick={() => setShowAiSidebar(!showAiSidebar)}
+                            className="w-full flex items-center gap-3 px-3 py-2.5 text-left text-xs font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-white/5 rounded-xl transition-all"
+                          >
+                            <Sparkle size={16} weight="duotone" className="text-primary"/>
+                            Smart Editor
+                          </button>
+                          <button 
+                            onClick={() => {
+                              navigator.clipboard.writeText(transcription.text || '');
+                              setDriveSaved(true);
+                              setTimeout(() => setDriveSaved(false), 2000);
+                            }}
+                            className="w-full flex items-center gap-3 px-3 py-2.5 text-left text-xs font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-white/5 rounded-xl transition-all"
+                          >
+                            <Copy size={16} weight="duotone" className="text-slate-400"/>
+                            Copy All
+                          </button>
+                        </div>
+                        
                         <button 
                           onClick={() => handleSaveToDrive('doc')}
                           disabled={isSavingToDrive}
@@ -699,44 +708,74 @@ const App: React.FC = () => {
                           </div>
                           Text File (.txt)
                         </button>
-                        <button 
-                          onClick={handleExportDocx}
-                          className="w-full flex items-center gap-3 px-3 py-2.5 text-left text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-white/5 rounded-xl transition-all group"
-                        >
-                          <div className="w-7 h-7 rounded-lg bg-blue-100/50 dark:bg-blue-900/20 flex items-center justify-center group-hover:scale-110 transition-transform">
-                            <Export size={14} weight="duotone" className="text-blue-500"/>
-                          </div>
-                          Word Document (.docx)
-                        </button>
                     </div>
                 </div>
               </div>
 
-              <button 
-                onClick={() => setShowArchiveSidebar(true)}
-                className="w-9 h-9 rounded-xl flex items-center justify-center text-slate-500 hover:text-primary hover:bg-slate-100 dark:hover:bg-dark-card transition-all"
-                title="Open Archive"
-              >
-                <Clock size={16} weight="duotone" />
-              </button>
-
               <div className="w-px h-5 bg-slate-200 dark:bg-dark-border mx-1"></div>
 
-              <button 
-                onClick={() => setDarkMode(!darkMode)}
-                className="w-9 h-9 rounded-xl flex items-center justify-center text-slate-500 hover:text-primary hover:bg-slate-100 dark:hover:bg-dark-card transition-all"
-                title="Toggle Theme"
-              >
-                {darkMode ? <Sun size={16} weight="duotone" /> : <Moon size={16} weight="duotone" />}
-              </button>
+              {/* Global Actions Group */}
+              <div className="flex items-center gap-1 sm:gap-2">
+                <div className="hidden sm:flex items-center gap-1 sm:gap-2">
+                  <button 
+                    onClick={() => setShowArchiveSidebar(true)}
+                    className="flex items-center gap-2 px-3 py-2 rounded-xl text-slate-500 hover:text-primary hover:bg-slate-100 dark:hover:bg-dark-card transition-all font-bold text-xs"
+                    title="Open Archive"
+                  >
+                    <Clock size={16} weight="duotone" />
+                    <span>Archive</span>
+                  </button>
 
-              <button 
-                onClick={() => safeNavigation(clearAll)}
-                className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-primary/10 text-primary dark:text-accent hover:bg-primary/20 transition-all font-semibold text-xs"
-              >
-                <Plus size={14} weight="bold" />
-                New
-              </button>
+                  <button 
+                    onClick={() => setDarkMode(!darkMode)}
+                    className="w-9 h-9 rounded-xl flex items-center justify-center text-slate-500 hover:text-primary hover:bg-slate-100 dark:hover:bg-dark-card transition-all"
+                    title="Toggle Theme"
+                  >
+                    {darkMode ? <Sun size={16} weight="duotone" /> : <Moon size={16} weight="duotone" />}
+                  </button>
+
+                  <button 
+                    onClick={() => safeNavigation(clearAll)}
+                    className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-primary/10 text-primary dark:text-accent hover:bg-primary/20 transition-all font-bold text-xs"
+                  >
+                    <Plus size={14} weight="bold" />
+                    New
+                  </button>
+                </div>
+
+                {/* Mobile "More" Menu */}
+                <div className="sm:hidden relative group">
+                  <button className="w-9 h-9 rounded-xl flex items-center justify-center text-slate-500 hover:bg-slate-100 dark:hover:bg-dark-card transition-all">
+                    <List size={18} weight="bold" />
+                  </button>
+                  <div className="absolute top-full right-0 mt-2 opacity-0 group-hover:opacity-100 pointer-events-none group-hover:pointer-events-auto transition-all duration-200 scale-95 group-hover:scale-100 origin-top-right z-50">
+                    <div className="bg-white dark:bg-dark-card rounded-2xl shadow-xl border border-slate-100 dark:border-dark-border p-1.5 min-w-[160px]">
+                      <button 
+                        onClick={() => setShowArchiveSidebar(true)}
+                        className="w-full flex items-center gap-3 px-3 py-2.5 text-left text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-white/5 rounded-xl transition-all"
+                      >
+                        <Clock size={16} weight="duotone" className="text-slate-400" />
+                        Archive
+                      </button>
+                      <button 
+                        onClick={() => setDarkMode(!darkMode)}
+                        className="w-full flex items-center gap-3 px-3 py-2.5 text-left text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-white/5 rounded-xl transition-all"
+                      >
+                        {darkMode ? <Sun size={16} /> : <Moon size={16} />}
+                        Theme
+                      </button>
+                      <div className="h-px bg-slate-100 dark:bg-dark-border my-1"></div>
+                      <button 
+                        onClick={() => safeNavigation(clearAll)}
+                        className="w-full flex items-center gap-3 px-3 py-2.5 text-left text-xs font-bold text-primary dark:text-accent hover:bg-primary/5 rounded-xl transition-all"
+                      >
+                        <Plus size={16} weight="bold" />
+                        New Transcription
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         </header>

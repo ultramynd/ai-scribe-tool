@@ -1071,7 +1071,7 @@ const TranscriptionEditor: React.FC<TranscriptionEditorProps> = ({
                       </div>
                       <div>
                           <div className="flex items-center gap-1.5">
-                              <h3 className="text-sm font-bold text-slate-900 dark:text-white leading-none">Smart Assistant</h3>
+                              <h3 className="text-sm font-bold text-slate-900 dark:text-white leading-none">Smart Editor</h3>
                               <span className="px-1.5 py-0.5 rounded-md bg-primary/10 text-[8px] font-black tracking-tighter text-primary border border-primary/20 leading-none">BETA</span>
                           </div>
                           <p className="text-[10px] text-slate-500 dark:text-dark-muted mt-1 uppercase tracking-wider font-bold">Document Intelligence</p>
