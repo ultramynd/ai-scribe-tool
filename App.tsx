@@ -758,25 +758,6 @@ const App: React.FC = () => {
                   >
                     {darkMode ? <Sun size={20} weight="duotone" /> : <Moon size={20} weight="duotone" />}
                   </button>
-
-                  {/* Auth Button */}
-                  {googleAccessToken ? (
-                    <button 
-                      onClick={handleGoogleLogout}
-                      className="flex items-center gap-2.5 px-5 py-2.5 rounded-2xl bg-slate-50 dark:bg-dark-bg border border-slate-200/50 dark:border-white/5 text-[10px] font-black text-slate-500 dark:text-slate-400 tracking-widest uppercase hover:bg-slate-100 dark:hover:bg-white/5 transition-all group"
-                    >
-                      <span>Connected</span>
-                      <SignOut size={16} weight="bold" className="text-slate-400 group-hover:text-primary transition-transform" />
-                    </button>
-                  ) : (
-                    <button 
-                      onClick={handleGoogleLogin}
-                      className="flex items-center gap-2.5 px-5 py-2.5 rounded-2xl bg-white dark:bg-dark-card border border-slate-100 dark:border-white/5 text-[10px] font-black text-slate-500 dark:text-slate-400 tracking-widest uppercase hover:shadow-md transition-all group"
-                    >
-                      <SignIn size={16} weight="bold" className="text-slate-400 group-hover:text-primary transition-colors" />
-                      <span>Login</span>
-                    </button>
-                  )}
                 </div>
 
                 {/* Mobile "More" Menu */}
@@ -919,11 +900,17 @@ const App: React.FC = () => {
                </div>
             </div>
 
-            <div className="text-center mb-12">
+            <div className="text-center mb-8 relative">
               <h2 className="text-4xl font-bold bg-clip-text text-transparent bg-gradient-to-b from-white to-gray-400 mb-4 tracking-tight animate-in fade-in slide-in-from-bottom-4 duration-700">Processing Media</h2>
               <div className="text-accent/80 font-mono text-xs uppercase tracking-widest flex items-center justify-center gap-2 animate-in fade-in slide-in-from-bottom-4 duration-700" style={{ animationDelay: '0.2s' }}>
                  <Cpu size={14} weight="duotone" className="animate-pulse" />
                  <span>{transcriptionMode === 'verbatim' ? 'High-Velocity Engine' : (isDeepThinking ? 'Deep Reasoning Engine' : 'Fast Semantic Engine')}</span>
+              </div>
+              
+              {/* Rate Limit Note */}
+              <div className="mt-6 inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-amber-500/10 border border-amber-500/20 text-[10px] font-bold text-amber-500 animate-in fade-in slide-in-from-bottom-2 duration-1000" style={{ animationDelay: '1.5s' }}>
+                <Clock size={12} weight="bold" />
+                <span className="uppercase tracking-wider">Quota Reset: Please wait 60s if transcription fails</span>
               </div>
             </div>
 
@@ -998,16 +985,16 @@ const App: React.FC = () => {
       {/* Glass Header */}
       <header className="glass-header sticky top-0 z-50 transition-all duration-300">
         <div className="max-w-5xl mx-auto px-6 h-20 flex items-center justify-between text-slate-900 dark:text-white">
-          <div className="flex items-center gap-3 cursor-pointer group" onClick={() => safeNavigation(clearAll)}>
-            <div className="bg-gradient-to-tr from-primary to-purple-600 p-2.5 rounded-2xl text-white shadow-xl shadow-primary/20 group-hover:scale-110 group-hover:rotate-3 transition-all duration-500">
+          <div className="flex items-center gap-3.5 cursor-pointer group" onClick={() => safeNavigation(clearAll)}>
+            <div className="w-10 h-10 bg-primary rounded-full flex items-center justify-center shadow-lg shadow-primary/20 group-hover:scale-110 transition-transform duration-500">
               <Lightning size={20} weight="fill" className="text-white" />
             </div>
             <div className="flex flex-col">
-              <div className="text-xl font-extrabold tracking-tight flex items-center gap-2 leading-none">
-                <span>Scribe<span className="text-primary dark:text-accent">AI</span></span>
-                <span className="text-[10px] px-2 py-0.5 rounded-full bg-primary/10 text-primary dark:bg-accent/20 dark:text-accent font-bold uppercase tracking-wider">Beta</span>
+              <div className="flex items-center gap-2">
+                <span className="text-xl font-black tracking-tight text-slate-900 dark:text-white leading-none">ScribeAI</span>
+                <span className="px-1.5 py-0.5 rounded-md bg-primary/10 text-[8px] font-black tracking-tighter text-primary border border-primary/20 leading-none">BETA</span>
               </div>
-              <span className="text-[9px] text-slate-400 dark:text-dark-muted font-bold uppercase tracking-[0.2em] mt-1">Intelligence</span>
+              <span className="text-[10px] text-slate-400 dark:text-dark-muted font-bold tracking-[0.2em] uppercase leading-none mt-1">Intelligence</span>
             </div>
           </div>
           
@@ -1016,45 +1003,44 @@ const App: React.FC = () => {
              {/* Archive Button */}
              <button 
                onClick={() => setShowArchiveSidebar(true)}
-               className="flex items-center gap-2 text-xs font-bold text-slate-500 hover:text-primary dark:hover:text-accent px-4 py-2.5 rounded-2xl bg-white/50 dark:bg-dark-card/50 border border-white/60 dark:border-white/5 transition-all shadow-sm"
+               className="flex items-center gap-2.5 px-5 py-2.5 rounded-2xl bg-white dark:bg-dark-card border border-slate-100 dark:border-white/5 text-xs font-bold text-slate-600 dark:text-slate-300 hover:shadow-md transition-all group"
              >
-               <Clock size={18} weight="duotone" />
+               <Clock size={18} weight="duotone" className="text-slate-400 group-hover:text-primary transition-colors" />
                <span className="hidden sm:inline">Archive</span>
                {archiveItems.length > 0 && (
-                 <span className="flex h-2 w-2 rounded-full bg-primary animate-pulse"></span>
+                 <div className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse ml-0.5"></div>
                )}
              </button>
 
              {/* Theme Toggle */}
              <button 
                onClick={() => setDarkMode(!darkMode)}
-               className="w-10 h-10 rounded-2xl flex items-center justify-center hover:bg-white/50 dark:hover:bg-dark-card/50 hover:text-primary dark:hover:text-accent transition-all duration-300 border border-transparent hover:border-white/50 dark:hover:border-white/10"
+               className="w-10 h-10 rounded-2xl flex items-center justify-center text-slate-500 hover:text-primary hover:bg-slate-100 dark:hover:bg-white/5 transition-all"
+               title="Toggle Theme"
              >
                {darkMode ? <Sun size={20} weight="duotone" /> : <Moon size={20} weight="duotone" />}
              </button>
 
              {driveScriptsLoaded && (
                googleAccessToken ? (
-                 <div className="flex items-center gap-3 bg-white/50 dark:bg-dark-card/50 backdrop-blur-md border border-white/60 dark:border-white/5 pl-4 pr-1 py-1 rounded-2xl shadow-sm">
-                   <div className="text-[10px] font-bold text-slate-600 dark:text-dark-muted uppercase tracking-wider">Connected</div>
-                   <button
-                     onClick={handleGoogleLogout}
-                     className="p-1.5 text-slate-400 dark:text-dark-muted hover:text-red-500 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-xl transition-all"
-                   >
-                     <SignOut size={16} weight="duotone" />
-                   </button>
-                 </div>
+                 <button 
+                    onClick={handleGoogleLogout}
+                    className="flex items-center gap-2.5 px-5 py-2.5 rounded-2xl bg-slate-50 dark:bg-dark-bg border border-slate-200/50 dark:border-white/5 text-[10px] font-black text-slate-500 dark:text-slate-400 tracking-widest uppercase hover:bg-slate-100 dark:hover:bg-white/5 transition-all group"
+                  >
+                    <span>Connected</span>
+                    <SignOut size={16} weight="bold" className="text-slate-400 group-hover:text-primary transition-transform" />
+                  </button>
                ) : (
-                 googleClientId ? (
-                   <button
+                 googleClientId && (
+                    <button 
                       onClick={handleGoogleLogin}
                       disabled={isLoggingIn}
-                      className="flex items-center gap-2 text-xs font-bold text-slate-700 dark:text-dark-text hover:text-primary dark:hover:text-accent px-5 py-2.5 rounded-2xl bg-white/50 dark:bg-dark-card/50 border border-white/60 dark:border-white/5 hover:border-primary/30 transition-all shadow-sm"
-                   >
-                     {isLoggingIn ? <Spinner size={16} weight="bold" className="animate-spin" /> : <SignIn size={16} weight="duotone" />}
-                     <span>Sign In</span>
-                   </button>
-                 ) : null
+                      className="flex items-center gap-2.5 px-5 py-2.5 rounded-2xl bg-white dark:bg-dark-card border border-slate-100 dark:border-white/5 text-[10px] font-black text-slate-500 dark:text-slate-400 tracking-widest uppercase hover:shadow-md transition-all group"
+                    >
+                      {isLoggingIn ? <Spinner size={16} weight="bold" className="animate-spin text-primary" /> : <SignIn size={16} weight="bold" className="text-slate-400 group-hover:text-primary transition-colors" />}
+                      <span>Login</span>
+                    </button>
+                 )
                )
              )}
           </div>
@@ -1275,6 +1261,12 @@ const App: React.FC = () => {
                                        <div className="text-left">
                                           <div className="text-xs font-bold text-slate-700 dark:text-slate-200">Deep Thinking</div>
                                           <div className="text-[10px] text-slate-500">Enhanced reasoning (Slower)</div>
+                                          {isDeepThinking && (
+                                             <div className="mt-1 flex items-center gap-1.5 text-[9px] font-bold text-amber-500 animate-in fade-in duration-300">
+                                                <WarningCircle size={10} weight="fill" />
+                                                <span>Exhausts quota significantly faster</span>
+                                             </div>
+                                          )}
                                        </div>
                                     </div>
                                     <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center transition-all ${isDeepThinking ? 'border-purple-500 bg-purple-500' : 'border-slate-300 dark:border-slate-600'}`}>
