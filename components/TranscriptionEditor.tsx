@@ -9,7 +9,7 @@ import {
   Spinner, VideoCamera, TextHOne, TextHTwo, TextHThree, Palette, 
   Eraser, DotsThree, ArrowRight, Microphone, UploadSimple, Stop, 
   Play, Pause, WarningCircle, MagicWand, Timer, Warning, CaretUp,
-  List, Repeat, ArrowsOutSimple, ArrowsInSimple, Scissors, Funnel, ChatCenteredText
+  List, Repeat, ArrowsOutSimple, ArrowsInSimple, Scissors, Funnel, ChatCenteredText, DownloadSimple, DotsSixVertical
 } from '@phosphor-icons/react';
 import PlaybackControl from './PlaybackControl';
 import { generateTxt, generateDoc, generateDocx, generateSrt } from '../utils/exportUtils';
@@ -78,6 +78,7 @@ const TranscriptionEditor: React.FC<TranscriptionEditorProps> = ({
   const [summaryTitle, setSummaryTitle] = useState("Smart Summary");
   const [isEnhancing, setIsEnhancing] = useState(false);
   const [isAiSidebarExpanded, setIsAiSidebarExpanded] = useState(false);
+  const [isPreviewMode, setIsPreviewMode] = useState(true);
 
   // Real-time Transcription State
   const [isRecordingLive, setIsRecordingLive] = useState(false);
@@ -1135,19 +1136,46 @@ const TranscriptionEditor: React.FC<TranscriptionEditorProps> = ({
                       <div className="flex flex-col h-full gap-5">
                         <div className="flex items-center justify-between">
                             <span className="text-[10px] font-extrabold uppercase tracking-widest text-slate-400 dark:text-dark-muted">{summaryTitle}</span>
-                            <div className="flex items-center gap-1">
-                                <span className={`w-1.5 h-1.5 rounded-full ${isSummarizing ? 'bg-amber-500 animate-pulse' : 'bg-emerald-500'}`}></span>
-                                <span className="text-[9px] font-bold text-slate-400 uppercase tracking-tighter">{isSummarizing ? "Processing" : "Ready to Edit"}</span>
+                            <div className="flex items-center gap-2">
+                                <button 
+                                  onClick={() => { setShowSummarySidebar(true); onAiSidebarToggle(); }} 
+                                  className="p-1.5 hover:bg-slate-200 dark:hover:bg-dark-border rounded text-slate-400 dark:text-dark-muted transition-colors" 
+                                  title="Pop Out (Draggable)"
+                                >
+                                  <ArrowsOutSimple size={12} weight="bold"/>
+                                </button>
+                                <button 
+                                  onClick={() => setIsPreviewMode(!isPreviewMode)} 
+                                  className="flex items-center gap-1 bg-slate-100 dark:bg-white/5 px-2 py-1 rounded text-[9px] font-bold text-slate-500 hover:bg-slate-200 dark:hover:bg-white/10 transition-colors"
+                                >
+                                  {isPreviewMode ? (
+                                    <> <PencilSimple size={10} weight="bold" /> Edit </>
+                                  ) : (
+                                    <> <Eye size={10} weight="bold" /> Preview </>
+                                  )}
+                                </button>
+                                <div className="flex items-center gap-1 ml-1">
+                                    <span className={`w-1.5 h-1.5 rounded-full ${isSummarizing ? 'bg-amber-500 animate-pulse' : 'bg-emerald-500'}`}></span>
+                                    <span className="text-[9px] font-bold text-slate-400 uppercase tracking-tighter">{isSummarizing ? "Processing" : "Ready"}</span>
+                                </div>
                             </div>
                         </div>
                         
-                        <div className="flex-1 relative group">
-                            <textarea 
-                                value={editedSummary || ''}
-                                onChange={(e) => setEditedSummary(e.target.value)}
-                                className="w-full h-full bg-white/50 dark:bg-dark-bg/50 border border-slate-200 dark:border-dark-border rounded-2xl p-4 text-sm leading-relaxed font-medium text-slate-700 dark:text-slate-200 focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all resize-none custom-scrollbar shadow-inner"
-                                placeholder="AI result will appear here. You can also type directly to refine it..."
-                            />
+                        <div className="flex-1 relative group overflow-hidden">
+                            {isPreviewMode ? (
+                              <div className="w-full h-full bg-white dark:bg-dark-bg border border-slate-200 dark:border-dark-border rounded-2xl p-4 overflow-y-auto custom-scrollbar shadow-inner">
+                                <div className="prose prose-sm prose-slate dark:prose-invert max-w-none text-xs">
+                                  <ReactMarkdown>{editedSummary || ''}</ReactMarkdown>
+                                </div>
+                              </div>
+                            ) : (
+                              <textarea 
+                                  value={editedSummary || ''}
+                                  onChange={(e) => setEditedSummary(e.target.value)}
+                                  className="w-full h-full bg-white/50 dark:bg-dark-bg/50 border border-slate-200 dark:border-dark-border rounded-2xl p-4 text-sm leading-relaxed font-medium text-slate-700 dark:text-slate-200 focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all resize-none custom-scrollbar shadow-inner"
+                                  placeholder="AI result will appear here. You can also type directly to refine it..."
+                              />
+                            )}
                             <div className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity">
                                 <div className="p-1 px-2 rounded-md bg-slate-900/10 dark:bg-white/10 text-[9px] font-bold text-slate-500 dark:text-slate-400 backdrop-blur-sm">
                                     EDITABLE
@@ -1173,22 +1201,34 @@ const TranscriptionEditor: React.FC<TranscriptionEditorProps> = ({
                                     {copied ? "Copied!" : "Copy Result"}
                                 </button>
                                 
-                                <div className="flex bg-white dark:bg-dark-card border border-slate-200 dark:border-dark-border rounded-xl p-1">
+                                <div className="relative">
                                     <button 
-                                        onClick={() => handleExportAI('docx')}
-                                        className="p-2 text-slate-500 hover:text-blue-500 dark:text-dark-muted dark:hover:text-blue-400 transition-colors"
-                                        title="Export as Word"
+                                        onClick={() => toggleMenu('export')}
+                                        className={`flex items-center gap-2 bg-white dark:bg-dark-card border border-slate-200 dark:border-dark-border text-slate-700 dark:text-white font-bold py-3 px-4 rounded-xl text-xs transition-all hover:bg-slate-50 dark:hover:bg-white/5 active:scale-95 ${activeMenu === 'export' ? 'ring-2 ring-primary/20 border-primary' : ''}`}
                                     >
-                                        <FileText size={18} weight="duotone" />
+                                        <DownloadSimple size={16} weight="duotone" />
+                                        Download
+                                        <CaretDown size={12} weight="bold" className={`transition-transform ${activeMenu === 'export' ? 'rotate-180' : ''}`}/>
                                     </button>
-                                    <div className="w-px h-4 bg-slate-200 dark:bg-dark-border my-auto mx-1"></div>
-                                    <button 
-                                        onClick={() => handleExportAI('txt')}
-                                        className="p-2 text-slate-500 hover:text-slate-900 dark:text-dark-muted dark:hover:text-white transition-colors"
-                                        title="Export as Text"
-                                    >
-                                        <File size={18} weight="duotone" />
-                                    </button>
+                                    
+                                    {activeMenu === 'export' && (
+                                        <div className="absolute bottom-full right-0 mb-2 bg-white dark:bg-dark-card rounded-xl shadow-xl border border-slate-100 dark:border-dark-border z-50 p-1.5 min-w-[160px] animate-in fade-in slide-in-from-bottom-2">
+                                            <button 
+                                                onClick={() => { handleExportAI('docx'); setActiveMenu(null); }} 
+                                                className="w-full flex items-center gap-2 px-3 py-2.5 text-left text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-white/5 rounded-lg transition-colors"
+                                            >
+                                                <FileText size={16} weight="duotone" className="text-blue-500" />
+                                                Word Doc (.docx)
+                                            </button>
+                                            <button 
+                                                onClick={() => { handleExportAI('txt'); setActiveMenu(null); }} 
+                                                className="w-full flex items-center gap-2 px-3 py-2.5 text-left text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-white/5 rounded-lg transition-colors"
+                                            >
+                                                <File size={16} weight="duotone" className="text-slate-400" />
+                                                Text File (.txt)
+                                            </button>
+                                        </div>
+                                    )}
                                 </div>
                             </div>
                         </div>
@@ -1211,7 +1251,16 @@ const TranscriptionEditor: React.FC<TranscriptionEditorProps> = ({
       {/* Legacy sidebar for when AI sidebar is not open but we have a summary */}
       {showSummarySidebar && !showAiSidebar && (
           <div 
-            className={`absolute w-80 bg-white/95 dark:bg-dark-card/95 backdrop-blur-xl shadow-2xl border border-slate-200 dark:border-dark-border rounded-2xl p-5 flex flex-col animate-in slide-in-from-right-10 duration-300 z-50 ${!summaryPosition ? 'right-4 top-16 bottom-24' : ''}`}
+            className={`
+              fixed md:absolute inset-0 md:inset-auto
+              w-full md:w-96 md:min-w-[320px] md:min-h-[300px] h-full md:h-auto
+              bg-white dark:bg-dark-card md:bg-white/95 md:dark:bg-dark-card/95 
+              md:backdrop-blur-xl shadow-2xl border-0 md:border border-slate-200 dark:border-dark-border 
+              rounded-none md:rounded-2xl p-5 flex flex-col 
+              animate-in slide-in-from-bottom md:slide-in-from-right-10 duration-300 
+              z-[60] md:z-50 md:resize overflow-hidden 
+              ${!summaryPosition ? 'md:right-4 md:top-16 md:bottom-24' : ''}
+            `}
             style={summaryPosition ? {
               left: summaryPosition.x,
               top: summaryPosition.y,
@@ -1227,7 +1276,6 @@ const TranscriptionEditor: React.FC<TranscriptionEditorProps> = ({
                   e.preventDefault();
                   setIsDraggingSummary(true);
                   // Find the draggable container (this div's parent is relative, this div is absolute)
-                  // We want the div that has the 'absolute' class, which is the direct parent of this header
                   const rect = (e.currentTarget.closest('.absolute') as HTMLElement)?.getBoundingClientRect();
                   if (rect) {
                     summaryDragStartRef.current = {
@@ -1239,15 +1287,26 @@ const TranscriptionEditor: React.FC<TranscriptionEditorProps> = ({
                   }
                 }}
               >
-                  <h3 className="text-sm font-bold text-slate-800 dark:text-dark-text flex items-center gap-2 pointer-events-none">
-                      {summaryTitle === "Visual Analysis" ? <VideoCamera className="text-primary dark:text-accent" size={16} weight="duotone" /> : 
-                       summaryTitle === "Smart Suggestions" ? <MagicWand className="text-primary dark:text-accent" size={16} weight="duotone" /> :
-                       <BookOpen className="text-primary dark:text-accent" size={16} weight="duotone" />}
-                      {summaryTitle}
-                  </h3>
-                  <button onClick={() => setShowSummarySidebar(false)} className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-dark-border text-slate-400">
-                      <X size={16} weight="bold" />
-                  </button>
+                  <div className="flex items-center gap-2 pointer-events-none">
+                      <DotsSixVertical size={16} weight="bold" className="text-slate-300 dark:text-slate-600" />
+                      <h3 className="text-sm font-bold text-slate-800 dark:text-dark-text flex items-center gap-2">
+                          {summaryTitle === "Visual Analysis" ? <VideoCamera className="text-primary dark:text-accent" size={16} weight="duotone" /> : 
+                           summaryTitle === "Smart Suggestions" ? <MagicWand className="text-primary dark:text-accent" size={16} weight="duotone" /> :
+                           <BookOpen className="text-primary dark:text-accent" size={16} weight="duotone" />}
+                          {summaryTitle}
+                      </h3>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button 
+                      onClick={() => setIsPreviewMode(!isPreviewMode)} 
+                      className="flex items-center gap-1 bg-slate-100 dark:bg-white/5 px-2 py-1 rounded text-[9px] font-bold text-slate-500 hover:bg-slate-200 dark:hover:bg-white/10 transition-colors"
+                    >
+                      {isPreviewMode ? <PencilSimple size={10} weight="bold" /> : <Eye size={10} weight="bold" />}
+                    </button>
+                    <button onClick={() => setShowSummarySidebar(false)} className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-dark-border text-slate-400">
+                        <X size={16} weight="bold" />
+                    </button>
+                  </div>
               </div>
               
               <div className="flex-1 overflow-y-auto custom-scrollbar">
@@ -1258,13 +1317,24 @@ const TranscriptionEditor: React.FC<TranscriptionEditorProps> = ({
                       </div>
                   ) : summary ? (
                       <>
-                        <div className="prose prose-sm prose-slate dark:prose-invert text-sm">
-                            <ReactMarkdown>{summary}</ReactMarkdown>
+                        <div className="flex-1 relative group h-full overflow-hidden">
+                           {isPreviewMode ? (
+                              <div className="w-full h-full overflow-y-auto custom-scrollbar prose prose-sm prose-slate dark:prose-invert text-xs p-1">
+                                  <ReactMarkdown>{editedSummary || summary}</ReactMarkdown>
+                              </div>
+                           ) : (
+                              <textarea 
+                                  value={editedSummary || ''}
+                                  onChange={(e) => setEditedSummary(e.target.value)}
+                                  className="w-full h-full bg-white/50 dark:bg-dark-bg/50 border border-slate-200 dark:border-dark-border rounded-xl p-3 text-xs leading-relaxed font-medium text-slate-700 dark:text-slate-200 focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all resize-none custom-scrollbar"
+                                  placeholder="Edit analysis..."
+                              />
+                           )}
                         </div>
                         {summaryTitle === "Smart Suggestions" && (
                             <button 
                                 onClick={handleApplyEnhancement}
-                                className="w-full mt-4 bg-primary hover:bg-primary/90 text-white font-bold py-2.5 rounded-lg text-xs"
+                                className="w-full mt-4 bg-primary hover:bg-primary/90 text-white font-bold py-2.5 rounded-lg text-xs flex-shrink-0"
                             >
                                 <Checks size={14} weight="bold" /> Apply Suggestions
                             </button>

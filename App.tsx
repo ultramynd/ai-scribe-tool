@@ -187,35 +187,106 @@ const App: React.FC = () => {
     return () => { if (micUrl) URL.revokeObjectURL(micUrl); };
   }, [micUrl]);
 
-  const handleSaveToDrive = async () => {
+  const handleSaveToDrive = async (format: 'doc' | 'txt' = 'doc') => {
     if (!googleAccessToken || !transcription.text) {
       handleGoogleLogin();
       return;
     }
+    
     setIsSavingToDrive(true);
+    
     try {
-      const metadata = {
-        name: `Smart Editor Transcription - ${new Date().toLocaleDateString()}`,
-        mimeType: 'application/vnd.google-apps.document'
-      };
-      const form = new FormData();
-      form.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
-      form.append('file', new Blob([transcription.text || ''], { type: 'text/plain' }));
-      
-      const response = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
-        method: 'POST',
-        headers: { 'Authorization': `Bearer ${googleAccessToken}` },
-        body: form
+      const timestamp = new Date().toLocaleString('en-US', { 
+        month: 'short', 
+        day: 'numeric', 
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
       });
       
-      if (response.ok) {
-        setDriveSaved(true);
-        setTimeout(() => setDriveSaved(false), 3000);
-      } else {
-        alert('Failed to save to Google Drive');
+      const fileName = `ScribeAI Transcription - ${timestamp}`;
+      
+      // Prepare metadata based on format
+      const metadata = {
+        name: fileName,
+        mimeType: format === 'doc' 
+          ? 'application/vnd.google-apps.document' 
+          : 'text/plain',
+        description: `Transcription created with ScribeAI on ${timestamp}`
+      };
+      
+      // Create form data for multipart upload
+      const form = new FormData();
+      form.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
+      
+      // For Google Docs, convert markdown to HTML for better formatting
+      let content = transcription.text || '';
+      if (format === 'doc') {
+        // Basic markdown to HTML conversion for Google Docs
+        content = content
+          .replace(/^### (.*$)/gim, '<h3>$1</h3>')
+          .replace(/^## (.*$)/gim, '<h2>$1</h2>')
+          .replace(/^# (.*$)/gim, '<h1>$1</h1>')
+          .replace(/\*\*(.*?)\*\*/g, '<b>$1</b>')
+          .replace(/\*(.*?)\*/g, '<i>$1</i>')
+          .replace(/__(.*?)__/g, '<u>$1</u>')
+          .replace(/~~(.*?)~~/g, '<s>$1</s>')
+          .replace(/\n/g, '<br>');
       }
-    } catch (err) {
-      alert('Error saving to Drive');
+      
+      form.append('file', new Blob([content], { 
+        type: format === 'doc' ? 'text/html' : 'text/plain' 
+      }));
+      
+      const response = await fetch(
+        'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,name,webViewLink', 
+        {
+          method: 'POST',
+          headers: { 'Authorization': `Bearer ${googleAccessToken}` },
+          body: form
+        }
+      );
+      
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        
+        // Handle token expiration
+        if (response.status === 401) {
+          localStorage.removeItem('googleAccessToken');
+          setGoogleAccessToken(null);
+          throw new Error('Session expired. Please sign in again.');
+        }
+        
+        // Handle quota/permission errors
+        if (response.status === 403) {
+          throw new Error('Permission denied. Check your Google Drive access.');
+        }
+        
+        if (response.status === 429) {
+          throw new Error('Too many requests. Please try again in a moment.');
+        }
+        
+        throw new Error(errorData.error?.message || `Failed to save (${response.status})`);
+      }
+      
+      const fileData = await response.json();
+      
+      // Show success with link to file
+      setDriveSaved(true);
+      setTimeout(() => setDriveSaved(false), 5000);
+      
+      // Optional: Open the file in a new tab
+      if (fileData.webViewLink) {
+        const shouldOpen = confirm(`File saved successfully!\n\nWould you like to open "${fileData.name}" in Google Drive?`);
+        if (shouldOpen) {
+          window.open(fileData.webViewLink, '_blank');
+        }
+      }
+      
+    } catch (err: any) {
+      console.error('Save to Drive error:', err);
+      const errorMessage = err.message || 'Failed to save to Google Drive';
+      alert(`❌ ${errorMessage}\n\nPlease try again or check your connection.`);
     } finally {
       setIsSavingToDrive(false);
     }
@@ -610,7 +681,7 @@ const App: React.FC = () => {
                 <div className="absolute top-full right-0 mt-2 opacity-0 group-hover:opacity-100 pointer-events-none group-hover:pointer-events-auto transition-all duration-200 scale-95 group-hover:scale-100 origin-top-right z-50">
                     <div className="bg-white dark:bg-dark-card rounded-2xl shadow-xl border border-slate-100 dark:border-dark-border p-1.5 min-w-[160px]">
                         <button 
-                          onClick={handleSaveToDrive}
+                          onClick={() => handleSaveToDrive('doc')}
                           disabled={isSavingToDrive}
                           className="w-full flex items-center gap-3 px-3 py-2.5 text-left text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-white/5 rounded-xl transition-all group"
                         >
