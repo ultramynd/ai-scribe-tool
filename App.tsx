@@ -766,10 +766,7 @@ const App: React.FC = () => {
                   setIsPickerOpen(true);
                }}
               onStartUpload={(file) => {
-                setUploadedFile(file);
-                setActiveTab(AudioSource.FILE);
-                // Trigger transcription immediately
-                setTimeout(handleTranscribe, 100);
+                handleBackgroundTranscribe(file);
               }}
             />
         </main>

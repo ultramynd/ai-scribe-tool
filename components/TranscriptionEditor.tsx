@@ -38,6 +38,7 @@ interface TranscriptionEditorProps {
   googleAccessToken?: string | null;
   onBackgroundTranscribe?: (file: AudioFile) => void;
   onAttachDrive?: () => void;
+  onSeek?: (timeInSeconds: number) => void;
 }
 
 type ActiveMenu = 'formatting' | 'tools' | 'export' | 'search' | 'ai-features' | 'copy-as' | null;
@@ -65,6 +66,8 @@ const TranscriptionEditor: React.FC<TranscriptionEditorProps> = ({
   const [history, setHistory] = useState<string[]>([initialText]);
   const [historyIndex, setHistoryIndex] = useState(0);
   const [text, setText] = useState(initialText);
+  const lastSentTextRef = useRef(initialText);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   
   // Menus & Features
   const [activeMenu, setActiveMenu] = useState<ActiveMenu>(null);
@@ -303,11 +306,13 @@ const TranscriptionEditor: React.FC<TranscriptionEditorProps> = ({
   // --- Effects ---
 
   useEffect(() => {
-    if (initialText !== history[0]) {
+    // Only update from parent if it's an external change (e.g. cloud load)
+    // We avoid syncing if the change was just sent to the parent via onTextChange
+    if (initialText !== text && initialText !== lastSentTextRef.current) {
         setText(initialText);
         setHistory([initialText]);
         setHistoryIndex(0);
-        if (contentEditableRef.current) {
+        if (contentEditableRef.current && isEditing) {
             contentEditableRef.current.innerHTML = markdownToHtml(initialText);
         }
     }
@@ -381,17 +386,15 @@ const TranscriptionEditor: React.FC<TranscriptionEditorProps> = ({
   };
 
   const updateText = (newText: string) => {
+      lastSentTextRef.current = newText;
       setText(newText);
       onTextChange(newText);
       
-      // Add to history with duplicate check
       const newHistory = history.slice(0, historyIndex + 1);
       if (newHistory[newHistory.length - 1] !== newText) {
-        newHistory.push(newText);
-        // Keep only last 50 states to prevent memory issues
-        const trimmedHistory = newHistory.slice(-50);
-        setHistory(trimmedHistory);
-        setHistoryIndex(trimmedHistory.length - 1);
+        const updated = [...newHistory, newText].slice(-50);
+        setHistory(updated);
+        setHistoryIndex(updated.length - 1);
       }
       
       if (contentEditableRef.current && isEditing) {
@@ -401,13 +404,16 @@ const TranscriptionEditor: React.FC<TranscriptionEditorProps> = ({
 
   const handleApplyEnhancement = () => {
       if (!editedSummary) return;
+      lastSentTextRef.current = editedSummary;
       setText(editedSummary);
       onTextChange(editedSummary);
       
       const newHistory = history.slice(0, historyIndex + 1);
-      newHistory.push(editedSummary);
-      setHistory(newHistory);
-      setHistoryIndex(newHistory.length - 1);
+      if (newHistory[newHistory.length - 1] !== editedSummary) {
+          const updated = [...newHistory, editedSummary].slice(-50);
+          setHistory(updated);
+          setHistoryIndex(updated.length - 1);
+      }
       
       if (contentEditableRef.current) contentEditableRef.current.innerHTML = markdownToHtml(editedSummary);
       setToast({ message: "Changes applied to document!", type: "info" });
@@ -436,6 +442,7 @@ const TranscriptionEditor: React.FC<TranscriptionEditorProps> = ({
       if (historyIndex > 0) {
           const newIndex = historyIndex - 1;
           const newText = history[newIndex];
+          lastSentTextRef.current = newText;
           setText(newText);
           setHistoryIndex(newIndex);
           onTextChange(newText);
@@ -447,6 +454,7 @@ const TranscriptionEditor: React.FC<TranscriptionEditorProps> = ({
       if (historyIndex < history.length - 1) {
           const newIndex = historyIndex + 1;
           const newText = history[newIndex];
+          lastSentTextRef.current = newText;
           setText(newText);
           setHistoryIndex(newIndex);
           onTextChange(newText);
@@ -457,20 +465,26 @@ const TranscriptionEditor: React.FC<TranscriptionEditorProps> = ({
   const handleContentInput = (e: React.FormEvent<HTMLDivElement>) => {
     const html = e.currentTarget.innerHTML;
     const newMd = htmlToMarkdown(html);
-    setText(newMd);
-    onTextChange(newMd);
+    
+    if (newMd !== text) {
+        lastSentTextRef.current = newMd;
+        setText(newMd);
+        onTextChange(newMd);
 
-    // Debounced history update
-    if (historyDebounceRef.current) clearTimeout(historyDebounceRef.current);
-    historyDebounceRef.current = setTimeout(() => {
-      const newHistory = history.slice(0, historyIndex + 1);
-      // Only push if different from last history entry
-      if (newHistory[newHistory.length - 1] !== newMd) {
-          newHistory.push(newMd);
-          setHistory(newHistory);
-          setHistoryIndex(newHistory.length - 1);
-      }
-    }, 1000);
+        // Debounced history update
+        if (historyDebounceRef.current) clearTimeout(historyDebounceRef.current);
+        historyDebounceRef.current = setTimeout(() => {
+          setHistory(prev => {
+              const currentHistory = prev.slice(0, historyIndex + 1);
+              if (currentHistory[currentHistory.length - 1] !== newMd) {
+                  const updated = [...currentHistory, newMd].slice(-50);
+                  setHistoryIndex(updated.length - 1);
+                  return updated;
+              }
+              return prev;
+          });
+        }, 1000);
+    }
   };
 
   const execCmd = (command: string, value: string | undefined = undefined) => {
@@ -478,7 +492,9 @@ const TranscriptionEditor: React.FC<TranscriptionEditorProps> = ({
       if (contentEditableRef.current) {
           const html = contentEditableRef.current.innerHTML;
           const newMd = htmlToMarkdown(html);
+          lastSentTextRef.current = newMd;
           setText(newMd);
+          onTextChange(newMd);
       }
   };
 
@@ -487,8 +503,26 @@ const TranscriptionEditor: React.FC<TranscriptionEditorProps> = ({
       if (contentEditableRef.current) {
         const html = contentEditableRef.current.innerHTML;
         const newMd = htmlToMarkdown(html);
+        lastSentTextRef.current = newMd;
         setText(newMd);
+        onTextChange(newMd);
       }
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file && onStartUpload) {
+      const audioFile: AudioFile = {
+        file,
+        previewUrl: URL.createObjectURL(file),
+        mimeType: file.type,
+        base64: null
+      };
+      // Keep user in editor and transcribe in background
+      onStartUpload(audioFile);
+      // Reset input so same file can be picked again
+      e.target.value = '';
+    }
   };
 
   // --- Bulk Tools ---
@@ -1012,7 +1046,7 @@ const TranscriptionEditor: React.FC<TranscriptionEditorProps> = ({
                         
                         {/* Upload Button - More subtle */}
                         <button 
-                          onClick={onUploadClick}
+                          onClick={() => fileInputRef.current?.click()}
                           className="group flex items-center gap-2 px-5 py-2.5 rounded-xl bg-slate-100 dark:bg-dark-bg text-slate-600 dark:text-slate-300 font-bold text-sm hover:bg-slate-200 dark:hover:bg-dark-border transition-all border border-slate-200/50 dark:border-white/5"
                         >
                           <UploadSimple size={16} weight="bold" className="text-primary dark:text-accent"/>
@@ -1040,16 +1074,6 @@ const TranscriptionEditor: React.FC<TranscriptionEditorProps> = ({
                               <h3 className="text-sm font-bold text-slate-900 dark:text-white leading-none">Smart Assistant</h3>
                               <span className="px-1.5 py-0.5 rounded-md bg-primary/10 text-[8px] font-black tracking-tighter text-primary border border-primary/20 leading-none">BETA</span>
                           </div>
-                          {googleAccessToken && (
-                            <button 
-                              onClick={onAttachDrive}
-                              className="flex items-center gap-1.5 px-3 py-2 rounded-2xl text-xs font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-dark-card transition-all"
-                              title="Attach another file for background transcription"
-                            >
-                              <CloudArrowDown size={16} weight="duotone" className="text-emerald-500"/>
-                              <span>Attach from Google</span>
-                            </button>
-                          )}
                           <p className="text-[10px] text-slate-500 dark:text-dark-muted mt-1 uppercase tracking-wider font-bold">Document Intelligence</p>
                       </div>
                   </div>
@@ -1070,6 +1094,11 @@ const TranscriptionEditor: React.FC<TranscriptionEditorProps> = ({
               {/* AI Actions Tabs/Sections */}
               <div className="p-4 border-b border-slate-100 dark:border-dark-border bg-white dark:bg-dark-card space-y-4">
                 {(() => {
+                  const ExperimentalBadge = () => (
+                    <span className="px-1.5 py-0.5 rounded-md bg-amber-100 dark:bg-amber-900/20 text-[7px] font-black text-amber-600 dark:text-amber-400 uppercase tracking-tighter border border-amber-200/50 dark:border-amber-400/20 leading-none">
+                      Exp.
+                    </span>
+                  );
                   const context = analyzeDocumentContext();
                   const canShowSummary = context.wordCount > 200 || context.hasMultipleParagraphs;
                   const canShowKeyMoments = context.hasTimestamps && context.wordCount > 300;
@@ -1108,7 +1137,10 @@ const TranscriptionEditor: React.FC<TranscriptionEditorProps> = ({
                       }`}
                     >
                       <BookOpen size={16} weight="duotone" />
-                      <span className="text-[11px] font-bold">Summary</span>
+                      <div className="flex flex-col items-start gap-0.5">
+                        <span className="text-[11px] font-bold">Summary</span>
+                        <ExperimentalBadge />
+                      </div>
                     </button>
                     <button 
                       onClick={handleKeyMoments} 
@@ -1120,7 +1152,10 @@ const TranscriptionEditor: React.FC<TranscriptionEditorProps> = ({
                       }`}
                     >
                       <Timer size={16} weight="duotone" />
-                      <span className="text-[11px] font-bold">Key Moments</span>
+                      <div className="flex flex-col items-start gap-0.5">
+                        <span className="text-[11px] font-bold">Key Moments</span>
+                        <ExperimentalBadge />
+                      </div>
                     </button>
                   </div>
                 </div>
@@ -1142,7 +1177,10 @@ const TranscriptionEditor: React.FC<TranscriptionEditorProps> = ({
                       }`}
                     >
                       <MagicWand size={16} weight="duotone" />
-                      <span className="text-[11px] font-bold">Smart Fix</span>
+                      <div className="flex flex-col items-start gap-0.5">
+                        <span className="text-[11px] font-bold">Smart Fix</span>
+                        <ExperimentalBadge />
+                      </div>
                     </button>
                     )}
                     {canShowPleasantries && (
@@ -1156,7 +1194,10 @@ const TranscriptionEditor: React.FC<TranscriptionEditorProps> = ({
                       }`}
                     >
                       <Funnel size={16} weight="duotone" />
-                      <span className="text-[11px] font-bold">Strip Pleasantries</span>
+                      <div className="flex flex-col items-start gap-0.5">
+                        <span className="text-[11px] font-bold">Strip Pleasantries</span>
+                        <ExperimentalBadge />
+                      </div>
                     </button>
                     )}
                     <button 
@@ -1169,7 +1210,10 @@ const TranscriptionEditor: React.FC<TranscriptionEditorProps> = ({
                       }`}
                     >
                       <ChatCenteredText size={16} weight="duotone" />
-                      <span className="text-[11px] font-bold">Identify Core</span>
+                      <div className="flex flex-col items-start gap-0.5">
+                        <span className="text-[11px] font-bold">Identify Core</span>
+                        <ExperimentalBadge />
+                      </div>
                     </button>
                     {isVideoFile && (
                       <button 
@@ -1178,15 +1222,19 @@ const TranscriptionEditor: React.FC<TranscriptionEditorProps> = ({
                         className="flex items-center gap-2 p-2.5 rounded-xl bg-slate-50 dark:bg-dark-bg border border-slate-100 dark:border-dark-border text-slate-600 dark:text-dark-muted hover:border-accent/30 hover:bg-white dark:hover:bg-dark-card transition-all"
                       >
                         <VideoCamera size={16} weight="duotone" />
-                        <span className="text-[11px] font-bold">Visual Analysis</span>
+                        <div className="flex flex-col items-start gap-0.5">
+                          <span className="text-[11px] font-bold">Visual Analysis</span>
+                          <ExperimentalBadge />
+                        </div>
                       </button>
                     )}
                   </div>
                 </div>
-                    </>
-                  );
-                })()}
-              </div>
+                )}
+              </>
+            );
+          })()}
+        </div>
               
               {/* AI Content Area */}
               <div className="flex-1 overflow-y-auto p-5 custom-scrollbar bg-slate-50/30 dark:bg-dark-bg/30">
@@ -1511,6 +1559,13 @@ const TranscriptionEditor: React.FC<TranscriptionEditorProps> = ({
           border-left-color: #5EC5D4;
         }
       `}</style>
+      <input 
+        type="file" 
+        ref={fileInputRef} 
+        onChange={handleFileChange} 
+        accept="audio/*,video/*" 
+        className="hidden" 
+      />
     </div>
   );
 };
