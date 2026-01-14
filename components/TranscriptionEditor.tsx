@@ -359,6 +359,27 @@ const TranscriptionEditor: React.FC<TranscriptionEditorProps> = ({
 
   // --- Actions ---
 
+  // Document Context Analysis for Smart Assistant
+  const analyzeDocumentContext = () => {
+    const timestampRegex = /\[\s*\d{1,2}:\d{2}(?::\d{2})?\s*\]/g;
+    const speakerRegex = /(?:^|\n)\s*([A-Z][A-Za-z0-9\s]*?):/gm;
+    const pleasantryRegex = /\b(hi|hello|hey|thanks|thank you|best regards|sincerely|cheers|dear|greetings)\b/gi;
+    const words = text.trim().split(/\s+/).filter(w => w.length > 0);
+    const paragraphs = text.split('\n\n').filter(p => p.trim());
+    
+    return {
+      hasTimestamps: timestampRegex.test(text),
+      hasSpeakers: speakerRegex.test(text),
+      hasVideo: originalFile?.file?.type.startsWith('video/') || false,
+      hasAudio: originalFile?.file?.type.startsWith('audio/') || false,
+      hasMultipleParagraphs: paragraphs.length > 3,
+      hasFormatting: /\*\*.*?\*\*|\*.*?\*|__.*?__|_.*?_/.test(text),
+      wordCount: words.length,
+      isEmpty: words.length < 10,
+      hasPleasantries: pleasantryRegex.test(text)
+    };
+  };
+
   const updateText = (newText: string) => {
       setText(newText);
       onTextChange(newText);
