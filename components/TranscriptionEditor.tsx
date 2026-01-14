@@ -854,17 +854,18 @@ const TranscriptionEditor: React.FC<TranscriptionEditorProps> = ({
                         <div className="absolute top-full right-0 mt-2 bg-white dark:bg-dark-card rounded-2xl shadow-xl border border-slate-100 dark:border-dark-border z-50 p-3 w-72 animate-in fade-in slide-in-from-top-2">
                             {/* Speaker Discovery Section */}
                             <div className="mb-3">
-                                <p className="px-1 text-[10px] font-bold text-slate-400 dark:text-dark-muted uppercase tracking-wider mb-2">Detected Speakers</p>
+                                <p className="px-1 text-[10px] font-bold text-slate-400 dark:text-dark-muted uppercase tracking-wider mb-2">Detected Speakers/Characters</p>
                                 <div className="flex flex-wrap gap-1.5 max-h-24 overflow-y-auto custom-scrollbar p-1">
                                     {(() => {
-                                        // Extract speaker names from patterns like "Speaker 1:", "John:", etc.
-                                        const speakerMatches = text.match(/^([A-Z][A-Za-z0-9\\s]{0,20}):/gm) || [];
+                                        // Extract speaker names from patterns like "Speaker A:", "Speaker 1:", "John:", etc.
+                                        // Updated regex to match more patterns including "Speaker A:", "Speaker B:", etc.
+                                        const speakerMatches = text.match(/(?:^|\n)\s*([A-Z][A-Za-z0-9\s]*?):/gm) || [];
                                         const speakers = Array.from(new Set(
-                                            speakerMatches.map(match => match.replace(':', '').trim())
+                                            speakerMatches.map(match => match.replace(/^[\n\s]+/, '').replace(':', '').trim())
                                         )).slice(0, 8);
                                         
                                         if (speakers.length === 0) {
-                                            return <p className="text-[10px] text-slate-400 italic px-1">No speakers detected</p>;
+                                            return <p className="text-[10px] text-slate-400 italic px-1">No speakers/characters detected</p>;
                                         }
                                         
                                         return speakers.map((speaker) => (
