@@ -587,7 +587,7 @@ const App: React.FC = () => {
 
         {/* Main Bar / Header */}
         <header className="glass-header sticky top-0 z-50 transition-all duration-300">
-          <div className="max-w-5xl mx-auto px-6 h-20 flex items-center justify-between">
+          <div className="max-w-5xl mx-auto px-6 h-20 flex items-center justify-between text-slate-900 dark:text-white">
             {/* Left: Branding & Mode Toggle */}
             <div className="flex items-center gap-6">
               <div className="flex items-center gap-3.5 cursor-pointer group" onClick={() => safeNavigation(clearAll)}>
@@ -910,7 +910,7 @@ const App: React.FC = () => {
               {/* Rate Limit Note */}
               <div className="mt-6 inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-amber-500/10 border border-amber-500/20 text-[10px] font-bold text-amber-500 animate-in fade-in slide-in-from-bottom-2 duration-1000" style={{ animationDelay: '1.5s' }}>
                 <Clock size={12} weight="bold" />
-                <span className="uppercase tracking-wider">Quota Reset: Please wait 60s if transcription fails</span>
+                <span className="uppercase tracking-wider">Engine Note: Auto-fallback active if 'Deep Thinking' limits are hit</span>
               </div>
             </div>
 

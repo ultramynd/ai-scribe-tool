@@ -158,7 +158,7 @@ export const transcribeAudio = async (
         5. **Formatting**: Highlight key terms in **bold**.
       `;
 
-      const modelName = useSmartModel ? 'gemini-flash-latest' : 'gemini-flash-latest';
+      const modelName = useSmartModel ? 'gemini-1.5-pro' : 'gemini-1.5-flash';
       // Note: thinkingConfig is only for specific experimental models. Removing to ensure stability with 1.5 Pro.
       const config = undefined;
 
@@ -202,8 +202,17 @@ export const transcribeAudio = async (
         throw new Error("No transcription generated.");
       }
     } catch (error: any) {
-      if (attempt < 2 && (error.message.includes('429') || error.message.includes('503'))) {
-        onStatus?.(`AI busy (Rate Limit). Retrying in ${attempt + 2}s...`);
+      const errorMsg = error.message.toLowerCase();
+      const isRateLimited = errorMsg.includes('429') || errorMsg.includes('quota') || errorMsg.includes('resource_exhausted');
+
+      // Model Fallback Logic: Switch from Pro to Flash if capacity hit
+      if (useSmartModel && isRateLimited) {
+        onStatus?.("Switching to High-Capacity engine (Flash) due to rate limit...");
+        return transcribeAudio(mediaFile, mimeType, autoEdit, detectSpeakers, false, onStatus);
+      }
+
+      if (attempt < 2 && (isRateLimited || errorMsg.includes('503'))) {
+        onStatus?.(`AI busy. Retrying in ${attempt + 2}s...`);
         await new Promise(r => setTimeout(r, (attempt + 1) * 2000));
         return executeWithRetry(attempt + 1);
       }
@@ -227,8 +236,8 @@ export const transcribeAudio = async (
             const apiError = parsed.error || parsed;
             if (apiError.status === 'RESOURCE_EXHAUSTED' || apiError.message?.includes('quota')) {
                userMessage = useSmartModel 
-                 ? "Gemini Pro Rate Limit hit (Free tier is 2 RPM). Please wait 60 seconds or switch to 'Flash' for 15 RPM."
-                 : "Rate limit exceeded. You've hit your Gemini Flash quota. Please wait a minute.";
+                 ? "Gemini 1.5 Pro Rate Limit hit (2 RPM). Please wait 60 seconds or disable 'Deep Thinking' to use the higher-capacity Flash engine."
+                 : "Gemini 1.5 Flash Rate Limit hit. Please wait 60 seconds for the server to reset.";
             } else if (apiError.status === 'INVALID_ARGUMENT' || apiError.message?.includes('API key not valid')) {
                userMessage = "Invalid API Key. Please check your API key in the environment settings.";
             } else if (apiError.status === 'PERMISSION_DENIED') {
@@ -245,8 +254,8 @@ export const transcribeAudio = async (
           userMessage = "Invalid API Key. Please check your API key in the environment settings.";
         } else if (msg.includes('quota') || msg.includes('rate limit') || msg.includes('resource_exhausted')) {
           userMessage = useSmartModel 
-            ? "Gemini Pro Rate Limit hit. Please wait 60 seconds or switch to 'Flash'."
-            : "Rate limit exceeded. Please wait a minute.";
+            ? "Gemini 1.5 Pro Rate Limit hit. Please wait 60 seconds or disable 'Deep Thinking'."
+            : "Gemini 1.5 Flash Rate Limit hit. Please wait a minute for the quota to reset.";
         } else if (msg.includes('permission denied')) {
           userMessage = "Permission denied. Your API key may not have access to this model.";
         } else if (msg.includes('network') || msg.includes('fetch')) {
