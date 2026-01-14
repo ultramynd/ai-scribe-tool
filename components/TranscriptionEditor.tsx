@@ -1351,9 +1351,10 @@ const TranscriptionEditor: React.FC<TranscriptionEditorProps> = ({
                         {summaryTitle === "Smart Suggestions" && (
                             <button 
                                 onClick={handleApplyEnhancement}
-                                className="w-full mt-4 bg-primary hover:bg-primary/90 text-white font-bold py-2.5 rounded-lg text-xs flex-shrink-0"
+                                className="w-full mt-4 bg-gradient-to-r from-primary to-purple-600 hover:from-primary/90 hover:to-purple-600/90 text-white font-bold py-3 rounded-xl text-sm flex items-center justify-center gap-2 shadow-lg shadow-primary/20 transition-all active:scale-[0.98] flex-shrink-0"
                             >
-                                <Checks size={14} weight="bold" /> Apply Suggestions
+                                <Sparkle size={16} weight="fill" />
+                                Apply to Document
                             </button>
                         )}
                       </>
