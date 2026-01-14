@@ -1,7 +1,8 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Microphone, Stop, ArrowsClockwise, WarningCircle, Brain, Sparkle, Spinner } from '@phosphor-icons/react';
 import { formatTime } from '../utils/audioUtils';
-import { startLiveTranscription } from '../services/webSpeechService';
+import { AudioStreamRecorder } from '../services/audioStreamService';
+import { transcribeAudioChunk } from '../services/groqService';
 
 interface AudioRecorderProps {
   onRecordingComplete: (blob: Blob, liveText?: string) => void;
@@ -13,11 +14,12 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({ onRecordingComplete, isTr
   const [duration, setDuration] = useState(0);
   const [error, setError] = useState<string | null>(null);
   
+  
   // Live Transcription State
-  const [isLiveEnabled, setIsLiveEnabled] = useState(false);
+  const [isLiveEnabled, setIsLiveEnabled] = useState(true); // Default to enabled with Groq
   const [liveTranscript, setLiveTranscript] = useState('');
   const [interimTranscript, setInterimTranscript] = useState('');
-  const stopLiveRef = useRef<(() => string) | null>(null);
+  const audioStreamRecorderRef = useRef<AudioStreamRecorder | null>(null);
   
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
@@ -105,62 +107,58 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({ onRecordingComplete, isTr
   const startRecording = async () => {
     setError(null);
     try {
-      if (isLiveEnabled) {
-        setLiveTranscript('');
-        setInterimTranscript('');
-        const { stop } = startLiveTranscription(
-          { language: 'en-US' },
-          (result) => {
-            if (result.isFinal) {
-              setLiveTranscript(result.text);
+      setLiveTranscript('');
+      setInterimTranscript('');
+      
+      // Create AudioStreamRecorder with Groq Whisper transcription
+      const recorder = new AudioStreamRecorder(
+        async (chunk) => {
+          // Handle each audio chunk for real-time transcription
+          if (isLiveEnabled) {
+            try {
+              setInterimTranscript('Transcribing...');
+              const chunkText = await transcribeAudioChunk(chunk, liveTranscript);
+              setLiveTranscript(prev => prev + ' ' + chunkText);
               setInterimTranscript('');
-            } else {
-              setInterimTranscript(result.text.substring(liveTranscript.length));
+            } catch (err) {
+              console.error('Chunk transcription error:', err);
+              setInterimTranscript('');
             }
-          },
-          (err) => {
-            console.error("Live transcription error:", err);
-            setError("Live connection issues. Still recording audio...");
           }
-        );
-        stopLiveRef.current = stop;
-      }
-
+        },
+        (text) => {
+          // Update transcript callback
+          setLiveTranscript(prev => prev + ' ' + text);
+        },
+        5000 // 5-second chunks
+      );
+      
+      await recorder.start();
+      audioStreamRecorderRef.current = recorder;
+      
+      // Get stream for visualizer
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       streamRef.current = stream;
-      const mediaRecorder = new MediaRecorder(stream);
-      mediaRecorderRef.current = mediaRecorder;
-      audioChunksRef.current = [];
-
-      mediaRecorder.ondataavailable = (event) => {
-        if (event.data.size > 0) audioChunksRef.current.push(event.data);
-      };
-
-      mediaRecorder.onstop = () => {
-        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
-        let finalLiveText = undefined;
-        if (stopLiveRef.current) {
-          finalLiveText = stopLiveRef.current();
-          stopLiveRef.current = null;
-        }
-        onRecordingComplete(audioBlob, finalLiveText);
-        stopVisualizer();
-        if (streamRef.current) streamRef.current.getTracks().forEach(track => track.stop());
-      };
-
-      mediaRecorder.start();
+      
       setIsRecording(true);
       setDuration(0);
       startVisualizer(stream);
       timerIntervalRef.current = window.setInterval(() => setDuration(prev => prev + 1), 1000);
     } catch (err) {
-      setError("Please allow microphone access.");
+      console.error('Recording error:', err);
+      setError("Please allow microphone access or check your Groq API key.");
     }
   };
 
   const stopRecording = () => {
-    if (mediaRecorderRef.current && isRecording) {
-      mediaRecorderRef.current.stop();
+    if (audioStreamRecorderRef.current && isRecording) {
+      const finalBlob = audioStreamRecorderRef.current.stop();
+      const finalText = liveTranscript.trim();
+      
+      onRecordingComplete(finalBlob, finalText || undefined);
+      stopVisualizer();
+      if (streamRef.current) streamRef.current.getTracks().forEach(track => track.stop());
+      
       setIsRecording(false);
       if (timerIntervalRef.current !== null) {
         window.clearInterval(timerIntervalRef.current);
@@ -179,7 +177,7 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({ onRecordingComplete, isTr
       if (timerIntervalRef.current !== null) window.clearInterval(timerIntervalRef.current);
       stopVisualizer();
       if (streamRef.current) streamRef.current.getTracks().forEach(track => track.stop());
-      if (stopLiveRef.current) stopLiveRef.current();
+      if (audioStreamRecorderRef.current) audioStreamRecorderRef.current.stop();
     };
   }, []);
 
