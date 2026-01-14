@@ -1069,7 +1069,32 @@ const TranscriptionEditor: React.FC<TranscriptionEditorProps> = ({
               
               {/* AI Actions Tabs/Sections */}
               <div className="p-4 border-b border-slate-100 dark:border-dark-border bg-white dark:bg-dark-card space-y-4">
+                {(() => {
+                  const context = analyzeDocumentContext();
+                  const canShowSummary = context.wordCount > 200 || context.hasMultipleParagraphs;
+                  const canShowKeyMoments = context.hasTimestamps && context.wordCount > 300;
+                  const canShowSmartFix = context.wordCount > 50 && !context.isEmpty;
+                  const canShowPleasantries = context.hasPleasantries;
+                  
+                  // Show empty state if document is too short
+                  if (context.isEmpty) {
+                    return (
+                      <div className="text-center py-12 px-4">
+                        <div className="w-16 h-16 bg-slate-50 dark:bg-dark-bg rounded-2xl flex items-center justify-center mb-4 mx-auto border border-slate-100 dark:border-dark-border">
+                          <Sparkle size={28} className="text-slate-300 dark:text-dark-border" />
+                        </div>
+                        <h4 className="text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">Add Content to Unlock AI</h4>
+                        <p className="text-xs text-slate-400 dark:text-dark-muted leading-relaxed max-w-[200px] mx-auto">
+                          Write or transcribe to unlock AI features
+                        </p>
+                      </div>
+                    );
+                  }
+                  
+                  return (
+                    <>
                 {/* Synthesis Section */}
+                {(canShowSummary || canShowKeyMoments) && (
                 <div>
                   <p className="px-1 text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-2">Synthesis & Insights</p>
                   <div className="grid grid-cols-2 gap-2">
@@ -1099,11 +1124,14 @@ const TranscriptionEditor: React.FC<TranscriptionEditorProps> = ({
                     </button>
                   </div>
                 </div>
+                )}
 
                 {/* Productivity Section */}
+                {(canShowSmartFix || canShowPleasantries) && (
                 <div>
                   <p className="px-1 text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-2">Editor Intelligence</p>
                   <div className="grid grid-cols-2 gap-2">
+                    {canShowSmartFix && (
                     <button 
                       onClick={handleEnhance} 
                       disabled={isSummarizing} 
@@ -1116,6 +1144,8 @@ const TranscriptionEditor: React.FC<TranscriptionEditorProps> = ({
                       <MagicWand size={16} weight="duotone" />
                       <span className="text-[11px] font-bold">Smart Fix</span>
                     </button>
+                    )}
+                    {canShowPleasantries && (
                     <button 
                       onClick={handleStripPleasantries} 
                       disabled={isSummarizing} 
@@ -1128,6 +1158,7 @@ const TranscriptionEditor: React.FC<TranscriptionEditorProps> = ({
                       <Funnel size={16} weight="duotone" />
                       <span className="text-[11px] font-bold">Strip Pleasantries</span>
                     </button>
+                    )}
                     <button 
                       onClick={handleFindBounds} 
                       disabled={isSummarizing} 
@@ -1152,6 +1183,9 @@ const TranscriptionEditor: React.FC<TranscriptionEditorProps> = ({
                     )}
                   </div>
                 </div>
+                    </>
+                  );
+                })()}
               </div>
               
               {/* AI Content Area */}
