@@ -79,3 +79,18 @@ export const transcribeWithGroq = async (
     throw error;
   }
 };
+
+/**
+ * Transcribe audio chunks for real-time streaming
+ * Optimized for speed with minimal latency
+ */
+export const transcribeAudioChunk = async (
+  audioChunk: Blob,
+  previousContext?: string
+): Promise<string> => {
+  return transcribeWithGroq(audioChunk, {
+    model: 'whisper-large-v3',
+    prompt: previousContext ? `Previous context: ${previousContext.slice(-200)}` : undefined,
+    onStatus: (msg) => console.log(`[Chunk] ${msg}`)
+  });
+};
