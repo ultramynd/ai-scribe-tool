@@ -10,7 +10,7 @@ import {
   Spinner, VideoCamera, TextHOne, TextHTwo, TextHThree, Palette, 
   Eraser, DotsThree, ArrowRight, Microphone, UploadSimple, Stop, 
   Play, Pause, WarningCircle, MagicWand, Timer, Warning, CaretUp,
-  List, Repeat, ArrowsOutSimple, ArrowsInSimple, Scissors, Funnel, ChatCenteredText, DownloadSimple, DotsSixVertical, Users
+  List, Repeat, ArrowsOutSimple, ArrowsInSimple, Scissors, Funnel, ChatCenteredText, DownloadSimple, DotsSixVertical, Users, ArrowSquareOut
 } from '@phosphor-icons/react';
 import PlaybackControl from './PlaybackControl';
 import { generateTxt, generateDoc, generateDocx, generateSrt } from '../utils/exportUtils';
@@ -43,7 +43,7 @@ interface TranscriptionEditorProps {
   useDeepThinking?: boolean;
 }
 
-type ActiveMenu = 'formatting' | 'tools' | 'export' | 'search' | 'ai-features' | 'copy-as' | 'export-as' | null;
+type ActiveMenu = 'formatting' | 'tools' | 'export' | 'search' | 'ai-features' | null;
 
 const TranscriptionEditor: React.FC<TranscriptionEditorProps> = ({ 
   initialText, 
@@ -977,16 +977,55 @@ const TranscriptionEditor: React.FC<TranscriptionEditorProps> = ({
 
                 <div className="w-px h-5 bg-slate-200 dark:bg-dark-border mx-1"></div>
 
-                {/* Copy As Toolbar Dropdown */}
+                <div className="w-px h-5 bg-slate-200 dark:bg-dark-border mx-1"></div>
+
+                {/* Consolidated Export Toolbar Dropdown */}
                 <div className="relative">
-                    <button onClick={() => toggleMenu('copy-as')} className={`flex items-center gap-1 px-3 py-1.5 rounded-2xl text-xs font-semibold transition-all ${activeMenu === 'copy-as' ? 'bg-indigo-500/10 text-indigo-500' : 'text-slate-500 hover:bg-slate-100 dark:hover:bg-dark-bg'}`}>
-                       <Copy size={16} weight="duotone" />
-                       <CaretDown size={12} weight="bold" className={`transition-transform ${activeMenu === 'copy-as' ? 'rotate-180' : ''}`}/>
+                    <button onClick={() => toggleMenu('export')} className={`flex items-center gap-1.5 px-3 py-1.5 rounded-2xl text-[10px] font-black uppercase tracking-wider transition-all ${activeMenu === 'export' ? 'bg-primary text-white shadow-lg shadow-primary/20' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-dark-bg'}`}>
+                       <Export size={16} weight="duotone" />
+                       <span>Export</span>
+                       <CaretDown size={10} weight="bold" className={`transition-transform ${activeMenu === 'export' ? 'rotate-180' : ''}`}/>
                     </button>
-                    {activeMenu === 'copy-as' && (
-                        <div className="absolute top-full right-0 mt-2 bg-white dark:bg-dark-card rounded-2xl shadow-xl border border-slate-100 dark:border-dark-border z-50 p-1.5 min-w-[150px] animate-in fade-in slide-in-from-top-2">
-                             <button onClick={() => { navigator.clipboard.writeText(text); setActiveMenu(null); }} className="w-full flex items-center gap-2.5 px-2.5 py-2 text-left text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-dark-bg rounded-lg group transition-colors">
-                               <Checks size={14} weight="bold" className="text-indigo-500"/> Everything
+                    {activeMenu === 'export' && (
+                        <div className="absolute top-full right-0 mt-2 bg-white dark:bg-dark-card rounded-2xl shadow-xl border border-slate-100 dark:border-dark-border z-50 p-2 min-w-[200px] animate-in fade-in slide-in-from-top-2">
+                             <div className="px-2.5 py-1.5 text-[9px] font-black text-slate-400 dark:text-dark-muted uppercase tracking-widest">Preview & Copy</div>
+                             <button 
+                               onClick={() => {
+                                 const previewWindow = window.open('', '_blank');
+                                 if (previewWindow) {
+                                   previewWindow.document.write(`
+                                     <html>
+                                       <head>
+                                         <title>Transcript Preview</title>
+                                         <style>
+                                           body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; line-height: 1.6; padding: 40px; max-width: 800px; margin: 0 auto; color: #1e293b; background: #f8fafc; }
+                                           .content { background: white; padding: 60px; border-radius: 24px; shadow: 0 10px 15px -3px rgba(0,0,0,0.1); border: 1px solid #e2e8f0; }
+                                           h1, h2, h3 { color: #0f172a; margin-top: 1.5em; }
+                                           b { color: #0f172a; }
+                                           .timestamp { color: #6366f1; font-weight: bold; }
+                                         </style>
+                                       </head>
+                                       <body>
+                                         <div class="content">${markdownToHtml(text)}</div>
+                                       </body>
+                                     </html>
+                                   `);
+                                   previewWindow.document.close();
+                                 }
+                                 setActiveMenu(null);
+                               }}
+                               className="w-full flex items-center gap-3 px-2.5 py-2 text-left text-[11px] font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-dark-bg rounded-xl transition-all group"
+                             >
+                               <div className="w-7 h-7 rounded-lg bg-primary/10 dark:bg-accent/20 flex items-center justify-center group-hover:scale-110 transition-transform">
+                                 <ArrowSquareOut size={14} weight="duotone" className="text-primary dark:text-accent"/>
+                               </div>
+                               Open in New Tab
+                             </button>
+                             <button onClick={() => { navigator.clipboard.writeText(text); setActiveMenu(null); }} className="w-full flex items-center gap-3 px-2.5 py-2 text-left text-[11px] font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-dark-bg rounded-xl transition-all group">
+                               <div className="w-7 h-7 rounded-lg bg-indigo-50 dark:bg-indigo-900/20 flex items-center justify-center group-hover:scale-110 transition-transform">
+                                 <Checks size={14} weight="duotone" className="text-indigo-500"/>
+                               </div>
+                               Everything
                              </button>
                              <button onClick={() => { 
                                const clean = text
@@ -998,38 +1037,45 @@ const TranscriptionEditor: React.FC<TranscriptionEditorProps> = ({
                                  .trim();
                                navigator.clipboard.writeText(clean);
                                setActiveMenu(null);
-                             }} className="w-full flex items-center gap-2.5 px-2.5 py-2 text-left text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-dark-bg rounded-lg group transition-colors">
-                               <FileText size={14} weight="bold" className="text-blue-500"/> Plain Text
+                             }} className="w-full flex items-center gap-3 px-2.5 py-2 text-left text-[11px] font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-dark-bg rounded-xl transition-all group">
+                               <div className="w-7 h-7 rounded-lg bg-blue-50 dark:bg-blue-900/20 flex items-center justify-center group-hover:scale-110 transition-transform">
+                                 <FileText size={14} weight="duotone" className="text-blue-500"/>
+                               </div>
+                               Plain Text
                              </button>
                              <button onClick={() => { 
                                const html = text.replace(/\*\*(.*?)\*\*/g, '<b>$1</b>').replace(/\*(.*?)\*/g, '<i>$1</i>').replace(/\n/g, '<br>');
                                navigator.clipboard.writeText(html); 
                                setActiveMenu(null); 
-                             }} className="w-full flex items-center gap-2.5 px-2.5 py-2 text-left text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-dark-bg rounded-lg group transition-colors">
-                               <FileCode size={14} weight="bold" className="text-orange-500"/> HTML Code
+                             }} className="w-full flex items-center gap-3 px-2.5 py-2 text-left text-[11px] font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-dark-bg rounded-xl transition-all group">
+                               <div className="w-7 h-7 rounded-lg bg-orange-50 dark:bg-orange-900/20 flex items-center justify-center group-hover:scale-110 transition-transform">
+                                 <FileCode size={14} weight="duotone" className="text-orange-500"/>
+                               </div>
+                               HTML Format
                              </button>
-                        </div>
-                    )}
-                </div>
 
-                {/* Export Toolbar Dropdown */}
-                <div className="relative">
-                    <button onClick={() => toggleMenu('export-as')} className={`flex items-center gap-1 px-3 py-1.5 rounded-2xl text-xs font-semibold transition-all ${activeMenu === 'export-as' ? 'bg-emerald-500/10 text-emerald-500' : 'text-slate-500 hover:bg-slate-100 dark:hover:bg-dark-bg'}`}>
-                       <Export size={16} weight="duotone" />
-                       <CaretDown size={12} weight="bold" className={`transition-transform ${activeMenu === 'export-as' ? 'rotate-180' : ''}`}/>
-                    </button>
-                    {activeMenu === 'export-as' && (
-                        <div className="absolute top-full right-0 mt-2 bg-white dark:bg-dark-card rounded-2xl shadow-xl border border-slate-100 dark:border-dark-border z-50 p-1.5 min-w-[160px] animate-in fade-in slide-in-from-top-2">
+                             <div className="h-px bg-slate-100 dark:bg-dark-border my-2 mx-2"></div>
+                             
+                             <div className="px-2.5 py-1.5 text-[9px] font-black text-slate-400 dark:text-dark-muted uppercase tracking-widest">Download Files</div>
                              {onSaveToDrive && (
-                               <button onClick={() => { onSaveToDrive(); setActiveMenu(null); }} className="w-full flex items-center gap-2.5 px-2.5 py-2 text-left text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-white/5 rounded-lg group transition-colors">
-                                 <CloudArrowDown size={14} weight="bold" className="text-emerald-500"/> Save to Drive
+                               <button onClick={() => { onSaveToDrive(); setActiveMenu(null); }} className="w-full flex items-center gap-3 px-2.5 py-2 text-left text-[11px] font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-dark-bg rounded-xl transition-all group">
+                                 <div className="w-7 h-7 rounded-lg bg-emerald-50 dark:bg-emerald-900/20 flex items-center justify-center group-hover:scale-110 transition-transform">
+                                   <CloudArrowDown size={14} weight="duotone" className="text-emerald-500"/>
+                                 </div>
+                                 Save to Drive
                                </button>
                              )}
-                             <button onClick={() => { handleExportAI('docx'); setActiveMenu(null); }} className="w-full flex items-center gap-2.5 px-2.5 py-2 text-left text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-white/5 rounded-lg group transition-colors">
-                               <FileIcon size={14} weight="bold" className="text-blue-500"/> Word (.docx)
+                             <button onClick={() => { handleExportAI('docx'); setActiveMenu(null); }} className="w-full flex items-center gap-3 px-2.5 py-2 text-left text-[11px] font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-dark-bg rounded-xl transition-all group">
+                               <div className="w-7 h-7 rounded-lg bg-blue-50 dark:bg-blue-900/20 flex items-center justify-center group-hover:scale-110 transition-transform">
+                                 <FileIcon size={14} weight="duotone" className="text-blue-500"/>
+                               </div>
+                               Word (.docx)
                              </button>
-                             <button onClick={() => { handleExportAI('txt'); setActiveMenu(null); }} className="w-full flex items-center gap-2.5 px-2.5 py-2 text-left text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-white/5 rounded-lg group transition-colors">
-                               <FileText size={14} weight="bold" className="text-slate-500"/> Text (.txt)
+                             <button onClick={() => { handleExportAI('txt'); setActiveMenu(null); }} className="w-full flex items-center gap-3 px-2.5 py-2 text-left text-[11px] font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-dark-bg rounded-xl transition-all group">
+                               <div className="w-7 h-7 rounded-lg bg-slate-50 dark:bg-dark-border flex items-center justify-center group-hover:scale-110 transition-transform">
+                                 <FileText size={14} weight="duotone" className="text-slate-400 group-hover:text-primary"/>
+                               </div>
+                               Text (.txt)
                              </button>
                         </div>
                     )}
@@ -1425,44 +1471,89 @@ const TranscriptionEditor: React.FC<TranscriptionEditorProps> = ({
                                 <Checks size={18} weight="bold" /> Apply to Document
                             </button>
                             
-                            <div className="flex gap-2">
+                            <div className="relative">
                                 <button 
-                                    onClick={handleCopySummary}
-                                    className="flex-1 bg-white dark:bg-dark-card border border-slate-200 dark:border-dark-border text-slate-700 dark:text-white font-bold py-3 rounded-xl text-xs flex items-center justify-center gap-2 transition-all hover:bg-slate-50 dark:hover:bg-white/5 active:scale-95"
+                                    onClick={() => toggleMenu('export')}
+                                    className={`w-full flex items-center justify-center gap-2 bg-white dark:bg-dark-card border border-slate-200 dark:border-dark-border text-slate-700 dark:text-white font-bold py-3.5 rounded-2xl text-[13px] transition-all hover:bg-slate-50 dark:hover:bg-white/5 active:scale-95 ${activeMenu === 'export' ? 'ring-2 ring-primary/20 border-primary shadow-lg shadow-primary/10' : ''}`}
                                 >
-                                    {copied ? <Check size={16} weight="bold" className="text-emerald-500" /> : <Copy size={16} weight="duotone" />}
-                                    {copied ? "Copied!" : "Copy Result"}
+                                    <Export size={18} weight="duotone" />
+                                    Export Result
+                                    <CaretDown size={12} weight="bold" className={`transition-transform ${activeMenu === 'export' ? 'rotate-180' : ''}`}/>
                                 </button>
                                 
-                                <div className="relative">
-                                    <button 
-                                        onClick={() => toggleMenu('export')}
-                                        className={`flex items-center gap-2 bg-white dark:bg-dark-card border border-slate-200 dark:border-dark-border text-slate-700 dark:text-white font-bold py-3 px-4 rounded-xl text-xs transition-all hover:bg-slate-50 dark:hover:bg-white/5 active:scale-95 ${activeMenu === 'export' ? 'ring-2 ring-primary/20 border-primary' : ''}`}
-                                    >
-                                        <DownloadSimple size={16} weight="duotone" />
-                                        Download
-                                        <CaretDown size={12} weight="bold" className={`transition-transform ${activeMenu === 'export' ? 'rotate-180' : ''}`}/>
-                                    </button>
-                                    
-                                    {activeMenu === 'export' && (
-                                        <div className="absolute bottom-full right-0 mb-2 bg-white dark:bg-dark-card rounded-xl shadow-xl border border-slate-100 dark:border-dark-border z-50 p-1.5 min-w-[160px] animate-in fade-in slide-in-from-bottom-2">
-                                            <button 
-                                                onClick={() => { handleExportAI('docx'); setActiveMenu(null); }} 
-                                                className="w-full flex items-center gap-2 px-3 py-2.5 text-left text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-white/5 rounded-lg transition-colors"
-                                            >
-                                                <FileText size={16} weight="duotone" className="text-blue-500" />
-                                                Word Doc (.docx)
-                                            </button>
-                                            <button 
-                                                onClick={() => { handleExportAI('txt'); setActiveMenu(null); }} 
-                                                className="w-full flex items-center gap-2 px-3 py-2.5 text-left text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-white/5 rounded-lg transition-colors"
-                                            >
-                                                <FileIcon size={16} weight="duotone" className="text-slate-400" />
-                                                Text File (.txt)
-                                            </button>
-                                        </div>
-                                    )}
-                                </div>
+                                {activeMenu === 'export' && (
+                                    <div className="absolute bottom-full right-0 mb-3 bg-white dark:bg-dark-card rounded-2xl shadow-2xl border border-slate-100 dark:border-dark-border z-50 p-2 min-w-[200px] animate-in fade-in slide-in-from-bottom-2">
+                                        <div className="px-2.5 py-1.5 text-[9px] font-black text-slate-400 dark:text-dark-muted uppercase tracking-widest">Preview & Copy</div>
+                                        <button 
+                                            onClick={() => {
+                                                const previewWindow = window.open('', '_blank');
+                                                if (previewWindow) {
+                                                    previewWindow.document.write(`
+                                                        <html>
+                                                            <head>
+                                                                <title>ScribeAI - Insight Preview</title>
+                                                                <style>
+                                                                    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; line-height: 1.7; padding: 50px; max-width: 850px; margin: 0 auto; color: #1e293b; background: #fdfdff; }
+                                                                    .card { background: white; padding: 60px; border-radius: 32px; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.05); border: 1px solid #f1f5f9; }
+                                                                    .tag { display: inline-block; background: #6366f115; color: #6366f1; font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 1px; padding: 5px 12px; border-radius: 10px; margin-bottom: 25px; }
+                                                                    h1, h2, h3 { color: #0f172a; margin-top: 2em; margin-bottom: 0.8em; font-weight: 800; letter-spacing: -0.025em; }
+                                                                    p { margin-bottom: 1.5em; }
+                                                                    .footer { margin-top: 50px; padding-top: 30px; border-top: 1px solid #f1f5f9; font-size: 13px; color: #94a3b8; text-align: center; }
+                                                                </style>
+                                                            </head>
+                                                            <body>
+                                                                <div class="card">
+                                                                    <div class="tag">AI Generated Insight</div>
+                                                                    <div>${summary ? summary.replace(/\n/g, '<br>') : ''}</div>
+                                                                    <div class="footer">Generated by ScribeAI Intelligence</div>
+                                                                </div>
+                                                            </body>
+                                                        </html>
+                                                    `);
+                                                    previewWindow.document.close();
+                                                }
+                                                setActiveMenu(null);
+                                            }}
+                                            className="w-full flex items-center gap-3 px-3 py-2 text-left text-[11px] font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-dark-bg rounded-xl transition-all group"
+                                        >
+                                            <div className="w-7 h-7 rounded-lg bg-primary/10 dark:bg-accent/20 flex items-center justify-center group-hover:scale-110 transition-transform">
+                                                <ArrowSquareOut size={14} weight="duotone" className="text-primary dark:text-accent" />
+                                            </div>
+                                            Open in New Tab
+                                        </button>
+                                        <button 
+                                            onClick={handleCopySummary}
+                                            className="w-full flex items-center gap-3 px-3 py-2 text-left text-[11px] font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-dark-bg rounded-xl transition-all group"
+                                        >
+                                            <div className="w-7 h-7 rounded-lg bg-indigo-50 dark:bg-indigo-900/20 flex items-center justify-center group-hover:scale-110 transition-transform">
+                                                {copied ? <Check size={14} weight="bold" className="text-emerald-500" /> : <Copy size={14} weight="duotone" className="text-indigo-500" />}
+                                            </div>
+                                            {copied ? "Copied!" : "Result Text"}
+                                        </button>
+
+                                        <div className="h-px bg-slate-100 dark:bg-dark-border my-2 mx-2"></div>
+
+                                        <div className="px-2.5 py-1.5 text-[9px] font-black text-slate-400 dark:text-dark-muted uppercase tracking-widest">Download Files</div>
+                                        <button 
+                                            onClick={() => { handleExportAI('docx'); setActiveMenu(null); }} 
+                                            className="w-full flex items-center gap-3 px-3 py-2 text-left text-[11px] font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-dark-bg rounded-xl transition-all group"
+                                        >
+                                            <div className="w-7 h-7 rounded-lg bg-blue-50 dark:bg-blue-900/20 flex items-center justify-center group-hover:scale-110 transition-transform">
+                                                <FileIcon size={14} weight="duotone" className="text-blue-500" />
+                                            </div>
+                                            Word Doc (.docx)
+                                        </button>
+                                        <button 
+                                            onClick={() => { handleExportAI('txt'); setActiveMenu(null); }} 
+                                            className="w-full flex items-center gap-3 px-3 py-2 text-left text-[11px] font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-dark-bg rounded-xl transition-all group"
+                                        >
+                                            <div className="w-7 h-7 rounded-lg bg-slate-50 dark:bg-dark-border flex items-center justify-center group-hover:scale-110 transition-transform">
+                                                <FileText size={14} weight="duotone" className="text-slate-400 group-hover:text-primary" />
+                                            </div>
+                                            Text File (.txt)
+                                        </button>
+                                    </div>
+                                )}
                             </div>
                         </div>
                       </div>

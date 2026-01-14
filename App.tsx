@@ -4,7 +4,7 @@ import {
   SignIn, SignOut, Users, User, ArrowLeft, ArrowRight, Plus, Checks, 
   FloppyDisk, Lightning, Terminal, Moon, Sun, WarningCircle, X, Brain, 
   SpeakerHigh, Eye, PencilSimple, Copy, CloudArrowDown, Export, Check,
-  CaretDown, List, Trash, Clock, HardDrive, FileCode, File as FileIcon
+  CaretDown, List, Trash, Clock, HardDrive, FileCode, File as FileIcon, ArrowSquareOut
 } from '@phosphor-icons/react';
 import AudioRecorder from './components/AudioRecorder';
 import FileUploader from './components/FileUploader';
@@ -597,43 +597,6 @@ const App: React.FC = () => {
               {/* Global Actions Group */}
               <div className="flex items-center gap-4">
                 <div className="hidden sm:flex items-center gap-2">
-                  {/* Archive */}
-                  <button 
-                    onClick={() => setShowArchiveSidebar(true)}
-                    className="flex items-center gap-2.5 px-4 py-2 rounded-2xl bg-white dark:bg-dark-card border border-slate-100 dark:border-white/5 text-xs font-bold text-slate-600 dark:text-slate-300 hover:shadow-md transition-all group"
-                    title="Open Archive"
-                  >
-                    <Clock size={16} weight="duotone" className="text-slate-400 group-hover:text-primary transition-colors" />
-                    <span>Archive</span>
-                    {archiveItems.length > 0 && (
-                      <div className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse ml-0.5"></div>
-                    )}
-                  </button>
-
-                  {/* Connected Status */}
-                  {driveScriptsLoaded && (
-                    googleAccessToken ? (
-                      <button 
-                         onClick={handleGoogleLogout}
-                         className="flex items-center gap-2.5 px-4 py-2 rounded-2xl bg-slate-50 dark:bg-dark-bg border border-slate-100 dark:border-white/5 text-[9px] font-black text-slate-500 dark:text-slate-400 tracking-widest uppercase hover:bg-slate-100 dark:hover:bg-white/5 transition-all group"
-                       >
-                         <span>Connected</span>
-                         <SignOut size={14} weight="bold" className="text-slate-400 group-hover:text-primary transition-transform" />
-                       </button>
-                    ) : (
-                      googleClientId && (
-                         <button 
-                           onClick={handleGoogleLogin}
-                           disabled={isLoggingIn}
-                           className="flex items-center gap-2.5 px-4 py-2 rounded-2xl bg-white dark:bg-dark-card border border-slate-100 dark:border-white/5 text-[9px] font-black text-slate-500 dark:text-slate-400 tracking-widest uppercase hover:shadow-md transition-all group"
-                         >
-                           {isLoggingIn ? <Spinner size={14} weight="bold" className="animate-spin text-primary" /> : <SignIn size={14} weight="bold" className="text-slate-400 group-hover:text-primary transition-colors" />}
-                           <span>Login</span>
-                         </button>
-                      )
-                    )
-                  )}
-
                   {/* Mode Toggle Switcher */}
                   <div className="flex bg-slate-100 dark:bg-dark-bg p-1 rounded-2xl border border-slate-100 dark:border-white/5">
                     <button 
@@ -656,24 +619,70 @@ const App: React.FC = () => {
 
                   <div className="w-px h-5 bg-slate-200 dark:bg-dark-border mx-1"></div>
 
-                  {/* Copy As Dropdown */}
-                  <div className="relative group">
-                    <button className="flex items-center gap-1.5 px-4 py-2 rounded-2xl bg-white dark:bg-dark-card border border-slate-100 dark:border-white/5 text-[10px] font-black uppercase tracking-wider text-slate-600 dark:text-slate-300 hover:shadow-md transition-all group-hover:text-primary">
-                      <Copy size={14} weight="duotone" />
-                      <span>Copy As</span>
+                  {/* Smart Editor side trigger */}
+                  <button 
+                    onClick={() => setShowAiSidebar(!showAiSidebar)}
+                    className={`flex items-center gap-1.5 px-4 py-2 rounded-2xl text-[10px] font-black uppercase tracking-wider transition-all ${showAiSidebar ? 'text-primary dark:text-accent bg-primary/5' : 'text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-dark-card'}`}
+                  >
+                    <Sparkle size={14} weight="duotone" className="text-primary dark:text-accent"/>
+                    <span>Smart Editor</span>
+                  </button>
+
+                  {/* Consolidated Export Dropdown */}
+                  <div className="relative group/export">
+                    <button className="flex items-center gap-1.5 px-4 py-2 rounded-2xl bg-slate-900 dark:bg-white text-white dark:text-slate-900 text-[10px] font-black uppercase tracking-wider hover:opacity-90 transition-all shadow-md">
+                      <Export size={14} weight="duotone" />
+                      <span>Export</span>
+                      <CaretDown size={10} weight="bold" className="ml-0.5 opacity-50 group-hover/export:rotate-180 transition-transform" />
                     </button>
                     
-                    <div className="absolute top-full right-0 mt-2 opacity-0 group-hover:opacity-100 pointer-events-none group-hover:pointer-events-auto transition-all duration-200 scale-95 group-hover:scale-100 origin-top-right z-50">
-                        <div className="bg-white dark:bg-dark-card rounded-2xl shadow-xl border border-slate-100 dark:border-dark-border p-1.5 min-w-[180px]">
+                    <div className="absolute top-full right-0 mt-2 opacity-0 group-hover/export:opacity-100 pointer-events-none group-hover/export:pointer-events-auto transition-all duration-200 scale-95 group-hover/export:scale-100 origin-top-right z-50">
+                        <div className="bg-white dark:bg-dark-card rounded-2xl shadow-xl border border-slate-100 dark:border-dark-border p-2 min-w-[200px]">
+                            {/* Copy Section */}
+                            <div className="px-2.5 py-1.5 text-[9px] font-black text-slate-400 dark:text-dark-muted uppercase tracking-widest">Preview & Copy</div>
+                            <button 
+                              onClick={() => {
+                                const previewWindow = window.open('', '_blank');
+                                if (previewWindow) {
+                                  const content = (transcription.text || '')
+                                    .replace(/\*\*(.*?)\*\*/g, '<b>$1</b>')
+                                    .replace(/\*(.*?)\*/g, '<i>$1</i>')
+                                    .replace(/\n/g, '<br>');
+                                  
+                                  previewWindow.document.write(`
+                                    <html>
+                                      <head>
+                                        <title>ScribeAI - Transcript Preview</title>
+                                        <style>
+                                          body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; line-height: 1.7; padding: 50px; max-width: 850px; margin: 0 auto; color: #1e293b; background: #fdfdff; }
+                                          .content { background: white; padding: 60px; border-radius: 32px; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.05); border: 1px solid #f1f5f9; }
+                                          h1, h2, h3 { color: #0f172a; margin-top: 1.5em; font-weight: 800; }
+                                        </style>
+                                      </head>
+                                      <body>
+                                        <div class="content">${content}</div>
+                                      </body>
+                                    </html>
+                                  `);
+                                  previewWindow.document.close();
+                                }
+                              }}
+                              className="w-full flex items-center gap-3 px-3 py-2 text-left text-[11px] font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-white/5 rounded-xl transition-all group"
+                            >
+                              <div className="w-7 h-7 rounded-lg bg-primary/10 dark:bg-accent/20 flex items-center justify-center group-hover:scale-110 transition-transform">
+                                <ArrowSquareOut size={12} weight="duotone" className="text-primary dark:text-accent"/>
+                              </div>
+                              Open in New Tab
+                            </button>
                             <button 
                               onClick={() => {
                                 navigator.clipboard.writeText(transcription.text || '');
                                 setDriveSaved(true);
                                 setTimeout(() => setDriveSaved(false), 2000);
                               }}
-                              className="w-full flex items-center gap-2.5 px-3 py-2 text-left text-[11px] font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-white/5 rounded-xl transition-all group"
+                              className="w-full flex items-center gap-3 px-3 py-2 text-left text-[11px] font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-white/5 rounded-xl transition-all group"
                             >
-                              <div className="w-6 h-6 rounded-lg bg-indigo-100 dark:bg-indigo-900/20 flex items-center justify-center">
+                              <div className="w-7 h-7 rounded-lg bg-indigo-100 dark:bg-indigo-900/20 flex items-center justify-center group-hover:scale-110 transition-transform">
                                 <Checks size={12} weight="duotone" className="text-indigo-500"/>
                               </div>
                               Everything
@@ -681,19 +690,19 @@ const App: React.FC = () => {
                             <button 
                               onClick={() => {
                                 const clean = (transcription.text || '')
-                                  .replace(/\[\d{1,2}:\d{2}(?::\d{2})?\]/g, '') // Clear timestamps
-                                  .replace(/^(.*?):/gm, '') // Clear speakers
-                                  .replace(/\*/g, '') // Clear bold/italic
-                                  .replace(/~/g, '') // Clear strikethrough
-                                  .replace(/\s+/g, ' ') // Collapse spaces
+                                  .replace(/\[\d{1,2}:\d{2}(?::\d{2})?\]/g, '')
+                                  .replace(/^(.*?):/gm, '')
+                                  .replace(/\*/g, '')
+                                  .replace(/~/g, '')
+                                  .replace(/\s+/g, ' ')
                                   .trim();
                                 navigator.clipboard.writeText(clean);
                                 setDriveSaved(true);
                                 setTimeout(() => setDriveSaved(false), 2000);
                               }}
-                              className="w-full flex items-center gap-2.5 px-3 py-2 text-left text-[11px] font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-white/5 rounded-xl transition-all group"
+                              className="w-full flex items-center gap-3 px-3 py-2 text-left text-[11px] font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-white/5 rounded-xl transition-all group"
                             >
-                              <div className="w-6 h-6 rounded-lg bg-blue-100 dark:bg-blue-900/20 flex items-center justify-center">
+                              <div className="w-7 h-7 rounded-lg bg-blue-100 dark:bg-blue-900/20 flex items-center justify-center group-hover:scale-110 transition-transform">
                                 <FileText size={12} weight="duotone" className="text-blue-500"/>
                               </div>
                               Plain Text
@@ -708,61 +717,44 @@ const App: React.FC = () => {
                                 setDriveSaved(true);
                                 setTimeout(() => setDriveSaved(false), 2000);
                               }}
-                              className="w-full flex items-center gap-2.5 px-3 py-2 text-left text-[11px] font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-white/5 rounded-xl transition-all group"
+                              className="w-full flex items-center gap-3 px-3 py-2 text-left text-[11px] font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-white/5 rounded-xl transition-all group"
                             >
-                              <div className="w-6 h-6 rounded-lg bg-orange-100 dark:bg-orange-900/20 flex items-center justify-center">
+                              <div className="w-7 h-7 rounded-lg bg-orange-100 dark:bg-orange-900/20 flex items-center justify-center group-hover:scale-110 transition-transform">
                                 <FileCode size={12} weight="duotone" className="text-orange-500"/>
                               </div>
                               HTML Format
                             </button>
-                        </div>
-                    </div>
-                  </div>
 
-                  {/* Smart Editor side trigger (Moved here for better utility grouping) */}
-                  <button 
-                    onClick={() => setShowAiSidebar(!showAiSidebar)}
-                    className={`flex items-center gap-1.5 px-4 py-2 rounded-2xl text-[10px] font-black uppercase tracking-wider transition-all ${showAiSidebar ? 'text-primary dark:text-accent bg-primary/5' : 'text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-dark-card'}`}
-                  >
-                    <Sparkle size={14} weight="duotone" className="text-primary dark:text-accent"/>
-                    <span>Smart Editor</span>
-                  </button>
+                            <div className="h-px bg-slate-100 dark:bg-dark-border my-2 mx-2"></div>
 
-                  {/* Export Button */}
-                  <div className="relative group">
-                    <button className="flex items-center gap-1.5 px-4 py-2 rounded-2xl bg-slate-900 dark:bg-white text-white dark:text-slate-900 text-[10px] font-black uppercase tracking-wider hover:opacity-90 transition-all shadow-md">
-                      <CloudArrowDown size={14} weight="duotone" />
-                      <span>Export</span>
-                    </button>
-                    
-                    <div className="absolute top-full right-0 mt-2 opacity-0 group-hover:opacity-100 pointer-events-none group-hover:pointer-events-auto transition-all duration-200 scale-95 group-hover:scale-100 origin-top-right z-50">
-                        <div className="bg-white dark:bg-dark-card rounded-2xl shadow-xl border border-slate-100 dark:border-dark-border p-1.5 min-w-[180px]">
+                            {/* Download Section */}
+                            <div className="px-2.5 py-1.5 text-[9px] font-black text-slate-400 dark:text-dark-muted uppercase tracking-widest">Download Files</div>
                             <button 
                               onClick={() => handleSaveToDrive('doc')}
-                              className="w-full flex items-center gap-2.5 px-3 py-2.5 text-left text-[11px] font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-white/5 rounded-xl transition-all group"
+                              className="w-full flex items-center gap-3 px-3 py-2 text-left text-[11px] font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-white/5 rounded-xl transition-all group"
                             >
-                              <div className="w-6 h-6 rounded-lg bg-emerald-100 dark:bg-emerald-900/20 flex items-center justify-center group-hover:scale-110 transition-transform">
+                              <div className="w-7 h-7 rounded-lg bg-emerald-100 dark:bg-emerald-900/20 flex items-center justify-center group-hover:scale-110 transition-transform">
                                 <CloudArrowDown size={12} weight="duotone" className="text-emerald-500"/>
                               </div>
                               Save to Drive
                             </button>
                             <button 
                               onClick={handleExportDocx}
-                              className="w-full flex items-center gap-2.5 px-3 py-2.5 text-left text-[11px] font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-white/5 rounded-xl transition-all group"
+                              className="w-full flex items-center gap-3 px-3 py-2 text-left text-[11px] font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-white/5 rounded-xl transition-all group"
                             >
-                              <div className="w-6 h-6 rounded-lg bg-blue-100 dark:bg-blue-900/20 flex items-center justify-center group-hover:scale-110 transition-transform">
+                              <div className="w-7 h-7 rounded-lg bg-blue-100 dark:bg-blue-900/20 flex items-center justify-center group-hover:scale-110 transition-transform">
                                 <FileIcon size={12} weight="duotone" className="text-blue-500"/>
                               </div>
-                              Word Document (.docx)
+                              Word (.docx)
                             </button>
                             <button 
                               onClick={handleExportTxt}
-                              className="w-full flex items-center gap-2.5 px-3 py-2.5 text-left text-[11px] font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-white/5 rounded-xl transition-all group"
+                              className="w-full flex items-center gap-3 px-3 py-2 text-left text-[11px] font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-white/5 rounded-xl transition-all group"
                             >
-                              <div className="w-6 h-6 rounded-lg bg-slate-100 dark:bg-dark-border flex items-center justify-center group-hover:scale-110 transition-transform">
+                              <div className="w-7 h-7 rounded-lg bg-slate-100 dark:bg-dark-border flex items-center justify-center group-hover:scale-110 transition-transform">
                                 <FileText size={12} weight="duotone" className="text-slate-400 group-hover:text-primary"/>
                               </div>
-                              Text File (.txt)
+                              Text (.txt)
                             </button>
                         </div>
                     </div>
@@ -797,12 +789,70 @@ const App: React.FC = () => {
                     </div>
                   </div>
 
-                  <button 
-                    onClick={() => setDarkMode(!darkMode)}
-                    className="w-9 h-9 rounded-2xl flex items-center justify-center text-slate-500 hover:text-primary hover:bg-slate-100 dark:hover:bg-white/5 transition-all"
-                  >
-                    {darkMode ? <Sun size={18} weight="duotone" /> : <Moon size={18} weight="duotone" />}
-                  </button>
+                  {/* User Profile Dropdown - Archive, Login, Dark Mode */}
+                  <div className="relative group/more">
+                    <button className="w-9 h-9 rounded-2xl flex items-center justify-center text-slate-500 hover:text-primary hover:bg-slate-100 dark:hover:bg-white/5 transition-all">
+                      <User size={18} weight="duotone" />
+                    </button>
+                    
+                    <div className="absolute top-full right-0 mt-2 opacity-0 group-hover/more:opacity-100 pointer-events-none group-hover/more:pointer-events-auto transition-all duration-200 scale-95 group-hover/more:scale-100 origin-top-right z-50">
+                      <div className="bg-white dark:bg-dark-card rounded-2xl shadow-xl border border-slate-100 dark:border-dark-border p-2 min-w-[180px]">
+                        <button 
+                          onClick={() => setShowArchiveSidebar(true)}
+                          className="w-full flex items-center gap-3 px-3 py-2 text-left text-[11px] font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-white/5 rounded-xl transition-all group"
+                        >
+                          <div className="w-7 h-7 rounded-lg bg-slate-100 dark:bg-dark-border flex items-center justify-center group-hover:scale-110 transition-transform">
+                            <Clock size={14} weight="duotone" className="text-slate-500" />
+                          </div>
+                          <div className="flex items-center gap-2 flex-1">
+                            <span>Archive</span>
+                            {archiveItems.length > 0 && (
+                              <div className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse"></div>
+                            )}
+                          </div>
+                        </button>
+
+                        {driveScriptsLoaded && (
+                          googleAccessToken ? (
+                            <button 
+                              onClick={handleGoogleLogout}
+                              className="w-full flex items-center gap-3 px-3 py-2 text-left text-[11px] font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-white/5 rounded-xl transition-all group"
+                            >
+                              <div className="w-7 h-7 rounded-lg bg-emerald-50 dark:bg-emerald-900/20 flex items-center justify-center group-hover:scale-110 transition-transform">
+                                <SignOut size={14} weight="duotone" className="text-emerald-500" />
+                              </div>
+                              Sign Out
+                            </button>
+                          ) : (
+                            googleClientId && (
+                              <button 
+                                onClick={handleGoogleLogin}
+                                disabled={isLoggingIn}
+                                className="w-full flex items-center gap-3 px-3 py-2 text-left text-[11px] font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-white/5 rounded-xl transition-all group"
+                              >
+                                <div className="w-7 h-7 rounded-lg bg-primary/10 dark:bg-accent/20 flex items-center justify-center group-hover:scale-110 transition-transform">
+                                  {isLoggingIn ? <Spinner size={14} weight="bold" className="animate-spin text-primary" /> : <SignIn size={14} weight="duotone" className="text-primary" />}
+                                </div>
+                                {isLoggingIn ? 'Signing In...' : 'Sign In'}
+                              </button>
+                            )
+                          )
+                        )}
+
+                        <div className="h-px bg-slate-100 dark:bg-dark-border my-2 mx-2"></div>
+
+                        <button 
+                          onClick={() => setDarkMode(!darkMode)}
+                          className="w-full flex items-center gap-3 px-3 py-2 text-left text-[11px] font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-white/5 rounded-xl transition-all group"
+                        >
+                          <div className="w-7 h-7 rounded-lg bg-amber-50 dark:bg-amber-900/20 flex items-center justify-center group-hover:scale-110 transition-transform">
+                            {darkMode ? <Sun size={14} weight="duotone" className="text-amber-500" /> : <Moon size={14} weight="duotone" className="text-slate-600" />}
+                          </div>
+                          {darkMode ? 'Light Mode' : 'Dark Mode'}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
                 </div>
 
                 {/* Mobile "More" Menu */}
@@ -1179,15 +1229,54 @@ const App: React.FC = () => {
           </div>
         ) : (
           <div className="animate-in fade-in zoom-in-95 duration-200 max-w-2xl mx-auto w-full">
-            <button 
-              onClick={() => safeNavigation(() => setActiveTab(null))}
-              className="mb-8 flex items-center gap-3 text-slate-400 hover:text-primary dark:hover:text-accent font-bold text-sm transition-all group"
-            >
-              <div className="p-2 rounded-xl bg-white/50 dark:bg-dark-card/50 border border-white/60 dark:border-white/5 shadow-sm group-hover:scale-110 transition-transform">
-                <ArrowRight size={16} weight="bold" />
+            <div className="mb-8 flex items-center gap-4">
+              <button 
+                onClick={() => safeNavigation(() => setActiveTab(null))}
+                className="flex items-center gap-3 text-slate-400 hover:text-primary dark:hover:text-accent font-bold text-sm transition-all group"
+              >
+                <div className="p-2 rounded-xl bg-white/50 dark:bg-dark-card/50 border border-white/60 dark:border-white/5 shadow-sm group-hover:scale-110 transition-transform">
+                  <ArrowLeft size={16} weight="bold" />
+                </div>
+                <span className="uppercase tracking-widest text-[10px]">Back to Selection</span>
+              </button>
+
+              {/* Service Tabs */}
+              <div className="flex items-center gap-2 ml-auto">
+                <button
+                  onClick={() => setActiveTab(AudioSource.MICROPHONE)}
+                  className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all ${
+                    activeTab === AudioSource.MICROPHONE
+                      ? 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20'
+                      : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 hover:bg-white/50 dark:hover:bg-dark-card/50'
+                  }`}
+                >
+                  <Microphone size={14} weight="duotone" />
+                  <span className="hidden sm:inline">Record</span>
+                </button>
+                <button
+                  onClick={() => setActiveTab(AudioSource.FILE)}
+                  className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all ${
+                    activeTab === AudioSource.FILE
+                      ? 'bg-accent/10 text-accent border border-accent/20'
+                      : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 hover:bg-white/50 dark:hover:bg-dark-card/50'
+                  }`}
+                >
+                  <UploadSimple size={14} weight="duotone" />
+                  <span className="hidden sm:inline">Upload</span>
+                </button>
+                <button
+                  onClick={() => setActiveTab(AudioSource.URL)}
+                  className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all ${
+                    activeTab === AudioSource.URL
+                      ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20'
+                      : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 hover:bg-white/50 dark:hover:bg-dark-card/50'
+                  }`}
+                >
+                  <Link size={14} weight="duotone" />
+                  <span className="hidden sm:inline">URL</span>
+                </button>
               </div>
-              <span className="uppercase tracking-widest text-[10px]">Back to Selection</span>
-            </button>
+            </div>
 
             <div className="glass-card rounded-[3rem] overflow-hidden">
                <div className="p-10 sm:p-14 min-h-[480px] flex flex-col relative">
