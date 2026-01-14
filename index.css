@@ -188,3 +188,55 @@ body {
   -moz-osx-font-smoothing: grayscale;
   text-rendering: optimizeLegibility;
 }
+
+/* Enhanced Loading Screen Animations */
+@keyframes blink {
+  0%, 49% {
+    opacity: 1;
+  }
+  50%, 100% {
+    opacity: 0;
+  }
+}
+
+.animate-blink {
+  animation: blink 1s step-end infinite;
+}
+
+/* Floating particles animation */
+.animate-float {
+  animation: float-particles 10s ease-in-out infinite;
+}
+
+@keyframes float-particles {
+  0%, 100% {
+    transform: translate(0, 0);
+    opacity: 0.3;
+  }
+  25% {
+    transform: translate(10px, -20px);
+    opacity: 0.6;
+  }
+  50% {
+    transform: translate(-5px, -40px);
+    opacity: 0.3;
+  }
+  75% {
+    transform: translate(-15px, -20px);
+    opacity: 0.6;
+  }
+}
+
+/* Shimmer effect for progress bar */
+@keyframes shimmer {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+.animate-shimmer {
+  animation: shimmer 2s ease-in-out infinite;
+}

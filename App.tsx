@@ -784,67 +784,114 @@ const App: React.FC = () => {
         
         {/* Animated Background */}
         <div className="absolute inset-0 w-full h-full overflow-hidden z-0">
-           <div className="absolute top-1/4 left-1/4 w-[500px] h-[500px] bg-primary/20 rounded-full mix-blend-screen filter blur-[100px] animate-blob"></div>
-           <div className="absolute bottom-1/4 right-1/4 w-[400px] h-[400px] bg-accent/20 rounded-full mix-blend-screen filter blur-[100px] animate-blob animation-delay-2000"></div>
-           <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-20 brightness-100 contrast-150"></div>
+          {/* Gradient Blobs */}
+          <div className="absolute top-1/4 left-1/4 w-[500px] h-[500px] bg-primary/20 rounded-full mix-blend-screen filter blur-[100px] animate-blob"></div>
+          <div className="absolute bottom-1/4 right-1/4 w-[400px] h-[400px] bg-accent/20 rounded-full mix-blend-screen filter blur-[100px] animate-blob animation-delay-2000"></div>
+          
+          {/* Floating Particles */}
+          {[...Array(20)].map((_, i) => (
+            <div
+              key={i}
+              className="absolute w-1 h-1 bg-accent/30 rounded-full animate-float"
+              style={{
+                left: `${Math.random() * 100}%`,
+                top: `${Math.random() * 100}%`,
+                animationDelay: `${Math.random() * 5}s`,
+                animationDuration: `${5 + Math.random() * 10}s`
+              }}
+            />
+          ))}
+          
+          {/* Noise Texture */}
+          <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-20 brightness-100 contrast-150"></div>
         </div>
 
         <div className="relative z-10 w-full max-w-lg">
             
-            {/* Core Reactor */}
-            <div className="relative w-40 h-40 mx-auto mb-16">
+            {/* Enhanced Core Reactor */}
+            <div className="relative w-40 h-40 mx-auto mb-16 group cursor-pointer">
+               {/* Outer rotating rings */}
                <div className="absolute inset-0 border border-primary/30 rounded-full animate-[spin_10s_linear_infinite]"></div>
                <div className="absolute inset-4 border border-accent/30 rounded-full animate-[spin_15s_linear_infinite_reverse]"></div>
+               
+               {/* Pulsing rings */}
+               <div className="absolute inset-0 border-2 border-primary/40 rounded-full animate-ping opacity-20"></div>
+               <div className="absolute inset-8 border-2 border-accent/40 rounded-full animate-ping opacity-20" style={{ animationDelay: '0.5s' }}></div>
+               
+               {/* Glow effect */}
                <div className="absolute inset-0 bg-gradient-to-b from-primary/20 to-accent/20 rounded-full blur-2xl animate-pulse"></div>
                
+               {/* Center icon with hover effect */}
                <div className="absolute inset-0 flex items-center justify-center">
-                 <div className="w-24 h-24 bg-dark-bg rounded-full border border-primary/50 flex items-center justify-center shadow-[0_0_30px_rgba(113,0,150,0.3)]">
-                    <Sparkle size={32} weight="duotone" className="text-accent animate-pulse" />
+                 <div className="w-24 h-24 bg-dark-bg rounded-full border border-primary/50 flex items-center justify-center shadow-[0_0_30px_rgba(113,0,150,0.3)] group-hover:shadow-[0_0_50px_rgba(113,0,150,0.5)] transition-all duration-500 group-hover:scale-110">
+                    <Sparkle size={32} weight="duotone" className="text-accent animate-pulse group-hover:rotate-12 transition-transform duration-500" />
                  </div>
+               </div>
+               
+               {/* Orbiting dots */}
+               <div className="absolute inset-0 animate-[spin_20s_linear_infinite]">
+                 <div className="absolute top-0 left-1/2 w-2 h-2 bg-primary rounded-full -translate-x-1/2 animate-pulse"></div>
+               </div>
+               <div className="absolute inset-0 animate-[spin_25s_linear_infinite_reverse]">
+                 <div className="absolute bottom-0 left-1/2 w-2 h-2 bg-accent rounded-full -translate-x-1/2 animate-pulse" style={{ animationDelay: '0.5s' }}></div>
                </div>
             </div>
 
             <div className="text-center mb-12">
-              <h2 className="text-4xl font-bold bg-clip-text text-transparent bg-gradient-to-b from-white to-gray-400 mb-4 tracking-tight">Processing Media</h2>
-              <div className="text-accent/80 font-mono text-xs uppercase tracking-widest flex items-center justify-center gap-2">
-                 <Cpu size={14} weight="duotone" />
+              <h2 className="text-4xl font-bold bg-clip-text text-transparent bg-gradient-to-b from-white to-gray-400 mb-4 tracking-tight animate-in fade-in slide-in-from-bottom-4 duration-700">Processing Media</h2>
+              <div className="text-accent/80 font-mono text-xs uppercase tracking-widest flex items-center justify-center gap-2 animate-in fade-in slide-in-from-bottom-4 duration-700" style={{ animationDelay: '0.2s' }}>
+                 <Cpu size={14} weight="duotone" className="animate-pulse" />
                  <span>{transcriptionMode === 'verbatim' ? 'High-Velocity Engine' : (isDeepThinking ? 'Deep Reasoning Engine' : 'Fast Semantic Engine')}</span>
               </div>
             </div>
 
-            {/* Terminal Log */}
-            <div className="bg-dark-card/60 backdrop-blur-md rounded-2xl border border-dark-border p-6 mb-8 font-mono text-xs h-36 overflow-hidden flex flex-col justify-end shadow-2xl relative">
+            {/* Enhanced Terminal Log with typing effect */}
+            <div className="bg-dark-card/60 backdrop-blur-md rounded-2xl border border-dark-border p-6 mb-8 font-mono text-xs h-36 overflow-hidden flex flex-col justify-end shadow-2xl relative group hover:border-primary/30 transition-colors duration-500">
+              {/* Window controls */}
               <div className="absolute top-3 left-4 flex gap-1.5">
-                <div className="w-2.5 h-2.5 rounded-full bg-red-500/80"></div>
-                <div className="w-2.5 h-2.5 rounded-full bg-yellow-500/80"></div>
-                <div className="w-2.5 h-2.5 rounded-full bg-green-500/80"></div>
+                <div className="w-2.5 h-2.5 rounded-full bg-red-500/80 group-hover:bg-red-500 transition-colors cursor-pointer"></div>
+                <div className="w-2.5 h-2.5 rounded-full bg-yellow-500/80 group-hover:bg-yellow-500 transition-colors cursor-pointer"></div>
+                <div className="w-2.5 h-2.5 rounded-full bg-green-500/80 group-hover:bg-green-500 transition-colors cursor-pointer"></div>
               </div>
+              
+              {/* Log lines with staggered animation */}
               <div className="space-y-2 pt-4">
                 {logLines.slice(-4).map((line, i) => (
-                  <div key={i} className="flex items-center gap-3 text-dark-muted animate-in slide-in-from-left-2 fade-in duration-300">
+                  <div 
+                    key={i} 
+                    className="flex items-center gap-3 text-dark-muted animate-in slide-in-from-left-2 fade-in duration-300"
+                    style={{ animationDelay: `${i * 0.1}s` }}
+                  >
                     <span className="text-accent">➜</span>
                     <span className={i === logLines.slice(-4).length - 1 ? "text-dark-text font-bold" : ""}>{line}</span>
                   </div>
                 ))}
+                {/* Blinking cursor */}
                 <div className="flex items-center gap-3 text-accent animate-pulse">
                    <span className="text-accent">➜</span>
-                   <span className="w-2 h-4 bg-accent block"></span>
+                   <span className="w-2 h-4 bg-accent block animate-blink"></span>
                 </div>
               </div>
             </div>
 
-            {/* Progress Bar */}
-            <div className="relative h-1.5 bg-dark-border rounded-full overflow-hidden">
+            {/* Enhanced Progress Bar */}
+            <div className="relative h-1.5 bg-dark-border rounded-full overflow-hidden group cursor-pointer">
                <div 
-                 className="absolute inset-y-0 left-0 bg-gradient-to-r from-primary via-accent to-primary w-full transition-transform duration-300 ease-out"
+                 className="absolute inset-y-0 left-0 bg-gradient-to-r from-primary via-accent to-primary w-full transition-transform duration-300 ease-out group-hover:shadow-[0_0_20px_rgba(113,0,150,0.5)]"
                  style={{ transform: `translateX(${progress - 100}%)` }}
                >
-                 <div className="absolute right-0 top-0 bottom-0 w-24 bg-gradient-to-r from-transparent to-white blur-md"></div>
+                 {/* Shimmer effect */}
+                 <div className="absolute right-0 top-0 bottom-0 w-24 bg-gradient-to-r from-transparent to-white blur-md animate-pulse"></div>
+                 
+                 {/* Moving highlight */}
+                 <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent animate-shimmer"></div>
                </div>
             </div>
+            
+            {/* Progress info with animation */}
             <div className="flex justify-between mt-3 text-[10px] font-mono text-dark-muted font-bold">
-               <span>00:00</span>
-               <span>{Math.round(progress)}%</span>
+               <span className="animate-pulse">00:00</span>
+               <span className="tabular-nums transition-all duration-300">{Math.round(progress)}%</span>
             </div>
         </div>
       </div>
