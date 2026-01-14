@@ -168,13 +168,18 @@ const App: React.FC = () => {
           if (prev >= 99) return 99;
           
           let increment = 0;
-          let speedFactor = transcriptionMode === 'verbatim' ? 2.5 : (isDeepThinking ? 0.6 : 1.2);
+          // Very slow increments for "Deep Reasoning" feel
+          let speedFactor = transcriptionMode === 'verbatim' ? 1.5 : (isDeepThinking ? 0.3 : 0.8);
           
-          // Slow down as we approach the next step or the end
+          // Progressive slowdown as we approach thresholds
           if (prev < 90) {
-            increment = Math.random() * (1.5 * speedFactor);
+            increment = Math.random() * (0.8 * speedFactor);
+            // Further slowdown as we approach the next threshold
+            if (step < steps.length && prev > steps[step].threshold - 10) {
+              increment *= 0.4;
+            }
           } else {
-            increment = Math.random() * (0.2 * speedFactor);
+            increment = Math.random() * (0.1 * speedFactor);
           }
           
           const nextProgress = prev + increment;
@@ -187,7 +192,7 @@ const App: React.FC = () => {
           
           return Math.min(nextProgress, 99);
         });
-      }, 200);
+      }, 400); // Slower interval
     } else if (transcription.text) {
       setProgress(100);
     }
@@ -923,15 +928,15 @@ const App: React.FC = () => {
             </div>
 
             {/* Enhanced Terminal Log with distinct border and header */}
-            <div className="bg-dark-card/40 backdrop-blur-xl rounded-2xl border border-white/5 mb-8 font-mono text-[11px] h-40 overflow-hidden flex flex-col shadow-2xl relative group transition-all duration-500">
-              {/* Window Header (Distinct Area) */}
-              <div className="flex-none h-9 flex items-center px-4 bg-white/[0.03] border-b border-white/5">
-                <div className="flex gap-2">
-                  <div className="w-3 h-3 rounded-full bg-[#FF5F56] shadow-[0_0_10px_rgba(255,95,86,0.3)]"></div>
-                  <div className="w-3 h-3 rounded-full bg-[#FFBD2E] shadow-[0_0_10px_rgba(255,189,46,0.3)]"></div>
-                  <div className="w-3 h-3 rounded-full bg-[#27C93F] shadow-[0_0_10px_rgba(39,201,63,0.3)]"></div>
+            <div className="bg-dark-card/40 backdrop-blur-xl rounded-2xl border border-white/5 mb-8 font-mono text-[11px] h-44 overflow-hidden flex flex-col shadow-2xl relative group transition-all duration-500">
+              {/* Window Header (Distinct Area with "Invisible" spacer) */}
+              <div className="flex-none h-11 flex items-center px-5 bg-black/40 border-b border-white/5">
+                <div className="flex items-center gap-3 py-1 px-2.5 rounded-full bg-black/50 border border-white/5">
+                  <div className="w-2.5 h-2.5 rounded-full bg-[#FF5F56] shadow-[0_0_8px_rgba(255,95,86,0.3)]"></div>
+                  <div className="w-2.5 h-2.5 rounded-full bg-[#FFBD2E] shadow-[0_0_8px_rgba(255,189,46,0.3)]"></div>
+                  <div className="w-2.5 h-2.5 rounded-full bg-[#27C93F] shadow-[0_0_8px_rgba(39,201,63,0.3)]"></div>
                 </div>
-                <div className="flex-1 text-center text-[9px] text-dark-muted font-bold uppercase tracking-[0.2em] opacity-40">System Console</div>
+                <div className="flex-1 text-center text-[9px] text-dark-muted font-black uppercase tracking-[0.3em] opacity-30">System Shell v2.0</div>
               </div>
               
               {/* Log lines area with padding from header */}
