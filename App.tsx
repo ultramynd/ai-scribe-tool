@@ -153,30 +153,41 @@ const App: React.FC = () => {
     let interval: ReturnType<typeof setInterval>;
     if (transcription.isLoading) {
       setProgress(0);
-      setLogLines(['Initializing AI session...']);
+      setLogLines(['➜ Initializing AI session...']);
       
+      let step = 0;
+      const steps = [
+        { threshold: 15, log: '➜ Connecting to Deep Reasoning Engine...' },
+        { threshold: 40, log: '➜ Initializing Neural Inference layer...' },
+        { threshold: 65, log: '➜ Generating transcription (Deep Inference)...' },
+        { threshold: 85, log: '➜ Finalizing text and formatting...' },
+      ];
+
       interval = setInterval(() => {
         setProgress((prev) => {
+          if (prev >= 99) return 99;
+          
           let increment = 0;
+          let speedFactor = transcriptionMode === 'verbatim' ? 2.5 : (isDeepThinking ? 0.6 : 1.2);
           
-          // Speed simulation
-          let speedFactor = 1.0;
-          if (transcriptionMode === 'verbatim') speedFactor = 3.5; // Groq is fast
-          else if (!isDeepThinking) speedFactor = 2.0; // Flash is moderately fast
-          else speedFactor = 0.8; // Pro/Thinking is slower
-
-          if (prev < 40) increment = Math.random() * (2.5 * speedFactor);
-          else if (prev < 70) increment = Math.random() * (1.5 * speedFactor);
-          else if (prev < 90) increment = 0.5 * speedFactor;
+          // Slow down as we approach the next step or the end
+          if (prev < 90) {
+            increment = Math.random() * (1.5 * speedFactor);
+          } else {
+            increment = Math.random() * (0.2 * speedFactor);
+          }
           
-          const newProgress = Math.min(prev + increment, 99);
+          const nextProgress = prev + increment;
           
-          // Technical logs now come from services, keep UI simple here
-          if (prev < 5 && newProgress >= 5) setLogLines(p => [...p, 'Initializing AI Engine...']);
+          // Check if we passed a step threshold
+          if (step < steps.length && nextProgress >= steps[step].threshold) {
+             setLogLines(p => [...p, steps[step].log]);
+             step++;
+          }
           
-          return newProgress;
+          return Math.min(nextProgress, 99);
         });
-      }, 100);
+      }, 200);
     } else if (transcription.text) {
       setProgress(100);
     }
@@ -911,31 +922,35 @@ const App: React.FC = () => {
               </div>
             </div>
 
-            {/* Enhanced Terminal Log with typing effect */}
-            <div className="bg-dark-card/60 backdrop-blur-md rounded-2xl border border-dark-border p-6 mb-8 font-mono text-xs h-36 overflow-hidden flex flex-col justify-end shadow-2xl relative group hover:border-primary/30 transition-colors duration-500">
-              {/* Window controls */}
-              <div className="absolute top-3 left-4 flex gap-1.5">
-                <div className="w-2.5 h-2.5 rounded-full bg-red-500/80 group-hover:bg-red-500 transition-colors cursor-pointer"></div>
-                <div className="w-2.5 h-2.5 rounded-full bg-yellow-500/80 group-hover:bg-yellow-500 transition-colors cursor-pointer"></div>
-                <div className="w-2.5 h-2.5 rounded-full bg-green-500/80 group-hover:bg-green-500 transition-colors cursor-pointer"></div>
+            {/* Enhanced Terminal Log with distinct border and header */}
+            <div className="bg-dark-card/40 backdrop-blur-xl rounded-2xl border border-white/5 mb-8 font-mono text-[11px] h-40 overflow-hidden flex flex-col shadow-2xl relative group transition-all duration-500">
+              {/* Window Header (Distinct Area) */}
+              <div className="flex-none h-9 flex items-center px-4 bg-white/[0.03] border-b border-white/5">
+                <div className="flex gap-2">
+                  <div className="w-3 h-3 rounded-full bg-[#FF5F56] shadow-[0_0_10px_rgba(255,95,86,0.3)]"></div>
+                  <div className="w-3 h-3 rounded-full bg-[#FFBD2E] shadow-[0_0_10px_rgba(255,189,46,0.3)]"></div>
+                  <div className="w-3 h-3 rounded-full bg-[#27C93F] shadow-[0_0_10px_rgba(39,201,63,0.3)]"></div>
+                </div>
+                <div className="flex-1 text-center text-[9px] text-dark-muted font-bold uppercase tracking-[0.2em] opacity-40">System Console</div>
               </div>
               
-              {/* Log lines with staggered animation */}
-              <div className="space-y-2 pt-4">
+              {/* Log lines area with padding from header */}
+              <div className="flex-1 flex flex-col justify-end p-5 space-y-2.5 overflow-hidden">
                 {logLines.slice(-4).map((line, i) => (
                   <div 
                     key={i} 
-                    className="flex items-center gap-3 text-dark-muted animate-in slide-in-from-left-2 fade-in duration-300"
-                    style={{ animationDelay: `${i * 0.1}s` }}
+                    className="flex items-start gap-4 animate-in slide-in-from-left-2 fade-in duration-300"
+                    style={{ animationDelay: `${i * 0.15}s` }}
                   >
-                    <span className="text-accent">➜</span>
-                    <span className={i === logLines.slice(-4).length - 1 ? "text-dark-text font-bold" : ""}>{line}</span>
+                    <span className={`transition-all duration-300 ${i === logLines.slice(-4).length - 1 ? "text-dark-text opacity-100" : "text-dark-muted opacity-50"}`}>
+                       {line}
+                    </span>
                   </div>
                 ))}
-                {/* Blinking cursor */}
-                <div className="flex items-center gap-3 text-accent animate-pulse">
-                   <span className="text-accent">➜</span>
-                   <span className="w-2 h-4 bg-accent block animate-blink"></span>
+                {/* Custom glowing cursor line */}
+                <div className="flex items-center gap-2 pt-1">
+                   <div className="w-1.5 h-3.5 bg-accent shadow-[0_0_10px_rgba(94,197,212,0.8)] animate-pulse"></div>
+                   <div className="h-0.5 w-12 bg-gradient-to-r from-accent to-transparent opacity-20"></div>
                 </div>
               </div>
             </div>
