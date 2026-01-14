@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import ReactMarkdown from 'react-markdown';
+import { motion, AnimatePresence } from 'framer-motion';
 import { 
   PencilSimple, Eye, ArrowArcLeft, ArrowArcRight, TextB, TextItalic, 
   TextUnderline, TextStrikethrough, CloudArrowDown, FileText, File, 
@@ -13,7 +14,7 @@ import {
 } from '@phosphor-icons/react';
 import PlaybackControl from './PlaybackControl';
 import { generateTxt, generateDoc, generateDocx, generateSrt } from '../utils/exportUtils';
-import { summarizeText, enhanceFormatting, analyzeVideoContent, extractKeyMoments, findDiscussionBounds, stripPleasantries } from '../services/geminiService';
+import { summarizeText, enhanceFormatting, analyzeVideoContent, extractKeyMoments, findDiscussionBounds, stripPleasantries, refineSpeakers, refineAfricanContext } from '../services/geminiService';
 import { AudioFile } from '../types';
 
 interface TranscriptionEditorProps {
@@ -39,6 +40,7 @@ interface TranscriptionEditorProps {
   onBackgroundTranscribe?: (file: AudioFile) => void;
   onAttachDrive?: () => void;
   onSeek?: (timeInSeconds: number) => void;
+  useDeepThinking?: boolean;
 }
 
 type ActiveMenu = 'formatting' | 'tools' | 'export' | 'search' | 'ai-features' | 'copy-as' | null;
@@ -60,7 +62,9 @@ const TranscriptionEditor: React.FC<TranscriptionEditorProps> = ({
   isRecording = false,
   googleAccessToken,
   onBackgroundTranscribe,
-  onAttachDrive
+  onAttachDrive,
+  onSeek,
+  useDeepThinking = false
 }) => {
   // --- State ---
   const [history, setHistory] = useState<string[]>([initialText]);
@@ -94,6 +98,8 @@ const TranscriptionEditor: React.FC<TranscriptionEditorProps> = ({
 
   // Playback State
   const [playbackTime, setPlaybackTime] = useState(0);
+  const [seekToTime, setSeekToTime] = useState<number | undefined>(undefined);
+  const [activeSegmentIndex, setActiveSegmentIndex] = useState(-1);
 
   // Draggable Toolbar State
   const [toolbarPosition, setToolbarPosition] = useState<{ x: number; y: number } | null>(null);
@@ -126,63 +132,26 @@ const TranscriptionEditor: React.FC<TranscriptionEditorProps> = ({
     }
   }, [isEditing]);
 
-  // Handle draggable toolbar mouse events
+  // Dragging logic is handled by framer-motion
+
+  // Auto-scroll to active segment in Read mode
   useEffect(() => {
-    const handleMouseMove = (e: MouseEvent) => {
-      if (isDragging && dragStartRef.current) {
-        const deltaX = e.clientX - dragStartRef.current.x;
-        const deltaY = e.clientY - dragStartRef.current.y;
-        setToolbarPosition({
-          x: dragStartRef.current.posX + deltaX,
-          y: dragStartRef.current.posY + deltaY
-        });
-      }
-    };
-
-    const handleMouseUp = () => {
-      setIsDragging(false);
-      dragStartRef.current = null;
-    };
-
-    if (isDragging) {
-      document.addEventListener('mousemove', handleMouseMove);
-      document.addEventListener('mouseup', handleMouseUp);
+    if (isEditing || segments.length === 0) return;
+    
+    let currentIdx = -1;
+    for (let i = 0; i < segments.length; i++) {
+        if (playbackTime >= segments[i].time) currentIdx = i;
+        else break;
     }
-
-    return () => {
-      document.removeEventListener('mousemove', handleMouseMove);
-      document.removeEventListener('mouseup', handleMouseUp);
-    };
-  }, [isDragging]);
-
-  // Handle draggable Summary Card mouse events
-  useEffect(() => {
-    const handleMouseMove = (e: MouseEvent) => {
-      if (isDraggingSummary && summaryDragStartRef.current) {
-        const deltaX = e.clientX - summaryDragStartRef.current.x;
-        const deltaY = e.clientY - summaryDragStartRef.current.y;
-        setSummaryPosition({
-          x: summaryDragStartRef.current.posX + deltaX,
-          y: summaryDragStartRef.current.posY + deltaY
-        });
+    
+    if (currentIdx !== -1 && currentIdx !== activeSegmentIndex) {
+      setActiveSegmentIndex(currentIdx);
+      const element = document.getElementById(`seg-${currentIdx}`);
+      if (element) {
+        element.scrollIntoView({ behavior: 'smooth', block: 'center' });
       }
-    };
-
-    const handleMouseUp = () => {
-      setIsDraggingSummary(false);
-      summaryDragStartRef.current = null;
-    };
-
-    if (isDraggingSummary) {
-      document.addEventListener('mousemove', handleMouseMove);
-      document.addEventListener('mouseup', handleMouseUp);
     }
-
-    return () => {
-      document.removeEventListener('mousemove', handleMouseMove);
-      document.removeEventListener('mouseup', handleMouseUp);
-    };
-  }, [isDraggingSummary]);
+  }, [playbackTime, isEditing, segments, activeSegmentIndex]);
 
   // --- Real-time Transcription Setup ---
 
@@ -328,6 +297,27 @@ const TranscriptionEditor: React.FC<TranscriptionEditorProps> = ({
   useEffect(() => {
      const handleEditorClick = (e: MouseEvent) => {
         const target = e.target as HTMLElement;
+
+        // Fix: Handle timestamp clicks for seeking in edit mode
+        if (target.classList.contains('timestamp-chip') || target.closest('.timestamp-chip')) {
+            const chip = target.classList.contains('timestamp-chip') ? target : target.closest('.timestamp-chip');
+            const timeStr = chip?.getAttribute('data-time');
+            if (timeStr && onSeek) {
+                const match = timeStr.match(/\[?(\d{1,2}):(\d{2})(?::(\d{2}))?\]?/);
+                if (match) {
+                    const hours = match[3] ? parseInt(match[1]) : 0;
+                    const minutes = match[3] ? parseInt(match[2]) : parseInt(match[1]);
+                    const seconds = match[3] ? parseInt(match[3]) : parseInt(match[2]);
+                    const timeInSeconds = hours * 3600 + minutes * 60 + seconds;
+                    setSeekToTime(timeInSeconds);
+                    // Clear seekToTime shortly after to allow triggering again with same value
+                    setTimeout(() => setSeekToTime(undefined), 100);
+                    if (onSeek) onSeek(timeInSeconds);
+                }
+            }
+            return;
+        }
+
         if (target.tagName === 'S' || target.closest('s')) {
            const sTag = target.tagName === 'S' ? target : target.closest('s');
            if (sTag) {
@@ -385,7 +375,7 @@ const TranscriptionEditor: React.FC<TranscriptionEditorProps> = ({
     };
   };
 
-  const updateText = (newText: string) => {
+  const updateText = (newText: string, skipDomUpdate: boolean = false) => {
       lastSentTextRef.current = newText;
       setText(newText);
       onTextChange(newText);
@@ -397,7 +387,7 @@ const TranscriptionEditor: React.FC<TranscriptionEditorProps> = ({
         setHistoryIndex(updated.length - 1);
       }
       
-      if (contentEditableRef.current && isEditing) {
+      if (!skipDomUpdate && contentEditableRef.current && isEditing) {
           contentEditableRef.current.innerHTML = markdownToHtml(newText);
       }
   };
@@ -439,6 +429,17 @@ const TranscriptionEditor: React.FC<TranscriptionEditorProps> = ({
   };
 
   const handleUndo = () => {
+      // If user has uncommitted changes (typing), revert to last committed state first
+      if (text !== history[historyIndex]) {
+          const stableText = history[historyIndex];
+          lastSentTextRef.current = stableText;
+          setText(stableText);
+          onTextChange(stableText);
+          if (contentEditableRef.current) contentEditableRef.current.innerHTML = markdownToHtml(stableText);
+          if (historyDebounceRef.current) clearTimeout(historyDebounceRef.current);
+          return;
+      }
+
       if (historyIndex > 0) {
           const newIndex = historyIndex - 1;
           const newText = history[newIndex];
@@ -478,12 +479,13 @@ const TranscriptionEditor: React.FC<TranscriptionEditorProps> = ({
               const currentHistory = prev.slice(0, historyIndex + 1);
               if (currentHistory[currentHistory.length - 1] !== newMd) {
                   const updated = [...currentHistory, newMd].slice(-50);
+                  // We update index in the next tick to avoid side effects in render
                   setHistoryIndex(updated.length - 1);
                   return updated;
               }
               return prev;
           });
-        }, 1000);
+        }, 800);
     }
   };
 
@@ -492,9 +494,7 @@ const TranscriptionEditor: React.FC<TranscriptionEditorProps> = ({
       if (contentEditableRef.current) {
           const html = contentEditableRef.current.innerHTML;
           const newMd = htmlToMarkdown(html);
-          lastSentTextRef.current = newMd;
-          setText(newMd);
-          onTextChange(newMd);
+          updateText(newMd, true); // Skip DOM update to preserve cursor
       }
   };
 
@@ -503,9 +503,7 @@ const TranscriptionEditor: React.FC<TranscriptionEditorProps> = ({
       if (contentEditableRef.current) {
         const html = contentEditableRef.current.innerHTML;
         const newMd = htmlToMarkdown(html);
-        lastSentTextRef.current = newMd;
-        setText(newMd);
-        onTextChange(newMd);
+        updateText(newMd, true); // Skip DOM update to preserve cursor
       }
   };
 
@@ -560,7 +558,7 @@ const TranscriptionEditor: React.FC<TranscriptionEditorProps> = ({
     setSummary(null);
     setEditedSummary(null);
     try {
-      const result = await summarizeText(text);
+      const result = await summarizeText(text, useDeepThinking);
       setSummary(result);
       setEditedSummary(result);
     } catch (e: any) {
@@ -597,7 +595,7 @@ const TranscriptionEditor: React.FC<TranscriptionEditorProps> = ({
       setSummary(null);
       setEditedSummary(null);
       try {
-          const result = await enhanceFormatting(text, contentType || "General");
+          const result = await enhanceFormatting(text, contentType || "General", useDeepThinking);
           setSummary(result);
           setEditedSummary(result);
       } catch (e: any) {
@@ -616,7 +614,7 @@ const TranscriptionEditor: React.FC<TranscriptionEditorProps> = ({
     setSummary(null);
     setEditedSummary(null);
     try {
-      const result = await extractKeyMoments(text);
+      const result = await extractKeyMoments(text, useDeepThinking);
       setSummary(result);
       setEditedSummary(result);
     } catch (e: any) {
@@ -633,7 +631,7 @@ const TranscriptionEditor: React.FC<TranscriptionEditorProps> = ({
     setSummary(null);
     setEditedSummary(null);
     try {
-      const result = await findDiscussionBounds(text);
+      const result = await findDiscussionBounds(text, useDeepThinking);
       setSummary(result);
       setEditedSummary(result);
     } catch (e: any) {
@@ -650,11 +648,45 @@ const TranscriptionEditor: React.FC<TranscriptionEditorProps> = ({
     setSummary(null);
     setEditedSummary(null);
     try {
-      const result = await stripPleasantries(text);
+      const result = await stripPleasantries(text, useDeepThinking);
       setSummary(result);
       setEditedSummary(result);
     } catch (e: any) {
       setSummary(`Failed to filter pleasantries.\n\nReason: ${e.message || 'AI could not find distinguishable intro/outro filler.'}`);
+    } finally {
+      setIsSummarizing(false);
+    }
+  };
+
+  const handleRefineSpeakers = async () => {
+    setSummaryTitle("Refine Speakers");
+    setShowSummarySidebar(true);
+    setIsSummarizing(true);
+    setSummary(null);
+    setEditedSummary(null);
+    try {
+      const result = await refineSpeakers(text, useDeepThinking);
+      setSummary(result);
+      setEditedSummary(result);
+    } catch (e: any) {
+      setSummary(`Failed to refine speaker labels.\n\nReason: ${e.message}`);
+    } finally {
+      setIsSummarizing(false);
+    }
+  };
+
+  const handleRefineAfricanContext = async () => {
+    setSummaryTitle("African Context");
+    setShowSummarySidebar(true);
+    setIsSummarizing(true);
+    setSummary(null);
+    setEditedSummary(null);
+    try {
+      const result = await refineAfricanContext(text, useDeepThinking);
+      setSummary(result);
+      setEditedSummary(result);
+    } catch (e: any) {
+      setSummary(`Failed to optimize for African context.\n\nReason: ${e.message}`);
     } finally {
       setIsSummarizing(false);
     }
@@ -736,14 +768,15 @@ const TranscriptionEditor: React.FC<TranscriptionEditorProps> = ({
               <div 
                 key={i} 
                 id={`seg-${i}`}
-                className={`transition-all duration-300 rounded-xl p-4 my-1 border-l-4 ${
+                onClick={() => onSeek?.(seg.time)}
+                className={`transition-all duration-300 rounded-xl p-4 my-1 border-l-4 cursor-pointer group ${
                   isActive 
                   ? 'bg-primary/5 border-primary shadow-sm' 
                   : 'bg-transparent border-transparent hover:bg-slate-50 dark:hover:bg-white/5'
                 }`}
               >
                   <ReactMarkdown 
-                    className="prose prose-lg prose-slate dark:prose-invert max-w-none"
+                    className="prose prose-lg prose-slate dark:prose-invert max-w-none pointer-events-none"
                     components={{
                         p: ({node, ...props}: any) => <p className={`mb-0 leading-relaxed ${isActive ? 'text-slate-900 dark:text-white font-medium' : 'text-slate-700 dark:text-slate-300'}`} {...props} />,
                         strong: ({node, ...props}: any) => <span className="font-bold text-primary dark:text-accent" {...props} />
@@ -784,49 +817,25 @@ const TranscriptionEditor: React.FC<TranscriptionEditorProps> = ({
         
         {/* Floating Editor Toolbar (Only shown in Edit Mode) - DRAGGABLE */}
         {isEditing && (
-          <div 
-            className="absolute z-50 animate-in fade-in slide-in-from-top-4 duration-300"
-            style={toolbarPosition ? {
-              left: toolbarPosition.x,
-              top: toolbarPosition.y,
-              transform: 'none'
-            } : {
-              left: '50%',
-              top: '1rem',
-              transform: 'translateX(-50%)'
+          <motion.div 
+            drag
+            dragMomentum={false}
+            className="absolute z-50 cursor-grab active:cursor-grabbing"
+            initial={{ opacity: 0, y: -20, x: "-50%" }}
+            animate={{ opacity: 1, y: 0, x: "-50%" }}
+            style={{ 
+              left: toolbarPosition?.x || '50%',
+              top: toolbarPosition?.y || '1rem',
+            }}
+            onDragEnd={(_, info) => {
+              // Optional: Update state if you want to persist position
+              // setToolbarPosition({ x: info.point.x, y: info.point.y });
             }}
           >
             <div 
               ref={toolbarRef} 
               className={`flex items-center gap-1 bg-white/95 dark:bg-dark-card/95 backdrop-blur-xl rounded-2xl px-2 py-1.5 border border-slate-200/80 dark:border-white/10 shadow-xl shadow-slate-900/[0.08] ${isDragging ? 'cursor-grabbing' : ''}`}
             >
-                {/* Drag Handle */}
-                <div 
-                  className="w-6 h-8 flex items-center justify-center cursor-grab active:cursor-grabbing text-slate-300 hover:text-slate-500 transition-colors"
-                  onMouseDown={(e) => {
-                    e.preventDefault();
-                    setIsDragging(true);
-                    const rect = (e.target as HTMLElement).closest('.absolute')?.getBoundingClientRect();
-                    if (rect) {
-                      dragStartRef.current = {
-                        x: e.clientX,
-                        y: e.clientY,
-                        posX: rect.left,
-                        posY: rect.top
-                      };
-                    }
-                  }}
-                >
-                  <svg width="6" height="14" viewBox="0 0 6 14" fill="currentColor">
-                    <circle cx="1.5" cy="1.5" r="1.5"/>
-                    <circle cx="4.5" cy="1.5" r="1.5"/>
-                    <circle cx="1.5" cy="7" r="1.5"/>
-                    <circle cx="4.5" cy="7" r="1.5"/>
-                    <circle cx="1.5" cy="12.5" r="1.5"/>
-                    <circle cx="4.5" cy="12.5" r="1.5"/>
-                  </svg>
-                </div>
-
                 <div className="w-px h-5 bg-slate-200 dark:bg-dark-border"></div>
                 
                 {/* Undo/Redo */}
@@ -956,7 +965,7 @@ const TranscriptionEditor: React.FC<TranscriptionEditorProps> = ({
                     )}
                 </div>
             </div>
-          </div>
+          </motion.div>
         )}
 
 
@@ -1231,6 +1240,43 @@ const TranscriptionEditor: React.FC<TranscriptionEditorProps> = ({
                   </div>
                 </div>
                 )}
+
+                {/* Cultural & Contextual Section */}
+                <div>
+                   <p className="px-1 text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-2 mt-4">Contextual Refinement</p>
+                   <div className="grid grid-cols-2 gap-2">
+                     <button 
+                       onClick={handleRefineSpeakers} 
+                       disabled={isSummarizing} 
+                       className={`flex items-center gap-2 p-2.5 rounded-xl border transition-all ${
+                         summaryTitle === "Refine Speakers" 
+                           ? "bg-indigo-500 text-white border-indigo-500 shadow-lg shadow-indigo-500/20" 
+                           : "bg-slate-50 dark:bg-dark-bg border-slate-100 dark:border-dark-border text-slate-600 dark:text-dark-muted hover:border-indigo-500/30 hover:bg-white dark:hover:bg-dark-card"
+                       }`}
+                     >
+                       <Users size={16} weight="duotone" />
+                       <div className="flex flex-col items-start gap-0.5">
+                         <span className="text-[11px] font-bold">Refine Speakers</span>
+                         <ExperimentalBadge />
+                       </div>
+                     </button>
+                     <button 
+                       onClick={handleRefineAfricanContext} 
+                       disabled={isSummarizing} 
+                       className={`flex items-center gap-2 p-2.5 rounded-xl border transition-all ${
+                         summaryTitle === "African Context" 
+                           ? "bg-emerald-500 text-white border-emerald-500 shadow-lg shadow-emerald-500/20" 
+                           : "bg-slate-50 dark:bg-dark-bg border-slate-100 dark:border-dark-border text-slate-600 dark:text-dark-muted hover:border-emerald-500/30 hover:bg-white dark:hover:bg-dark-card"
+                       }`}
+                     >
+                       <Palette size={16} weight="duotone" />
+                       <div className="flex flex-col items-start gap-0.5">
+                         <span className="text-[11px] font-bold">African Context</span>
+                         <ExperimentalBadge />
+                       </div>
+                     </button>
+                   </div>
+                </div>
               </>
             );
           })()}
@@ -1365,106 +1411,93 @@ const TranscriptionEditor: React.FC<TranscriptionEditorProps> = ({
           </div>
       )}
 
-      {/* Legacy sidebar for when AI sidebar is not open but we have a summary */}
-      {showSummarySidebar && !showAiSidebar && (
-          <div 
-            className={`
-              fixed md:absolute inset-0 md:inset-auto
-              w-full md:w-96 md:min-w-[320px] md:min-h-[300px] h-full md:h-auto
-              bg-white dark:bg-dark-card md:bg-white/95 md:dark:bg-dark-card/95 
-              md:backdrop-blur-xl shadow-2xl border-0 md:border border-slate-200 dark:border-dark-border 
-              rounded-none md:rounded-2xl p-5 flex flex-col 
-              animate-in slide-in-from-bottom md:slide-in-from-right-10 duration-300 
-              z-[60] md:z-50 md:resize overflow-hidden 
-              group
-              ${!summaryPosition ? 'md:right-4 md:top-16 md:bottom-24' : ''}
-            `}
-            style={summaryPosition ? {
-              left: summaryPosition.x,
-              top: summaryPosition.y,
-              right: 'auto',
-              bottom: 'auto',
-              height: 'auto',
-              maxHeight: '80vh'
-            } : {}}
-          >
-              {/* Drag Handle at Top - Subtle, shows on hover */}
-              <div 
-                className="flex justify-center py-1 cursor-grab active:cursor-grabbing select-none -mt-2 mb-1 opacity-0 group-hover:opacity-100 transition-opacity"
-                onMouseDown={(e) => {
-                  e.preventDefault();
-                  setIsDraggingSummary(true);
-                  const rect = (e.currentTarget.closest('.absolute') as HTMLElement)?.getBoundingClientRect();
-                  if (rect) {
-                    summaryDragStartRef.current = {
-                      x: e.clientX,
-                      y: e.clientY,
-                      posX: rect.left,
-                      posY: rect.top
-                    };
-                  }
-                }}
-              >
-                <div className="w-8 h-1 bg-slate-300 dark:bg-slate-600 rounded-full"></div>
-              </div>
-
-              {/* Header */}
-              <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-sm font-bold text-slate-800 dark:text-dark-text flex items-center gap-2">
-                      {summaryTitle === "Visual Analysis" ? <VideoCamera className="text-primary dark:text-accent" size={16} weight="duotone" /> : 
-                       summaryTitle === "Smart Suggestions" ? <MagicWand className="text-primary dark:text-accent" size={16} weight="duotone" /> :
-                       <BookOpen className="text-primary dark:text-accent" size={16} weight="duotone" />}
-                      {summaryTitle}
-                  </h3>
-                  <div className="flex items-center gap-2">
-                    <button 
-                      onClick={() => setIsPreviewMode(!isPreviewMode)} 
-                      className="flex items-center gap-1 bg-slate-100 dark:bg-white/5 px-2 py-1 rounded text-[9px] font-bold text-slate-500 hover:bg-slate-200 dark:hover:bg-white/10 transition-colors"
-                    >
-                      {isPreviewMode ? <PencilSimple size={10} weight="bold" /> : <Eye size={10} weight="bold" />}
-                    </button>
-                    <button onClick={() => setShowSummarySidebar(false)} className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-dark-border text-slate-400">
-                        <X size={16} weight="bold" />
-                    </button>
-                  </div>
-              </div>
-              
-              <div className="flex-1 overflow-y-auto custom-scrollbar">
-                  {isSummarizing ? (
-                      <div className="flex flex-col items-center justify-center h-40 gap-3 text-slate-400">
-                          <Spinner size={28} weight="bold" className="animate-spin text-primary" />
-                          <span className="text-xs">AI Processing...</span>
-                      </div>
-                  ) : summary ? (
-                      <>
-                        <div className="flex-1 relative group h-full overflow-hidden">
-                           {isPreviewMode ? (
-                              <div className="w-full h-full overflow-y-auto custom-scrollbar prose prose-sm prose-slate dark:prose-invert text-xs p-1">
-                                  <ReactMarkdown>{editedSummary || summary}</ReactMarkdown>
-                              </div>
-                           ) : (
-                              <textarea 
-                                  value={editedSummary || ''}
-                                  onChange={(e) => setEditedSummary(e.target.value)}
-                                  className="w-full h-full bg-white/50 dark:bg-dark-bg/50 border border-slate-200 dark:border-dark-border rounded-xl p-3 text-xs leading-relaxed font-medium text-slate-700 dark:text-slate-200 focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all resize-none custom-scrollbar"
-                                  placeholder="Edit analysis..."
-                              />
-                           )}
+      {/* Legacy sidebar for when AI sidebar is not open but we have a summary - DRAGGABLE */}
+      <AnimatePresence>
+        {showSummarySidebar && !showAiSidebar && (
+            <motion.div 
+              drag
+              dragMomentum={false}
+              layout
+              initial={{ opacity: 0, scale: 0.9, x: 20 }}
+              animate={{ opacity: 1, scale: 1, x: 0 }}
+              exit={{ opacity: 0, scale: 0.9, x: 20 }}
+              className={`
+                fixed md:absolute inset-0 md:inset-auto
+                w-full md:w-96 md:min-w-[320px] md:min-h-[300px] h-full md:h-auto
+                bg-white dark:bg-dark-card md:bg-white/95 md:dark:bg-dark-card/95 
+                md:backdrop-blur-xl shadow-2xl border-0 md:border border-slate-200 dark:border-dark-border 
+                rounded-none md:rounded-2xl p-5 flex flex-col 
+                z-[60] md:z-50 md:resize overflow-hidden 
+                group cursor-grab active:cursor-grabbing
+                ${!summaryPosition ? 'md:right-4 md:top-16 md:bottom-24' : ''}
+              `}
+              style={summaryPosition ? {
+                left: summaryPosition.x,
+                top: summaryPosition.y,
+                right: 'auto',
+                bottom: 'auto',
+                height: 'auto',
+                maxHeight: '80vh'
+              } : {}}
+            >
+                {/* Header */}
+                <div className="flex items-center justify-between mb-4 pointer-events-none">
+                    <h3 className="text-sm font-bold text-slate-800 dark:text-dark-text flex items-center gap-2">
+                        {summaryTitle === "Visual Analysis" ? <VideoCamera className="text-primary dark:text-accent" size={16} weight="duotone" /> : 
+                         summaryTitle === "Smart Suggestions" ? <MagicWand className="text-primary dark:text-accent" size={16} weight="duotone" /> :
+                         <BookOpen className="text-primary dark:text-accent" size={16} weight="duotone" />}
+                        {summaryTitle}
+                    </h3>
+                    <div className="flex items-center gap-2 pointer-events-auto">
+                      <button 
+                        onClick={() => setIsPreviewMode(!isPreviewMode)} 
+                        className="flex items-center gap-1 bg-slate-100 dark:bg-white/5 px-2 py-1 rounded text-[9px] font-bold text-slate-500 hover:bg-slate-200 dark:hover:bg-white/10 transition-colors"
+                      >
+                        {isPreviewMode ? <PencilSimple size={10} weight="bold" /> : <Eye size={10} weight="bold" />}
+                      </button>
+                      <button onClick={() => setShowSummarySidebar(false)} className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-dark-border text-slate-400">
+                          <X size={16} weight="bold" />
+                      </button>
+                    </div>
+                </div>
+                
+                <div className="flex-1 overflow-y-auto custom-scrollbar pointer-events-auto">
+                    {isSummarizing ? (
+                        <div className="flex flex-col items-center justify-center h-40 gap-3 text-slate-400">
+                            <Spinner size={28} weight="bold" className="animate-spin text-primary" />
+                            <span className="text-xs">AI Processing...</span>
                         </div>
-                        {summaryTitle === "Smart Suggestions" && (
-                            <button 
-                                onClick={handleApplyEnhancement}
-                                className="w-full mt-4 bg-gradient-to-r from-primary to-purple-600 hover:from-primary/90 hover:to-purple-600/90 text-white font-bold py-3 rounded-xl text-sm flex items-center justify-center gap-2 shadow-lg shadow-primary/20 transition-all active:scale-[0.98] flex-shrink-0"
-                            >
-                                <Sparkle size={16} weight="fill" />
-                                Apply to Document
-                            </button>
-                        )}
-                      </>
-                  ) : null}
-              </div>
-          </div>
-      )}
+                    ) : summary ? (
+                        <>
+                          <div className="flex-1 relative group h-full overflow-hidden">
+                             {isPreviewMode ? (
+                                <div className="w-full h-full overflow-y-auto custom-scrollbar prose prose-sm prose-slate dark:prose-invert text-xs p-1">
+                                    <ReactMarkdown>{editedSummary || summary}</ReactMarkdown>
+                                </div>
+                             ) : (
+                                <textarea 
+                                    value={editedSummary || ''}
+                                    onChange={(e) => setEditedSummary(e.target.value)}
+                                    className="w-full h-full bg-white/50 dark:bg-dark-bg/50 border border-slate-200 dark:border-dark-border rounded-xl p-3 text-xs leading-relaxed font-medium text-slate-700 dark:text-slate-200 focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all resize-none custom-scrollbar"
+                                    placeholder="Edit analysis..."
+                                />
+                             )}
+                          </div>
+                          {summaryTitle === "Smart Suggestions" && (
+                              <button 
+                                  onClick={handleApplyEnhancement}
+                                  className="w-full mt-4 bg-gradient-to-r from-primary to-purple-600 hover:from-primary/90 hover:to-purple-600/90 text-white font-bold py-3 rounded-xl text-sm flex items-center justify-center gap-2 shadow-lg shadow-primary/20 transition-all active:scale-[0.98] flex-shrink-0"
+                              >
+                                  <Sparkle size={16} weight="fill" />
+                                  Apply to Document
+                              </button>
+                          )}
+                        </>
+                    ) : null}
+                </div>
+            </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Toast Notification */}
       {toast && (
@@ -1491,11 +1524,15 @@ const TranscriptionEditor: React.FC<TranscriptionEditorProps> = ({
           </div>
         </div>
       )}
-      {/* Floating Audio Player for Read Mode */}
-      {!isEditing && audioUrl && (
+      {/* Floating Audio Player */}
+      {audioUrl && (
         <div className="fixed bottom-8 left-1/2 -translate-x-1/2 z-[100] w-full max-w-[500px] px-4 animate-in slide-in-from-bottom-8 duration-500">
            <div className="bg-[#121212]/90 backdrop-blur-2xl border border-white/10 rounded-full p-2 shadow-2xl">
-              <PlaybackControl audioUrl={audioUrl} onTimeUpdate={setPlaybackTime} />
+              <PlaybackControl 
+                audioUrl={audioUrl} 
+                onTimeUpdate={setPlaybackTime} 
+                seekToTime={seekToTime}
+              />
            </div>
         </div>
       )}

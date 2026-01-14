@@ -240,3 +240,19 @@ body {
 .animate-shimmer {
   animation: shimmer 2s ease-in-out infinite;
 }
+
+/* Interactive Transcription Elements */
+.timestamp-chip {
+  @apply inline-flex items-center justify-center px-1.5 py-0.5 mx-1 rounded-md bg-primary/10 text-primary 
+         text-[11px] font-bold border border-primary/20 cursor-pointer hover:bg-primary/20 transition-all;
+}
+
+.interactive-strike {
+  @apply relative cursor-pointer hover:text-red-500/50 transition-colors;
+}
+
+.interactive-strike:hover::after {
+  content: "✕ Click to remove";
+  @apply absolute -top-8 left-1/2 -translate-x-1/2 px-2 py-1 bg-slate-800 text-white text-[9px] 
+         rounded whitespace-nowrap opacity-100 z-50 pointer-events-none;
+}

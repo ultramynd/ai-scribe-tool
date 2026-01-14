@@ -4,7 +4,7 @@ import {
   SignIn, SignOut, Users, User, ArrowLeft, ArrowRight, Plus, Checks, 
   FloppyDisk, Lightning, Terminal, Moon, Sun, WarningCircle, X, Brain, 
   SpeakerHigh, Eye, PencilSimple, Copy, CloudArrowDown, Export, Check,
-  CaretDown, List, Trash, Clock, HardDrive
+  CaretDown, List, Trash, Clock, HardDrive, FileCode
 } from '@phosphor-icons/react';
 import AudioRecorder from './components/AudioRecorder';
 import FileUploader from './components/FileUploader';
@@ -150,54 +150,13 @@ const App: React.FC = () => {
   };
 
   useEffect(() => {
-    let interval: ReturnType<typeof setInterval>;
     if (transcription.isLoading) {
       setProgress(0);
       setLogLines(['➜ Initializing AI session...']);
-      
-      let step = 0;
-      const steps = [
-        { threshold: 15, log: '➜ Connecting to Deep Reasoning Engine...' },
-        { threshold: 40, log: '➜ Initializing Neural Inference layer...' },
-        { threshold: 65, log: '➜ Generating transcription (Deep Inference)...' },
-        { threshold: 85, log: '➜ Finalizing text and formatting...' },
-      ];
-
-      interval = setInterval(() => {
-        setProgress((prev) => {
-          if (prev >= 99) return 99;
-          
-          let increment = 0;
-          // Very slow increments for "Deep Reasoning" feel
-          let speedFactor = transcriptionMode === 'verbatim' ? 1.5 : (isDeepThinking ? 0.3 : 0.8);
-          
-          // Progressive slowdown as we approach thresholds
-          if (prev < 90) {
-            increment = Math.random() * (0.8 * speedFactor);
-            // Further slowdown as we approach the next threshold
-            if (step < steps.length && prev > steps[step].threshold - 10) {
-              increment *= 0.4;
-            }
-          } else {
-            increment = Math.random() * (0.1 * speedFactor);
-          }
-          
-          const nextProgress = prev + increment;
-          
-          // Check if we passed a step threshold
-          if (step < steps.length && nextProgress >= steps[step].threshold) {
-             setLogLines(p => [...p, steps[step].log]);
-             step++;
-          }
-          
-          return Math.min(nextProgress, 99);
-        });
-      }, 400); // Slower interval
     } else if (transcription.text) {
       setProgress(100);
     }
-    return () => clearInterval(interval);
-  }, [transcription.isLoading, transcription.text, transcriptionMode, isDeepThinking]);
+  }, [transcription.isLoading, transcription.text]);
 
   useEffect(() => {
     return () => { if (micUrl) URL.revokeObjectURL(micUrl); };
@@ -343,7 +302,10 @@ const App: React.FC = () => {
   const handleTranscribe = async () => {
     setTranscription({ isLoading: true, text: null, error: null });
     setContentType(null);
-    const statusLog = (msg: string) => setLogLines(prev => [...prev.slice(-4), msg]);
+    const statusLog = (msg: string, prg?: number) => {
+      setLogLines(prev => [...prev.slice(-4), msg]);
+      if (prg !== undefined) setProgress(prg);
+    };
 
     try {
       let mediaBlob: Blob | File | null = null;
@@ -383,7 +345,7 @@ const App: React.FC = () => {
     }
   };
 
-  const executeTranscription = async (mediaBlob: Blob | File, mimeType: string, onStatus?: (msg: string) => void): Promise<string> => {
+  const executeTranscription = async (mediaBlob: Blob | File, mimeType: string, onStatus?: (msg: string, prg?: number) => void): Promise<string> => {
     let text: string;
     
     let finalUseSmartModel = isDeepThinking;
@@ -439,9 +401,9 @@ const App: React.FC = () => {
     setShowArchiveSidebar(true);
 
     try {
-      const text = await executeTranscription(file.file!, file.file?.type || '', (msg) => {
+      const text = await executeTranscription(file.file!, file.file?.type || '', (msg, prg) => {
         setArchiveItems(prev => prev.map(item => 
-          item.id === id ? { ...item, progress: Math.min(item.progress + 10, 95) } : item
+          item.id === id ? { ...item, progress: prg !== undefined ? prg : Math.min(item.progress + 5, 95) } : item
         ));
       });
 
@@ -615,10 +577,10 @@ const App: React.FC = () => {
         {/* Main Bar / Header */}
         <header className="glass-header sticky top-0 z-50 transition-all duration-300">
           <div className="max-w-5xl mx-auto px-6 h-20 flex items-center justify-between text-slate-900 dark:text-white">
-            {/* Left: Branding & Mode Toggle */}
+            {/* Left: Branding */}
             <div className="flex items-center gap-6">
               <div className="flex items-center gap-3.5 cursor-pointer group" onClick={() => safeNavigation(clearAll)}>
-                <div className="w-10 h-10 bg-primary rounded-full flex items-center justify-center shadow-lg shadow-primary/20 group-hover:scale-110 transition-transform duration-500">
+                <div className="w-10 h-10 bg-primary rounded-xl flex items-center justify-center shadow-lg shadow-primary/20 group-hover:scale-110 transition-transform duration-500">
                   <Lightning size={20} weight="fill" className="text-white" />
                 </div>
                 <div className="flex flex-col">
@@ -626,205 +588,169 @@ const App: React.FC = () => {
                     <span className="text-xl font-black tracking-tight text-slate-900 dark:text-white leading-none">ScribeAI</span>
                     <span className="px-1.5 py-0.5 rounded-md bg-primary/10 text-[8px] font-black tracking-tighter text-primary border border-primary/20 leading-none">BETA</span>
                   </div>
-                  <span className="text-[10px] text-slate-400 dark:text-dark-muted font-bold tracking-[0.2em] uppercase leading-none mt-1">Intelligence</span>
                 </div>
-              </div>
-
-              <div className="w-px h-8 bg-slate-200 dark:bg-dark-border"></div>
-
-              {/* Mode Toggle Capsule */}
-              <div className="flex bg-slate-100 dark:bg-dark-bg p-1 rounded-2xl border border-slate-200/50 dark:border-white/5">
-                <button 
-                  onClick={() => setIsEditorMode(false)}
-                  className={`flex items-center gap-2 px-5 py-2 rounded-xl text-xs font-bold transition-all ${!isEditorMode ? 'bg-white dark:bg-dark-card text-primary dark:text-accent shadow-md' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}
-                >
-                  <Eye size={14} weight="duotone" />
-                  <span className="hidden md:inline">Read</span>
-                </button>
-                <button 
-                  onClick={() => setIsEditorMode(true)}
-                  className={`flex items-center gap-2 px-5 py-2 rounded-xl text-xs font-bold transition-all ${isEditorMode ? 'bg-white dark:bg-dark-card text-primary dark:text-accent shadow-md' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}
-                >
-                  <PencilSimple size={14} weight="duotone" />
-                  <span className="hidden md:inline">Edit</span>
-                </button>
               </div>
             </div>
             
             {/* Right: Actions */}
             <div className="flex items-center gap-2">
-              {/* Desktop Desktop Tools (Consolidated for small screens) */}
-              <div className="hidden lg:flex items-center gap-1">
-                {/* Copy As Dropdown */}
-                <div className="relative group">
-                  <button className="flex items-center gap-1.5 px-3 py-2 rounded-2xl text-xs font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-dark-card transition-all">
-                    <Copy size={16} weight="duotone" />
-                    <span>Copy As</span>
-                  </button>
-                  <div className="absolute top-full left-0 mt-2 opacity-0 group-hover:opacity-100 pointer-events-none group-hover:pointer-events-auto transition-all duration-200 scale-95 group-hover:scale-100 origin-top-left z-50">
-                    <div className="bg-white dark:bg-dark-card rounded-2xl shadow-xl border border-slate-100 dark:border-dark-border p-1.5 min-w-[140px]">
-                      <button 
-                        onClick={() => {
-                          navigator.clipboard.writeText(transcription.text || '');
-                          setDriveSaved(true);
-                          setTimeout(() => setDriveSaved(false), 2000);
-                        }}
-                        className="w-full flex items-center gap-2.5 px-3 py-2.5 text-left text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-white/5 rounded-xl transition-all group"
-                      >
-                        <div className="w-7 h-7 rounded-lg bg-purple-100/50 dark:bg-purple-900/20 flex items-center justify-center group-hover:scale-110 transition-transform">
-                          <Check size={14} className="text-primary dark:text-accent"/>
-                        </div>
-                        Everything
-                      </button>
-                      <button 
-                        onClick={() => {
-                          const html = (transcription.text || '').replace(/\*\*(.*?)\*\*/g, '<b>$1</b>').replace(/\*(.*?)\*/g, '<i>$1</i>').replace(/\n/g, '<br>');
-                          navigator.clipboard.writeText(html);
-                          setDriveSaved(true);
-                          setTimeout(() => setDriveSaved(false), 2000);
-                        }}
-                        className="w-full flex items-center gap-2.5 px-3 py-2.5 text-left text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-white/5 rounded-xl transition-all group"
-                      >
-                        <div className="w-7 h-7 rounded-lg bg-orange-100/50 dark:bg-orange-900/20 flex items-center justify-center group-hover:scale-110 transition-transform">
-                          <Export size={14} weight="duotone" className="text-orange-500"/>
-                        </div>
-                        HTML
-                      </button>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Smart Editor Side trigger */}
-                <button 
-                  onClick={() => setShowAiSidebar(!showAiSidebar)}
-                  className={`flex items-center gap-1.5 px-3 py-2 rounded-2xl text-xs font-bold transition-all ${showAiSidebar ? 'text-primary dark:text-accent bg-primary/5' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-dark-card'}`}
-                >
-                  <Sparkle size={16} weight="duotone" className="text-primary dark:text-accent"/>
-                  <span>Smart Editor</span>
-                  <span className="px-1.5 py-0.5 rounded-md bg-primary/10 text-[8px] font-black tracking-tighter text-primary border border-primary/20 leading-none">BETA</span>
-                </button>
-              </div>
-
-              {/* Export Button (Primary Tool) */}
-              <div className="relative group">
-                <button className="flex items-center gap-1.5 px-3 py-2 rounded-2xl bg-slate-900 dark:bg-white text-white dark:text-slate-900 text-xs font-bold hover:opacity-90 transition-all shadow-lg shadow-slate-900/10">
-                  <CloudArrowDown size={16} weight="duotone" />
-                  <span>Export</span>
-                </button>
-                
-                <div className="absolute top-full right-0 mt-2 opacity-0 group-hover:opacity-100 pointer-events-none group-hover:pointer-events-auto transition-all duration-200 scale-95 group-hover:scale-100 origin-top-right z-50">
-                    <div className="bg-white dark:bg-dark-card rounded-2xl shadow-xl border border-slate-100 dark:border-dark-border p-1.5 min-w-[170px]">
-                        {/* Mobile/Small Screen Tools (Inside Export or Tools Menu) */}
-                        <div className="lg:hidden pb-1 mb-1 border-b border-slate-100 dark:border-dark-border">
-                          <button 
-                            onClick={() => setShowAiSidebar(!showAiSidebar)}
-                            className="w-full flex items-center gap-3 px-3 py-2.5 text-left text-xs font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-white/5 rounded-xl transition-all"
-                          >
-                            <Sparkle size={16} weight="duotone" className="text-primary"/>
-                            Smart Editor
-                          </button>
-                          <button 
-                            onClick={() => {
-                              navigator.clipboard.writeText(transcription.text || '');
-                              setDriveSaved(true);
-                              setTimeout(() => setDriveSaved(false), 2000);
-                            }}
-                            className="w-full flex items-center gap-3 px-3 py-2.5 text-left text-xs font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-white/5 rounded-xl transition-all"
-                          >
-                            <Copy size={16} weight="duotone" className="text-slate-400"/>
-                            Copy All
-                          </button>
-                        </div>
-                        
-                        <button 
-                          onClick={() => handleSaveToDrive('doc')}
-                          disabled={isSavingToDrive}
-                          className="w-full flex items-center gap-3 px-3 py-2.5 text-left text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-white/5 rounded-xl transition-all group"
-                        >
-                          <div className="w-7 h-7 rounded-lg bg-emerald-100 dark:bg-emerald-900/20 flex items-center justify-center group-hover:scale-110 transition-transform">
-                            <FloppyDisk size={14} weight="duotone" className="text-emerald-500"/>
-                          </div>
-                          Save to Drive
-                        </button>
-                        <button 
-                          onClick={handleExportTxt}
-                          className="w-full flex items-center gap-3 px-3 py-2.5 text-left text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-white/5 rounded-xl transition-all group"
-                        >
-                          <div className="w-7 h-7 rounded-lg bg-slate-100 dark:bg-dark-border flex items-center justify-center group-hover:scale-110 transition-transform">
-                            <FileText size={14} weight="duotone" className="text-slate-400 group-hover:text-primary"/>
-                          </div>
-                          Text File (.txt)
-                        </button>
-                    </div>
-                </div>
-              </div>
-
-              <div className="w-px h-5 bg-slate-200 dark:bg-dark-border mx-1"></div>
-
               {/* Global Actions Group */}
               <div className="flex items-center gap-4">
-                <div className="hidden sm:flex items-center gap-3">
-                  <div className="relative">
-                    <button 
-                      onClick={() => setShowArchiveSidebar(true)}
-                      className="flex items-center gap-2.5 px-5 py-2.5 rounded-2xl bg-white dark:bg-dark-card border border-slate-100 dark:border-white/5 text-xs font-bold text-slate-600 dark:text-slate-300 hover:shadow-md transition-all group"
-                      title="Open Archive"
-                    >
-                      <Clock size={18} weight="duotone" className="text-slate-400 group-hover:text-primary transition-colors" />
-                      <span>Archive</span>
+                <div className="hidden sm:flex items-center gap-2">
+                  {/* Archive */}
+                  <button 
+                    onClick={() => setShowArchiveSidebar(true)}
+                    className="flex items-center gap-2.5 px-4 py-2 rounded-2xl bg-white dark:bg-dark-card border border-slate-100 dark:border-white/5 text-xs font-bold text-slate-600 dark:text-slate-300 hover:shadow-md transition-all group"
+                    title="Open Archive"
+                  >
+                    <Clock size={16} weight="duotone" className="text-slate-400 group-hover:text-primary transition-colors" />
+                    <span>Archive</span>
+                    {archiveItems.length > 0 && (
                       <div className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse ml-0.5"></div>
+                    )}
+                  </button>
+
+                  {/* Connected Status */}
+                  {driveScriptsLoaded && (
+                    googleAccessToken ? (
+                      <button 
+                         onClick={handleGoogleLogout}
+                         className="flex items-center gap-2.5 px-4 py-2 rounded-2xl bg-slate-50 dark:bg-dark-bg border border-slate-100 dark:border-white/5 text-[9px] font-black text-slate-500 dark:text-slate-400 tracking-widest uppercase hover:bg-slate-100 dark:hover:bg-white/5 transition-all group"
+                       >
+                         <span>Connected</span>
+                         <SignOut size={14} weight="bold" className="text-slate-400 group-hover:text-primary transition-transform" />
+                       </button>
+                    ) : (
+                      googleClientId && (
+                         <button 
+                           onClick={handleGoogleLogin}
+                           disabled={isLoggingIn}
+                           className="flex items-center gap-2.5 px-4 py-2 rounded-2xl bg-white dark:bg-dark-card border border-slate-100 dark:border-white/5 text-[9px] font-black text-slate-500 dark:text-slate-400 tracking-widest uppercase hover:shadow-md transition-all group"
+                         >
+                           {isLoggingIn ? <Spinner size={14} weight="bold" className="animate-spin text-primary" /> : <SignIn size={14} weight="bold" className="text-slate-400 group-hover:text-primary transition-colors" />}
+                           <span>Login</span>
+                         </button>
+                      )
+                    )
+                  )}
+
+                  {/* Mode Toggle Switcher */}
+                  <div className="flex bg-slate-100 dark:bg-dark-bg p-1 rounded-2xl border border-slate-100 dark:border-white/5">
+                    <button 
+                      onClick={() => setIsEditorMode(false)}
+                      className={`flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-[10px] font-bold transition-all ${!isEditorMode ? 'bg-white dark:bg-dark-card text-primary dark:text-accent shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                    >
+                      <Eye size={12} weight="duotone" />
+                      <span>Read</span>
                     </button>
+                    <button 
+                      onClick={() => setIsEditorMode(true)}
+                      className={`flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-[10px] font-bold transition-all ${isEditorMode ? 'bg-white dark:bg-dark-card text-primary dark:text-accent shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                    >
+                      <PencilSimple size={12} weight="duotone" />
+                      <span>Edit</span>
+                    </button>
+                  </div>
+
+                  <div className="w-px h-5 bg-slate-200 dark:bg-dark-border mx-1"></div>
+
+                  {/* Smart Editor side trigger (Moved here for better utility grouping) */}
+                  <button 
+                    onClick={() => setShowAiSidebar(!showAiSidebar)}
+                    className={`flex items-center gap-1.5 px-4 py-2 rounded-2xl text-[10px] font-black uppercase tracking-wider transition-all ${showAiSidebar ? 'text-primary dark:text-accent bg-primary/5' : 'text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-dark-card'}`}
+                  >
+                    <Sparkle size={14} weight="duotone" className="text-primary dark:text-accent"/>
+                    <span>Smart Editor</span>
+                  </button>
+
+                  {/* Export Button */}
+                  <div className="relative group">
+                    <button className="flex items-center gap-1.5 px-4 py-2 rounded-2xl bg-slate-900 dark:bg-white text-white dark:text-slate-900 text-[10px] font-black uppercase tracking-wider hover:opacity-90 transition-all shadow-md">
+                      <CloudArrowDown size={14} weight="duotone" />
+                      <span>Export</span>
+                    </button>
+                    
+                    <div className="absolute top-full right-0 mt-2 opacity-0 group-hover:opacity-100 pointer-events-none group-hover:pointer-events-auto transition-all duration-200 scale-95 group-hover:scale-100 origin-top-right z-50">
+                        <div className="bg-white dark:bg-dark-card rounded-2xl shadow-xl border border-slate-100 dark:border-dark-border p-1.5 min-w-[180px]">
+                            <button 
+                              onClick={() => {
+                                navigator.clipboard.writeText(transcription.text || '');
+                                setDriveSaved(true);
+                                setTimeout(() => setDriveSaved(false), 2000);
+                              }}
+                              className="w-full flex items-center gap-2.5 px-3 py-2 text-left text-[11px] font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-white/5 rounded-xl transition-all"
+                            >
+                              <Copy size={14} weight="duotone" className="text-slate-400"/>
+                              Copy Text
+                            </button>
+                            <button 
+                              onClick={() => {
+                                const html = (transcription.text || '').replace(/\*\*(.*?)\*\*/g, '<b>$1</b>').replace(/\*(.*?)\*/g, '<i>$1</i>').replace(/\n/g, '<br>');
+                                navigator.clipboard.writeText(html);
+                                setDriveSaved(true);
+                                setTimeout(() => setDriveSaved(false), 2000);
+                              }}
+                              className="w-full flex items-center gap-2.5 px-3 py-2 text-left text-[11px] font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-white/5 rounded-xl transition-all"
+                            >
+                              <FileCode size={14} weight="duotone" className="text-orange-400"/>
+                              Copy as HTML
+                            </button>
+                            <button 
+                              onClick={() => handleSaveToDrive('doc')}
+                              className="w-full flex items-center gap-2.5 px-3 py-2.5 text-left text-[11px] font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-white/5 rounded-xl transition-all group"
+                            >
+                              <div className="w-6 h-6 rounded-lg bg-emerald-100 dark:bg-emerald-900/20 flex items-center justify-center">
+                                <FloppyDisk size={12} weight="duotone" className="text-emerald-500"/>
+                              </div>
+                              Save to Drive
+                            </button>
+                            <button 
+                              onClick={handleExportTxt}
+                              className="w-full flex items-center gap-2.5 px-3 py-2.5 text-left text-[11px] font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-white/5 rounded-xl transition-all group"
+                            >
+                              <div className="w-6 h-6 rounded-lg bg-slate-100 dark:bg-dark-border flex items-center justify-center">
+                                <FileText size={12} weight="duotone" className="text-slate-400 group-hover:text-primary"/>
+                              </div>
+                              Text File (.txt)
+                            </button>
+                        </div>
+                    </div>
                   </div>
 
                   {/* New Session Button */}
                   <div className="relative group/new">
                     <button 
-                      className="flex items-center gap-2.5 px-5 py-2.5 rounded-2xl bg-slate-900 dark:bg-white text-white dark:text-slate-900 border border-transparent text-xs font-bold hover:shadow-lg transition-all shadow-xl shadow-primary/20"
+                      className="flex items-center gap-2 px-4 py-2 rounded-2xl bg-primary text-white text-[10px] font-black uppercase tracking-wider hover:shadow-lg transition-all shadow-xl shadow-primary/20"
                     >
-                      <Plus size={18} weight="bold" />
+                      <Plus size={16} weight="bold" />
                       <span>New</span>
                     </button>
                     
                     <div className="absolute top-full right-0 mt-2 opacity-0 group-hover/new:opacity-100 pointer-events-none group-hover/new:pointer-events-auto transition-all duration-200 scale-95 group-hover/new:scale-100 origin-top-right z-50">
-                      <div className="bg-white dark:bg-dark-card rounded-2xl shadow-xl border border-slate-100 dark:border-dark-border p-1.5 min-w-[180px]">
+                      <div className="bg-white dark:bg-dark-card rounded-2xl shadow-xl border border-slate-100 dark:border-dark-border p-1.5 min-w-[170px]">
                         <button 
                           onClick={() => safeNavigation(() => { clearAll(); setActiveTab(AudioSource.MICROPHONE); })}
-                          className="w-full flex items-center gap-3 px-3 py-2.5 text-left text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-white/5 rounded-xl transition-all group"
+                          className="w-full flex items-center gap-3 px-3 py-2 text-left text-xs font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-white/5 rounded-xl transition-all"
                         >
-                          <div className="w-7 h-7 rounded-lg bg-amber-100 dark:bg-amber-900/20 flex items-center justify-center group-hover:scale-110 transition-transform">
-                            <Microphone size={16} weight="duotone" className="text-amber-500"/>
-                          </div>
-                          Record Session
+                          <Microphone size={16} weight="duotone" className="text-amber-500"/>
+                          Record
                         </button>
                         <button 
                           onClick={() => safeNavigation(() => { clearAll(); setActiveTab(AudioSource.FILE); })}
-                          className="w-full flex items-center gap-3 px-3 py-2.5 text-left text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-white/5 rounded-xl transition-all group"
+                          className="w-full flex items-center gap-3 px-3 py-2 text-left text-xs font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-white/5 rounded-xl transition-all"
                         >
-                          <div className="w-7 h-7 rounded-lg bg-blue-100 dark:bg-blue-900/20 flex items-center justify-center group-hover:scale-110 transition-transform">
-                            <UploadSimple size={16} weight="duotone" className="text-blue-500"/>
-                          </div>
-                          Upload Media
-                        </button>
-                        <button 
-                          onClick={() => safeNavigation(() => { clearAll(); setActiveTab(AudioSource.URL); })}
-                          className="w-full flex items-center gap-3 px-3 py-2.5 text-left text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-white/5 rounded-xl transition-all group"
-                        >
-                          <div className="w-7 h-7 rounded-lg bg-emerald-100 dark:bg-emerald-900/20 flex items-center justify-center group-hover:scale-110 transition-transform">
-                            <HardDrive size={16} weight="duotone" className="text-emerald-500"/>
-                          </div>
-                          Cloud Import
+                          <UploadSimple size={16} weight="duotone" className="text-blue-500"/>
+                          Upload
                         </button>
                       </div>
                     </div>
                   </div>
 
-                  {/* Dark Mode Toggle */}
                   <button 
                     onClick={() => setDarkMode(!darkMode)}
-                    className="w-10 h-10 rounded-2xl flex items-center justify-center text-slate-500 hover:text-primary hover:bg-slate-100 dark:hover:bg-white/5 transition-all"
-                    title="Toggle Theme"
+                    className="w-9 h-9 rounded-2xl flex items-center justify-center text-slate-500 hover:text-primary hover:bg-slate-100 dark:hover:bg-white/5 transition-all"
                   >
-                    {darkMode ? <Sun size={20} weight="duotone" /> : <Moon size={20} weight="duotone" />}
+                    {darkMode ? <Sun size={18} weight="duotone" /> : <Moon size={18} weight="duotone" />}
                   </button>
                 </div>
 
@@ -1061,7 +987,7 @@ const App: React.FC = () => {
       <header className="glass-header sticky top-0 z-50 transition-all duration-300">
         <div className="max-w-5xl mx-auto px-6 h-20 flex items-center justify-between text-slate-900 dark:text-white">
           <div className="flex items-center gap-3.5 cursor-pointer group" onClick={() => safeNavigation(clearAll)}>
-            <div className="w-10 h-10 bg-primary rounded-full flex items-center justify-center shadow-lg shadow-primary/20 group-hover:scale-110 transition-transform duration-500">
+            <div className="w-10 h-10 bg-primary rounded-xl flex items-center justify-center shadow-lg shadow-primary/20 group-hover:scale-110 transition-transform duration-500">
               <Lightning size={20} weight="fill" className="text-white" />
             </div>
             <div className="flex flex-col">
@@ -1069,7 +995,6 @@ const App: React.FC = () => {
                 <span className="text-xl font-black tracking-tight text-slate-900 dark:text-white leading-none">ScribeAI</span>
                 <span className="px-1.5 py-0.5 rounded-md bg-primary/10 text-[8px] font-black tracking-tighter text-primary border border-primary/20 leading-none">BETA</span>
               </div>
-              <span className="text-[10px] text-slate-400 dark:text-dark-muted font-bold tracking-[0.2em] uppercase leading-none mt-1">Intelligence</span>
             </div>
           </div>
           
@@ -1087,15 +1012,7 @@ const App: React.FC = () => {
                )}
              </button>
 
-             {/* Theme Toggle */}
-             <button 
-               onClick={() => setDarkMode(!darkMode)}
-               className="w-10 h-10 rounded-2xl flex items-center justify-center text-slate-500 hover:text-primary hover:bg-slate-100 dark:hover:bg-white/5 transition-all"
-               title="Toggle Theme"
-             >
-               {darkMode ? <Sun size={20} weight="duotone" /> : <Moon size={20} weight="duotone" />}
-             </button>
-
+             {/* Connected / Login Status */}
              {driveScriptsLoaded && (
                googleAccessToken ? (
                  <button 
@@ -1118,6 +1035,15 @@ const App: React.FC = () => {
                  )
                )
              )}
+
+             {/* Theme Toggle */}
+             <button 
+               onClick={() => setDarkMode(!darkMode)}
+               className="w-10 h-10 rounded-2xl flex items-center justify-center text-slate-500 hover:text-primary hover:bg-slate-100 dark:hover:bg-white/5 transition-all"
+               title="Toggle Theme"
+             >
+               {darkMode ? <Sun size={20} weight="duotone" /> : <Moon size={20} weight="duotone" />}
+             </button>
           </div>
         </div>
       </header>

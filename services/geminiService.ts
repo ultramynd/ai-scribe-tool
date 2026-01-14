@@ -27,7 +27,7 @@ const getMimeTypeFromExtension = (filename: string): string | null => {
   return ext ? MIME_TYPE_MAP[ext] || null : null;
 };
 
-export type StatusCallback = (message: string) => void;
+export type StatusCallback = (message: string, progress?: number) => void;
 
 /**
  * Helper to upload large files to Gemini API
@@ -37,7 +37,7 @@ const uploadFileToGemini = async (
   mimeType: string, 
   onStatus?: StatusCallback
 ): Promise<string> => {
-  onStatus?.(`Initializing resumable upload for ${Math.round(mediaFile.size / 1024 / 1024)}MB file...`);
+  onStatus?.(`Initializing resumable upload for ${Math.round(mediaFile.size / 1024 / 1024)}MB file...`, 5);
   const uploadUrl = `https://generativelanguage.googleapis.com/upload/v1beta/files?key=${import.meta.env.VITE_GEMINI_API_KEY}`;
   const displayName = mediaFile instanceof File ? mediaFile.name : 'uploaded_media';
   
@@ -63,7 +63,7 @@ const uploadFileToGemini = async (
   const uploadUrlHeader = initialResponse.headers.get('x-goog-upload-url');
   if (!uploadUrlHeader) throw new Error("Failed to get upload URL");
 
-  onStatus?.("Capturing upload slot (Protocol: Resumable)...");
+  onStatus?.("Capturing upload slot (Protocol: Resumable)...", 10);
   const uploadBlob = new Blob([mediaFile], { type: mimeType });
   const uploadResponse = await fetch(uploadUrlHeader, {
     method: 'POST',
@@ -82,12 +82,12 @@ const uploadFileToGemini = async (
   const fileState = fileInfo.file.state;
 
   if (fileState === 'PROCESSING') {
-     onStatus?.("Server-side processing (AIAudioEngine)...");
+     onStatus?.("Server-side processing (AIAudioEngine)...", 20);
      let currentState = fileState;
      let retries = 0;
      while (currentState === 'PROCESSING' && retries < 30) {
          await new Promise(r => setTimeout(r, 2000));
-         onStatus?.(`Analyzing deep features (${retries + 1}/30)...`);
+         onStatus?.(`Analyzing deep features (${retries + 1}/30)...`, 20 + (retries * 2));
          const pollUrl = `https://generativelanguage.googleapis.com/v1beta/files/${fileInfo.file.name}?key=${import.meta.env.VITE_GEMINI_API_KEY}`;
          const pollResp = await fetch(pollUrl);
          const pollData = await pollResp.json();
@@ -111,6 +111,7 @@ export const transcribeAudio = async (
   useSmartModel: boolean = true,
   onStatus?: StatusCallback
 ): Promise<string> => {
+  onStatus?.("Preparing Media for AI Engine...", 2);
   const executeWithRetry = async (attempt: number = 0): Promise<string> => {
     try {
       if (!import.meta.env.VITE_GEMINI_API_KEY) {
@@ -118,7 +119,7 @@ export const transcribeAudio = async (
       }
       
       const ai = new GoogleGenAI({ apiKey: import.meta.env.VITE_GEMINI_API_KEY });
-      onStatus?.(`Engine initialized: ${useSmartModel ? '1.5 Pro' : '1.5 Flash'}`);
+      onStatus?.(`Engine initialized: ${useSmartModel ? '2.5 Pro' : '2.5 Flash'}`, 8);
   
       let finalMimeType = mimeType;
       if (mediaFile instanceof File && mediaFile.name) {
@@ -159,14 +160,13 @@ export const transcribeAudio = async (
       `;
 
       const modelName = useSmartModel ? 'gemini-2.5-pro' : 'gemini-2.5-flash';
-      // Note: thinkingConfig is only for specific experimental models. Removing to ensure stability with 1.5 Pro.
       const config = undefined;
 
       let contentPart: any;
       const MAX_INLINE_SIZE = 18 * 1024 * 1024; 
 
       if (mediaFile.size < MAX_INLINE_SIZE) {
-        onStatus?.("Buffering audio for inline execution...");
+        onStatus?.("Buffering audio for inline execution...", 12);
         const base64Data = await blobToBase64(mediaFile);
         contentPart = {
           inlineData: {
@@ -183,7 +183,7 @@ export const transcribeAudio = async (
         };
       }
 
-      onStatus?.("Generating transcription (Deep Inference)...");
+      onStatus?.("Generating transcription (Deep Inference)...", 60);
       const response = await ai.models.generateContent({
         model: modelName,
         contents: {
@@ -196,7 +196,7 @@ export const transcribeAudio = async (
       });
 
       if (response.text) {
-        onStatus?.("Transcription complete. Metadata cached.");
+        onStatus?.("Transcription complete. Metadata cached.", 100);
         return response.text;
       } else {
         throw new Error("No transcription generated.");
@@ -321,7 +321,6 @@ export const analyzeVideoContent = async (mediaFile: File | Blob): Promise<strin
       contents: {
         parts: [contentPart, { text: prompt }]
       },
-      // config: { thinkingConfig: { thinkingBudget: 2048 } }
     });
 
     return String(response.text || "No analysis could be generated.");
@@ -348,16 +347,22 @@ export const classifyContent = async (text: string): Promise<string> => {
   }
 };
 
-export const summarizeText = async (text: string): Promise<string> => {
+export const summarizeText = async (text: string, useSmartModel: boolean = false): Promise<string> => {
   const ai = new GoogleGenAI({ apiKey: import.meta.env.VITE_GEMINI_API_KEY });
-  const model = "gemini-2.5-flash"; 
+  const model = useSmartModel ? "gemini-2.5-pro" : "gemini-2.5-flash"; 
   const prompt = `
-    Provide a comprehensive analysis of this transcript consisting of:
-    1. **Executive Summary**: A concise high-level overview (1-2 paragraphs).
-    2. **Key Moments**: A list of the most important segments with their [MM:SS] timestamps and a brief explanation of why they matter.
-    3. **Action Items/Next Steps**: If any were mentioned.
+    You are ScribeAI Intelligence, a premium transcription analysis engine. Provide a deep, structured analysis of the provided transcript.
+    
+    Structure your response with these sections:
+    
+    1. **Executive Synthesis**: A high-density overview of the discussion, capturing the core themes, objectives, and atmosphere. (2-3 paragraphs).
+    2. **Key Moments & Chronology**: Identify the 5-8 most critical segments. Include their exact [MM:SS] timestamps. For each, explain:
+       - **What happened**: A brief summary.
+       - **Significance**: Why this moment is vital to the overall context.
+    3. **Actionable Outcomes**: Extract explicit or implied next steps, commitments, or decisions made.
+    4. **Sentiment & Tone**: Brief analysis of the conversation's dynamic (e.g., collaborative, confrontational, informational).
 
-    Use Markdown formatting for a professional look.
+    Use professional Markdown formatting. Do not be generic; find the "soul" of the conversation.
     
     Transcript:
     ${text}
@@ -369,24 +374,29 @@ export const summarizeText = async (text: string): Promise<string> => {
 /**
  * Context-aware formatting enhancement with diff support
  */
-export const enhanceFormatting = async (text: string, contextType: string = "General"): Promise<string> => {
+export const enhanceFormatting = async (text: string, contextType: string = "General", useSmartModel: boolean = false): Promise<string> => {
   const ai = new GoogleGenAI({ apiKey: import.meta.env.VITE_GEMINI_API_KEY });
-  const model = "gemini-2.5-flash";
+  const model = useSmartModel ? "gemini-2.5-pro" : "gemini-2.5-flash";
   
   const prompt = `
-    You are an expert editor. Improve the formatting of the following transcript.
+    You are ScribeAI Smart Editor. Your task is to transform a raw transcript into a polished, professional document while preserving the original meaning and nuances.
     
     Context: ${contextType}
     
-    Rules:
-    1. **Grammar & Flow**: Fix basic grammar and run-on sentences, but maintain the speaker's authentic voice (especially for Pidgin/Dialects).
-    2. **Interactive Editing**: 
-       - If you remove a word (filler, stutter), wrap it in ~~strikethrough~~ (e.g., ~~um~~).
-       - If you add or correct a word, wrap it in **bold** (e.g., **correction**).
-    3. **Formatting**: Add Markdown headings (#) where topics change.
-    4. **Non-English**: Italicize *non-English* words.
-    5. **Timestamps**: Keep all [MM:SS] timestamps exactly where they are. Do not remove them.
+    STRICT EDITING RULES:
+    1. **Semantic Cleanup**: Remove stutters, redundant repetitions, and excessive fillers (um, uh, like, you know) ONLY if they don't contribute to tone.
+    2. **Interactive Tracking**: 
+       - If you delete a word/phrase, wrap it in ~~strikethrough~~ (e.g., ~~um~~).
+       - If you add or correct a word for clarity/grammar, wrap it in **bold** (e.g., **correction**).
+    3. **Professional Structure**: 
+       - Insert thematic Markdown headings (# or ##) where the topic shifts.
+       - Use bullet points for lists.
+    4. **Diarization Preservation**: Keep all speaker labels (e.g., Speaker 1:) and [MM:SS] timestamps exactly where they are. 
+    5. **Tone Consistency**: If the speaker uses Pidgin, slang, or technical jargon, PRESERVE IT. Do not "over-sanitize".
+    6. **Typography**: Use *italics* for emphasis or non-English terms.
 
+    Produce the final document in clean Markdown.
+    
     Transcript:
     ${text}
   `;
@@ -398,9 +408,9 @@ export const enhanceFormatting = async (text: string, contextType: string = "Gen
 /**
  * Extracts key moments from the transcript.
  */
-export const extractKeyMoments = async (text: string): Promise<string> => {
+export const extractKeyMoments = async (text: string, useSmartModel: boolean = false): Promise<string> => {
   const ai = new GoogleGenAI({ apiKey: import.meta.env.VITE_GEMINI_API_KEY });
-  const model = "gemini-2.5-flash";
+  const model = useSmartModel ? "gemini-2.5-pro" : "gemini-2.5-flash";
   
   const prompt = `
     Analyze this transcript and extract the most important "Key Moments". 
@@ -422,9 +432,9 @@ export const extractKeyMoments = async (text: string): Promise<string> => {
 /**
  * Identifies the start and end of the main discussion.
  */
-export const findDiscussionBounds = async (text: string): Promise<string> => {
+export const findDiscussionBounds = async (text: string, useSmartModel: boolean = false): Promise<string> => {
   const ai = new GoogleGenAI({ apiKey: import.meta.env.VITE_GEMINI_API_KEY });
-  const model = "gemini-2.5-flash";
+  const model = useSmartModel ? "gemini-2.5-pro" : "gemini-2.5-flash";
   
   const prompt = `
     Look at this transcript and identify exactly where the main discussion starts and ends. 
@@ -445,9 +455,9 @@ export const findDiscussionBounds = async (text: string): Promise<string> => {
 /**
  * Removes pleasantries and fluff, keeping only the core interview/discussion content.
  */
-export const stripPleasantries = async (text: string): Promise<string> => {
+export const stripPleasantries = async (text: string, useSmartModel: boolean = false): Promise<string> => {
   const ai = new GoogleGenAI({ apiKey: import.meta.env.VITE_GEMINI_API_KEY });
-  const model = "gemini-2.5-flash";
+  const model = useSmartModel ? "gemini-2.5-pro" : "gemini-2.5-flash";
   
   const prompt = `
     You are a professional editor. Rewrite this transcript to remove all pleasantries, "small talk", filler intros (like "how are you today", "thank you for having me"), and outros that don't contribute to the core subject matter.
@@ -460,5 +470,57 @@ export const stripPleasantries = async (text: string): Promise<string> => {
   `;
   
   const response = await ai.models.generateContent({ model, contents: prompt });
+  return String(response.text || text);
+};
+
+/**
+ * Refines speaker labels based on context.
+ */
+export const refineSpeakers = async (text: string, useSmartModel: boolean = true): Promise<string> => {
+  const ai = new GoogleGenAI({ apiKey: import.meta.env.VITE_GEMINI_API_KEY });
+  const model = useSmartModel ? "gemini-2.5-pro" : "gemini-2.5-flash";
+  
+  const prompt = `
+    Review the following West African transcript and refine the speaker labels. 
+    1. Identify if "Speaker 1", "Speaker 2", etc. can be replaced with actual names based on conversation context (e.g., someone says "Gaza", "Kojo", "Blessing").
+    2. Correct misattributed turns if the flow of conversation suggests a different speaker.
+    3. Keep the format: "NAME [MM:SS]: Transcript".
+    4. RETURN THE FULL ENTIRE TRANSCRIPT with these improvements.
+  `;
+  
+  const response = await ai.models.generateContent({
+    model: model,
+    contents: {
+      parts: [{ text: prompt }, { text: text }]
+    }
+  });
+  
+  return String(response.text || text);
+};
+
+/**
+ * Optimizes transcript for African context (names, Pidgin, local idioms).
+ */
+export const refineAfricanContext = async (text: string, useSmartModel: boolean = true): Promise<string> => {
+  const ai = new GoogleGenAI({ apiKey: import.meta.env.VITE_GEMINI_API_KEY });
+  const model = useSmartModel ? "gemini-2.5-pro" : "gemini-2.5-flash";
+  
+  const prompt = `
+    You are an expert in West African English, Pidgin, and local idioms (Naija, Ghana, Sierra Leone).
+    Review this transcript and:
+    1. Correct spelling of local names (ensure they are capitalized and spelled standardly).
+    2. Format Pidgin English phrases properly (e.g., "I dey come" instead of "I they come").
+    3. Ensure local idioms are preserved and formatted if they were misinterpreted by the speech-to-text engine.
+    4. DO NOT translate to standard English. Maintain the original linguistic soul of the speaker.
+    RETURN THE FULL ENTIRE TRANSCRIPT with these improvements.
+  `;
+  
+  const response = await ai.models.generateContent({
+    model: model,
+    contents: {
+      parts: [{ text: prompt }, { text: text }]
+    }
+  });
+  
   return String(response.text || text);
 };
