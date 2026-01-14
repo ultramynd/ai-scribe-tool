@@ -158,7 +158,7 @@ export const transcribeAudio = async (
         5. **Formatting**: Highlight key terms in **bold**.
       `;
 
-      const modelName = useSmartModel ? 'gemini-1.5-pro-latest' : 'gemini-1.5-flash-latest';
+      const modelName = useSmartModel ? 'gemini-2.5-pro' : 'gemini-2.5-flash';
       // Note: thinkingConfig is only for specific experimental models. Removing to ensure stability with 1.5 Pro.
       const config = undefined;
 
@@ -236,8 +236,8 @@ export const transcribeAudio = async (
             const apiError = parsed.error || parsed;
             if (apiError.status === 'RESOURCE_EXHAUSTED' || apiError.message?.includes('quota')) {
                userMessage = useSmartModel 
-                 ? "Gemini 1.5 Pro Rate Limit hit (2 RPM). Please wait 60 seconds or disable 'Deep Thinking' to use the higher-capacity Flash engine."
-                 : "Gemini 1.5 Flash Rate Limit hit. Please wait 60 seconds for the server to reset.";
+                 ? "Gemini 2.5 Pro Rate Limit hit (2 RPM). Please wait 60 seconds or disable 'Deep Thinking' to use the higher-capacity Flash engine."
+                 : "Gemini 2.5 Flash Rate Limit hit. Please wait 60 seconds for the server to reset.";
             } else if (apiError.status === 'INVALID_ARGUMENT' || apiError.message?.includes('API key not valid')) {
                userMessage = "Invalid API Key. Please check your API key in the environment settings.";
             } else if (apiError.status === 'PERMISSION_DENIED') {
@@ -254,8 +254,8 @@ export const transcribeAudio = async (
           userMessage = "Invalid API Key. Please check your API key in the environment settings.";
         } else if (msg.includes('quota') || msg.includes('rate limit') || msg.includes('resource_exhausted')) {
           userMessage = useSmartModel 
-            ? "Gemini 1.5 Pro Rate Limit hit. Please wait 60 seconds or disable 'Deep Thinking'."
-            : "Gemini 1.5 Flash Rate Limit hit. Please wait a minute for the quota to reset.";
+            ? "Gemini 2.5 Pro Rate Limit hit. Please wait 60 seconds or disable 'Deep Thinking'."
+            : "Gemini 2.5 Flash Rate Limit hit. Please wait a minute for the quota to reset.";
         } else if (msg.includes('permission denied')) {
           userMessage = "Permission denied. Your API key may not have access to this model.";
         } else if (msg.includes('network') || msg.includes('fetch')) {
@@ -274,7 +274,7 @@ export const transcribeAudio = async (
  */
 export const analyzeVideoContent = async (mediaFile: File | Blob): Promise<string> => {
   const ai = new GoogleGenAI({ apiKey: import.meta.env.VITE_GEMINI_API_KEY });
-  const model = "gemini-1.5-flash-latest";
+  const model = "gemini-2.5-flash";
 
   let finalMimeType = mediaFile.type;
   if (mediaFile instanceof File && mediaFile.name) {
@@ -336,7 +336,7 @@ export const analyzeVideoContent = async (mediaFile: File | Blob): Promise<strin
  */
 export const classifyContent = async (text: string): Promise<string> => {
   const ai = new GoogleGenAI({ apiKey: import.meta.env.VITE_GEMINI_API_KEY });
-  const model = "gemini-1.5-flash-latest";
+  const model = "gemini-2.5-flash";
   const sample = text.substring(0, 2000);
   const prompt = `Classify this text into one category: Song, Podcast, Interview, Meeting, Lecture, Video, Voice Note, News. Return ONLY the category name.\n\nText:\n${sample}`;
 
@@ -350,7 +350,7 @@ export const classifyContent = async (text: string): Promise<string> => {
 
 export const summarizeText = async (text: string): Promise<string> => {
   const ai = new GoogleGenAI({ apiKey: import.meta.env.VITE_GEMINI_API_KEY });
-  const model = "gemini-1.5-flash-latest"; 
+  const model = "gemini-2.5-flash"; 
   const prompt = `
     Provide a comprehensive analysis of this transcript consisting of:
     1. **Executive Summary**: A concise high-level overview (1-2 paragraphs).
@@ -371,7 +371,7 @@ export const summarizeText = async (text: string): Promise<string> => {
  */
 export const enhanceFormatting = async (text: string, contextType: string = "General"): Promise<string> => {
   const ai = new GoogleGenAI({ apiKey: import.meta.env.VITE_GEMINI_API_KEY });
-  const model = "gemini-1.5-flash-latest";
+  const model = "gemini-2.5-flash";
   
   const prompt = `
     You are an expert editor. Improve the formatting of the following transcript.
@@ -400,7 +400,7 @@ export const enhanceFormatting = async (text: string, contextType: string = "Gen
  */
 export const extractKeyMoments = async (text: string): Promise<string> => {
   const ai = new GoogleGenAI({ apiKey: import.meta.env.VITE_GEMINI_API_KEY });
-  const model = "gemini-1.5-flash-latest";
+  const model = "gemini-2.5-flash";
   
   const prompt = `
     Analyze this transcript and extract the most important "Key Moments". 
@@ -424,7 +424,7 @@ export const extractKeyMoments = async (text: string): Promise<string> => {
  */
 export const findDiscussionBounds = async (text: string): Promise<string> => {
   const ai = new GoogleGenAI({ apiKey: import.meta.env.VITE_GEMINI_API_KEY });
-  const model = "gemini-1.5-flash-latest";
+  const model = "gemini-2.5-flash";
   
   const prompt = `
     Look at this transcript and identify exactly where the main discussion starts and ends. 
@@ -447,7 +447,7 @@ export const findDiscussionBounds = async (text: string): Promise<string> => {
  */
 export const stripPleasantries = async (text: string): Promise<string> => {
   const ai = new GoogleGenAI({ apiKey: import.meta.env.VITE_GEMINI_API_KEY });
-  const model = "gemini-1.5-flash-latest";
+  const model = "gemini-2.5-flash";
   
   const prompt = `
     You are a professional editor. Rewrite this transcript to remove all pleasantries, "small talk", filler intros (like "how are you today", "thank you for having me"), and outros that don't contribute to the core subject matter.
