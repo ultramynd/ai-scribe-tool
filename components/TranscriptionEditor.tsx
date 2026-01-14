@@ -362,10 +362,17 @@ const TranscriptionEditor: React.FC<TranscriptionEditorProps> = ({
   const updateText = (newText: string) => {
       setText(newText);
       onTextChange(newText);
+      
+      // Add to history with duplicate check
       const newHistory = history.slice(0, historyIndex + 1);
-      newHistory.push(newText);
-      setHistory(newHistory);
-      setHistoryIndex(newHistory.length - 1);
+      if (newHistory[newHistory.length - 1] !== newText) {
+        newHistory.push(newText);
+        // Keep only last 50 states to prevent memory issues
+        const trimmedHistory = newHistory.slice(-50);
+        setHistory(trimmedHistory);
+        setHistoryIndex(trimmedHistory.length - 1);
+      }
+      
       if (contentEditableRef.current && isEditing) {
           contentEditableRef.current.innerHTML = markdownToHtml(newText);
       }
