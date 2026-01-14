@@ -248,6 +248,25 @@ const TranscriptionEditor: React.FC<TranscriptionEditorProps> = ({
     }
   };
 
+  // Clean Up Tools Handlers
+  const handleRemoveTimestamps = () => {
+    // Remove all timestamps in format [ HH:MM:SS ] or [ MM:SS ]
+    const cleaned = text.replace(/\[\s*\d{1,2}:\d{2}(?::\d{2})?\s*\]/g, '').trim();
+    updateText(cleaned);
+  };
+
+  const handleRemoveSpeakers = () => {
+    // Remove speaker labels like "Speaker 1:", "John:", etc.
+    const cleaned = text.replace(/^[A-Za-z0-9\s]+:\s*/gm, '').trim();
+    updateText(cleaned);
+  };
+
+  const handleCompactText = () => {
+    // Remove extra blank lines, keeping only single line breaks
+    const cleaned = text.replace(/\n{3,}/g, '\n\n').trim();
+    updateText(cleaned);
+  };
+
   // --- HTML/Markdown Conversion Helpers ---
 
   const markdownToHtml = (md: string) => {
