@@ -574,12 +574,16 @@ const App: React.FC = () => {
           <div className="max-w-5xl mx-auto px-6 h-20 flex items-center justify-between">
             {/* Left: Branding & Mode Toggle */}
             <div className="flex items-center gap-6">
-              <div className="flex items-center gap-3 cursor-pointer group" onClick={() => safeNavigation(clearAll)}>
-                <div className="bg-gradient-to-tr from-primary to-purple-600 p-2.5 rounded-2xl text-white shadow-xl shadow-primary/20 group-hover:scale-110 group-hover:rotate-3 transition-all duration-500">
+              <div className="flex items-center gap-3.5 cursor-pointer group" onClick={() => safeNavigation(clearAll)}>
+                <div className="w-10 h-10 bg-primary rounded-full flex items-center justify-center shadow-lg shadow-primary/20 group-hover:scale-110 transition-transform duration-500">
                   <Lightning size={20} weight="fill" className="text-white" />
                 </div>
-                <div className="text-xl font-extrabold tracking-tight text-slate-900 dark:text-white hidden sm:flex items-center gap-2">
-                  <span>Scribe<span className="text-primary dark:text-accent">AI</span></span>
+                <div className="flex flex-col">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xl font-black tracking-tight text-slate-900 dark:text-white leading-none">ScribeAI</span>
+                    <span className="px-1.5 py-0.5 rounded-md bg-primary/10 text-[8px] font-black tracking-tighter text-primary border border-primary/20 leading-none">BETA</span>
+                  </div>
+                  <span className="text-[10px] text-slate-400 dark:text-dark-muted font-bold tracking-[0.2em] uppercase leading-none mt-1">Intelligence</span>
                 </div>
               </div>
 
@@ -715,32 +719,48 @@ const App: React.FC = () => {
               <div className="w-px h-5 bg-slate-200 dark:bg-dark-border mx-1"></div>
 
               {/* Global Actions Group */}
-              <div className="flex items-center gap-1 sm:gap-2">
-                <div className="hidden sm:flex items-center gap-1 sm:gap-2">
-                  <button 
-                    onClick={() => setShowArchiveSidebar(true)}
-                    className="flex items-center gap-2 px-3 py-2 rounded-xl text-slate-500 hover:text-primary hover:bg-slate-100 dark:hover:bg-dark-card transition-all font-bold text-xs"
-                    title="Open Archive"
-                  >
-                    <Clock size={16} weight="duotone" />
-                    <span>Archive</span>
-                  </button>
+              <div className="flex items-center gap-4">
+                <div className="hidden sm:flex items-center gap-3">
+                  {/* Archive Button */}
+                  <div className="relative">
+                    <button 
+                      onClick={() => setShowArchiveSidebar(true)}
+                      className="flex items-center gap-2.5 px-5 py-2.5 rounded-2xl bg-white dark:bg-dark-card border border-slate-100 dark:border-white/5 text-xs font-bold text-slate-600 dark:text-slate-300 hover:shadow-md transition-all group"
+                      title="Open Archive"
+                    >
+                      <Clock size={18} weight="duotone" className="text-slate-400 group-hover:text-primary transition-colors" />
+                      <span>Archive</span>
+                      <div className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse ml-0.5"></div>
+                    </button>
+                  </div>
 
+                  {/* Dark Mode Toggle */}
                   <button 
                     onClick={() => setDarkMode(!darkMode)}
-                    className="w-9 h-9 rounded-xl flex items-center justify-center text-slate-500 hover:text-primary hover:bg-slate-100 dark:hover:bg-dark-card transition-all"
+                    className="w-10 h-10 rounded-2xl flex items-center justify-center text-slate-500 hover:text-primary hover:bg-slate-100 dark:hover:bg-white/5 transition-all"
                     title="Toggle Theme"
                   >
-                    {darkMode ? <Sun size={16} weight="duotone" /> : <Moon size={16} weight="duotone" />}
+                    {darkMode ? <Sun size={20} weight="duotone" /> : <Moon size={20} weight="duotone" />}
                   </button>
 
-                  <button 
-                    onClick={() => safeNavigation(clearAll)}
-                    className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-primary/10 text-primary dark:text-accent hover:bg-primary/20 transition-all font-bold text-xs"
-                  >
-                    <Plus size={14} weight="bold" />
-                    New
-                  </button>
+                  {/* Auth Button */}
+                  {googleAccessToken ? (
+                    <button 
+                      onClick={handleGoogleLogout}
+                      className="flex items-center gap-2.5 px-5 py-2.5 rounded-2xl bg-slate-50 dark:bg-dark-bg border border-slate-200/50 dark:border-white/5 text-[10px] font-black text-slate-500 dark:text-slate-400 tracking-widest uppercase hover:bg-slate-100 dark:hover:bg-white/5 transition-all group"
+                    >
+                      <span>Connected</span>
+                      <SignOut size={16} weight="bold" className="text-slate-400 group-hover:text-primary transition-transform" />
+                    </button>
+                  ) : (
+                    <button 
+                      onClick={handleGoogleLogin}
+                      className="flex items-center gap-2.5 px-5 py-2.5 rounded-2xl bg-white dark:bg-dark-card border border-slate-100 dark:border-white/5 text-[10px] font-black text-slate-500 dark:text-slate-400 tracking-widest uppercase hover:shadow-md transition-all group"
+                    >
+                      <SignIn size={16} weight="bold" className="text-slate-400 group-hover:text-primary transition-colors" />
+                      <span>Login</span>
+                    </button>
+                  )}
                 </div>
 
                 {/* Mobile "More" Menu */}
@@ -765,13 +785,23 @@ const App: React.FC = () => {
                         Theme
                       </button>
                       <div className="h-px bg-slate-100 dark:bg-dark-border my-1"></div>
-                      <button 
-                        onClick={() => safeNavigation(clearAll)}
-                        className="w-full flex items-center gap-3 px-3 py-2.5 text-left text-xs font-bold text-primary dark:text-accent hover:bg-primary/5 rounded-xl transition-all"
-                      >
-                        <Plus size={16} weight="bold" />
-                        New Transcription
-                      </button>
+                      {googleAccessToken ? (
+                        <button 
+                          onClick={handleGoogleLogout}
+                          className="w-full flex items-center gap-3 px-3 py-2.5 text-left text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-white/5 rounded-xl transition-all"
+                        >
+                          <SignOut size={16} />
+                          Sign Out (Connected)
+                        </button>
+                      ) : (
+                        <button 
+                          onClick={handleGoogleLogin}
+                          className="w-full flex items-center gap-3 px-3 py-2.5 text-left text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-white/5 rounded-xl transition-all"
+                        >
+                          <SignIn size={16} />
+                          Sign In
+                        </button>
+                      )}
                     </div>
                   </div>
                 </div>
