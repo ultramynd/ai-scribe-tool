@@ -554,7 +554,7 @@ const TranscriptionEditor: React.FC<TranscriptionEditorProps> = ({
   // --- AI Features ---
 
   const handleSummarize = async () => {
-    setSummaryTitle("AI Analysis");
+    setSummaryTitle("Summary");
     setShowSummarySidebar(true);
     setIsSummarizing(true);
     setSummary(null);
@@ -590,7 +590,7 @@ const TranscriptionEditor: React.FC<TranscriptionEditorProps> = ({
   };
 
   const handleEnhance = async () => {
-      setSummaryTitle("Smart Suggestions");
+      setSummaryTitle("Smart Fix");
       setShowSummarySidebar(true);
       setIsSummarizing(true);
       setIsEnhancing(true);
@@ -627,7 +627,7 @@ const TranscriptionEditor: React.FC<TranscriptionEditorProps> = ({
   };
 
   const handleFindBounds = async () => {
-    setSummaryTitle("Discussion Bounds");
+    setSummaryTitle("Identify Core");
     setShowSummarySidebar(true);
     setIsSummarizing(true);
     setSummary(null);
@@ -644,7 +644,7 @@ const TranscriptionEditor: React.FC<TranscriptionEditorProps> = ({
   };
 
   const handleStripPleasantries = async () => {
-    setSummaryTitle("Clean Transcript (No Pleasantries)");
+    setSummaryTitle("Strip Pleasantries");
     setShowSummarySidebar(true);
     setIsSummarizing(true);
     setSummary(null);
@@ -1131,7 +1131,7 @@ const TranscriptionEditor: React.FC<TranscriptionEditorProps> = ({
                       onClick={handleSummarize} 
                       disabled={isSummarizing} 
                       className={`flex items-center gap-2 p-2.5 rounded-xl border transition-all ${
-                        summaryTitle === "Smart Summary" 
+                        summaryTitle === "Summary" 
                           ? "bg-emerald-500 text-white border-emerald-500 shadow-lg shadow-emerald-500/20" 
                           : "bg-slate-50 dark:bg-dark-bg border-slate-100 dark:border-dark-border text-slate-600 dark:text-dark-muted hover:border-emerald-500/30 hover:bg-white dark:hover:bg-dark-card"
                       }`}
@@ -1171,7 +1171,7 @@ const TranscriptionEditor: React.FC<TranscriptionEditorProps> = ({
                       onClick={handleEnhance} 
                       disabled={isSummarizing} 
                       className={`flex items-center gap-2 p-2.5 rounded-xl border transition-all ${
-                        summaryTitle === "Smart Suggestions" 
+                        summaryTitle === "Smart Fix" 
                           ? "bg-primary text-white border-primary shadow-lg shadow-primary/20" 
                           : "bg-slate-50 dark:bg-dark-bg border-slate-100 dark:border-dark-border text-slate-600 dark:text-dark-muted hover:border-primary/30 dark:hover:border-accent/40 hover:bg-white dark:hover:bg-dark-card"
                       }`}
@@ -1184,11 +1184,11 @@ const TranscriptionEditor: React.FC<TranscriptionEditorProps> = ({
                     </button>
                     )}
                     {canShowPleasantries && (
-                    <button 
-                      onClick={handleStripPleasantries} 
-                      disabled={isSummarizing} 
-                      className={`flex items-center gap-2 p-2.5 rounded-xl border transition-all ${
-                        summaryTitle.includes("Clean") 
+                      <button 
+                        onClick={handleStripPleasantries} 
+                        disabled={isSummarizing} 
+                        className={`flex items-center gap-2 p-2.5 rounded-xl border transition-all ${
+                          summaryTitle === "Strip Pleasantries" 
                           ? "bg-blue-500 text-white border-blue-500 shadow-lg shadow-blue-500/20" 
                           : "bg-slate-50 dark:bg-dark-bg border-slate-100 dark:border-dark-border text-slate-600 dark:text-dark-muted hover:border-blue-500/30 hover:bg-white dark:hover:bg-dark-card"
                       }`}
@@ -1204,7 +1204,7 @@ const TranscriptionEditor: React.FC<TranscriptionEditorProps> = ({
                       onClick={handleFindBounds} 
                       disabled={isSummarizing} 
                       className={`flex items-center gap-2 p-2.5 rounded-xl border transition-all ${
-                        summaryTitle === "Discussion Bounds" 
+                        summaryTitle === "Identify Core" 
                           ? "bg-purple-500 text-white border-purple-500 shadow-lg shadow-purple-500/20" 
                           : "bg-slate-50 dark:bg-dark-bg border-slate-100 dark:border-dark-border text-slate-600 dark:text-dark-muted hover:border-purple-500/30 hover:bg-white dark:hover:bg-dark-card"
                       }`}
@@ -1278,11 +1278,11 @@ const TranscriptionEditor: React.FC<TranscriptionEditorProps> = ({
                             </div>
                         </div>
                         
-                        <div className="flex-1 relative group overflow-hidden">
+                        <div className="flex-1 relative group overflow-hidden min-h-[150px]">
                             {isPreviewMode ? (
                               <div className="w-full h-full bg-white dark:bg-dark-bg border border-slate-200 dark:border-dark-border rounded-2xl p-4 overflow-y-auto custom-scrollbar shadow-inner">
-                                <div className="prose prose-sm prose-slate dark:prose-invert max-w-none text-xs">
-                                  <ReactMarkdown>{editedSummary || ''}</ReactMarkdown>
+                                <div className="prose prose-sm prose-slate dark:prose-invert max-w-none text-slate-900 dark:text-slate-100">
+                                  <ReactMarkdown>{String(editedSummary || summary || '')}</ReactMarkdown>
                                 </div>
                               </div>
                             ) : (
@@ -1290,7 +1290,7 @@ const TranscriptionEditor: React.FC<TranscriptionEditorProps> = ({
                                   value={editedSummary || ''}
                                   onChange={(e) => setEditedSummary(e.target.value)}
                                   className="w-full h-full bg-white/50 dark:bg-dark-bg/50 border border-slate-200 dark:border-dark-border rounded-2xl p-4 text-sm leading-relaxed font-medium text-slate-700 dark:text-slate-200 focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all resize-none custom-scrollbar shadow-inner"
-                                  placeholder="AI result will appear here. You can also type directly to refine it..."
+                                  placeholder="AI result will appear here..."
                               />
                             )}
                             <div className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity">

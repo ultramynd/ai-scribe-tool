@@ -274,7 +274,7 @@ export const transcribeAudio = async (
  */
 export const analyzeVideoContent = async (mediaFile: File | Blob): Promise<string> => {
   const ai = new GoogleGenAI({ apiKey: import.meta.env.VITE_GEMINI_API_KEY });
-  const model = "gemini-flash-latest";
+  const model = "gemini-1.5-flash";
 
   let finalMimeType = mediaFile.type;
   if (mediaFile instanceof File && mediaFile.name) {
@@ -324,7 +324,7 @@ export const analyzeVideoContent = async (mediaFile: File | Blob): Promise<strin
       // config: { thinkingConfig: { thinkingBudget: 2048 } }
     });
 
-    return response.text || "No analysis could be generated.";
+    return String(response.text || "No analysis could be generated.");
   } catch (error: any) {
     console.error("Video analysis error:", error);
     return `Error analyzing video: ${error.message}`;
@@ -336,13 +336,13 @@ export const analyzeVideoContent = async (mediaFile: File | Blob): Promise<strin
  */
 export const classifyContent = async (text: string): Promise<string> => {
   const ai = new GoogleGenAI({ apiKey: import.meta.env.VITE_GEMINI_API_KEY });
-  const model = "gemini-flash-latest";
+  const model = "gemini-1.5-flash";
   const sample = text.substring(0, 2000);
   const prompt = `Classify this text into one category: Song, Podcast, Interview, Meeting, Lecture, Video, Voice Note, News. Return ONLY the category name.\n\nText:\n${sample}`;
 
   try {
     const response = await ai.models.generateContent({ model, contents: prompt });
-    return response.text?.trim() || "Unknown";
+    return String(response.text || "").trim() || "Unknown";
   } catch (e) {
     return "Media";
   }
@@ -350,7 +350,7 @@ export const classifyContent = async (text: string): Promise<string> => {
 
 export const summarizeText = async (text: string): Promise<string> => {
   const ai = new GoogleGenAI({ apiKey: import.meta.env.VITE_GEMINI_API_KEY });
-  const model = "gemini-flash-latest"; 
+  const model = "gemini-1.5-flash"; 
   const prompt = `
     Provide a comprehensive analysis of this transcript consisting of:
     1. **Executive Summary**: A concise high-level overview (1-2 paragraphs).
@@ -362,12 +362,8 @@ export const summarizeText = async (text: string): Promise<string> => {
     Transcript:
     ${text}
   `;
-  const response = await ai.models.generateContent({
-    model,
-    contents: prompt,
-    // config: { thinkingConfig: { thinkingBudget: 1024 } }
-  });
-  return response.text || "Could not generate summary.";
+  const response = await ai.models.generateContent({ model, contents: prompt });
+  return String(response.text || "Could not generate summary.");
 };
 
 /**
@@ -375,7 +371,7 @@ export const summarizeText = async (text: string): Promise<string> => {
  */
 export const enhanceFormatting = async (text: string, contextType: string = "General"): Promise<string> => {
   const ai = new GoogleGenAI({ apiKey: import.meta.env.VITE_GEMINI_API_KEY });
-  const model = "gemini-flash-latest";
+  const model = "gemini-1.5-flash";
   
   const prompt = `
     You are an expert editor. Improve the formatting of the following transcript.
@@ -396,7 +392,7 @@ export const enhanceFormatting = async (text: string, contextType: string = "Gen
   `;
   
   const response = await ai.models.generateContent({ model, contents: prompt });
-  return response.text || text;
+  return String(response.text || text);
 };
 
 /**
@@ -404,7 +400,7 @@ export const enhanceFormatting = async (text: string, contextType: string = "Gen
  */
 export const extractKeyMoments = async (text: string): Promise<string> => {
   const ai = new GoogleGenAI({ apiKey: import.meta.env.VITE_GEMINI_API_KEY });
-  const model = "gemini-flash-latest";
+  const model = "gemini-1.5-flash";
   
   const prompt = `
     Analyze this transcript and extract the most important "Key Moments". 
@@ -419,12 +415,8 @@ export const extractKeyMoments = async (text: string): Promise<string> => {
     ${text}
   `;
   
-  const response = await ai.models.generateContent({ 
-    model, 
-    contents: prompt,
-    // config: { thinkingConfig: { thinkingBudget: 1024 } }
-  });
-  return response.text || "No key moments identified.";
+  const response = await ai.models.generateContent({ model, contents: prompt });
+  return String(response.text || "No key moments identified.");
 };
 
 /**
@@ -432,7 +424,7 @@ export const extractKeyMoments = async (text: string): Promise<string> => {
  */
 export const findDiscussionBounds = async (text: string): Promise<string> => {
   const ai = new GoogleGenAI({ apiKey: import.meta.env.VITE_GEMINI_API_KEY });
-  const model = "gemini-flash-latest";
+  const model = "gemini-1.5-flash";
   
   const prompt = `
     Look at this transcript and identify exactly where the main discussion starts and ends. 
@@ -447,7 +439,7 @@ export const findDiscussionBounds = async (text: string): Promise<string> => {
   `;
   
   const response = await ai.models.generateContent({ model, contents: prompt });
-  return response.text || "Could not identify discussion bounds.";
+  return String(response.text || "Could not identify discussion bounds.");
 };
 
 /**
@@ -455,7 +447,7 @@ export const findDiscussionBounds = async (text: string): Promise<string> => {
  */
 export const stripPleasantries = async (text: string): Promise<string> => {
   const ai = new GoogleGenAI({ apiKey: import.meta.env.VITE_GEMINI_API_KEY });
-  const model = "gemini-flash-latest";
+  const model = "gemini-1.5-flash";
   
   const prompt = `
     You are a professional editor. Rewrite this transcript to remove all pleasantries, "small talk", filler intros (like "how are you today", "thank you for having me"), and outros that don't contribute to the core subject matter.
@@ -467,10 +459,6 @@ export const stripPleasantries = async (text: string): Promise<string> => {
     ${text}
   `;
   
-  const response = await ai.models.generateContent({ 
-    model, 
-    contents: prompt,
-    // config: { thinkingConfig: { thinkingBudget: 2048 } }
-  });
-  return response.text || text;
+  const response = await ai.models.generateContent({ model, contents: prompt });
+  return String(response.text || text);
 };
