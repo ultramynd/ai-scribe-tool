@@ -4,7 +4,7 @@ import {
   SignIn, SignOut, Users, User, ArrowLeft, ArrowRight, Plus, Checks, 
   FloppyDisk, Lightning, Terminal, Moon, Sun, WarningCircle, X, Brain, 
   SpeakerHigh, Eye, PencilSimple, Copy, CloudArrowDown, Export, Check,
-  CaretDown, List, Trash, Clock, HardDrive, FileCode
+  CaretDown, List, Trash, Clock, HardDrive, FileCode, File as FileIcon
 } from '@phosphor-icons/react';
 import AudioRecorder from './components/AudioRecorder';
 import FileUploader from './components/FileUploader';
@@ -654,6 +654,71 @@ const App: React.FC = () => {
 
                   <div className="w-px h-5 bg-slate-200 dark:bg-dark-border mx-1"></div>
 
+                  <div className="w-px h-5 bg-slate-200 dark:bg-dark-border mx-1"></div>
+
+                  {/* Copy As Dropdown */}
+                  <div className="relative group">
+                    <button className="flex items-center gap-1.5 px-4 py-2 rounded-2xl bg-white dark:bg-dark-card border border-slate-100 dark:border-white/5 text-[10px] font-black uppercase tracking-wider text-slate-600 dark:text-slate-300 hover:shadow-md transition-all group-hover:text-primary">
+                      <Copy size={14} weight="duotone" />
+                      <span>Copy As</span>
+                    </button>
+                    
+                    <div className="absolute top-full right-0 mt-2 opacity-0 group-hover:opacity-100 pointer-events-none group-hover:pointer-events-auto transition-all duration-200 scale-95 group-hover:scale-100 origin-top-right z-50">
+                        <div className="bg-white dark:bg-dark-card rounded-2xl shadow-xl border border-slate-100 dark:border-dark-border p-1.5 min-w-[180px]">
+                            <button 
+                              onClick={() => {
+                                navigator.clipboard.writeText(transcription.text || '');
+                                setDriveSaved(true);
+                                setTimeout(() => setDriveSaved(false), 2000);
+                              }}
+                              className="w-full flex items-center gap-2.5 px-3 py-2 text-left text-[11px] font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-white/5 rounded-xl transition-all group"
+                            >
+                              <div className="w-6 h-6 rounded-lg bg-indigo-100 dark:bg-indigo-900/20 flex items-center justify-center">
+                                <Checks size={12} weight="duotone" className="text-indigo-500"/>
+                              </div>
+                              Everything
+                            </button>
+                            <button 
+                              onClick={() => {
+                                const clean = (transcription.text || '')
+                                  .replace(/\[\d{1,2}:\d{2}(?::\d{2})?\]/g, '') // Clear timestamps
+                                  .replace(/^(.*?):/gm, '') // Clear speakers
+                                  .replace(/\*/g, '') // Clear bold/italic
+                                  .replace(/~/g, '') // Clear strikethrough
+                                  .replace(/\s+/g, ' ') // Collapse spaces
+                                  .trim();
+                                navigator.clipboard.writeText(clean);
+                                setDriveSaved(true);
+                                setTimeout(() => setDriveSaved(false), 2000);
+                              }}
+                              className="w-full flex items-center gap-2.5 px-3 py-2 text-left text-[11px] font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-white/5 rounded-xl transition-all group"
+                            >
+                              <div className="w-6 h-6 rounded-lg bg-blue-100 dark:bg-blue-900/20 flex items-center justify-center">
+                                <FileText size={12} weight="duotone" className="text-blue-500"/>
+                              </div>
+                              Plain Text
+                            </button>
+                            <button 
+                              onClick={() => {
+                                const html = (transcription.text || '')
+                                  .replace(/\*\*(.*?)\*\*/g, '<b>$1</b>')
+                                  .replace(/\*(.*?)\*/g, '<i>$1</i>')
+                                  .replace(/\n/g, '<br>');
+                                navigator.clipboard.writeText(html);
+                                setDriveSaved(true);
+                                setTimeout(() => setDriveSaved(false), 2000);
+                              }}
+                              className="w-full flex items-center gap-2.5 px-3 py-2 text-left text-[11px] font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-white/5 rounded-xl transition-all group"
+                            >
+                              <div className="w-6 h-6 rounded-lg bg-orange-100 dark:bg-orange-900/20 flex items-center justify-center">
+                                <FileCode size={12} weight="duotone" className="text-orange-500"/>
+                              </div>
+                              HTML Format
+                            </button>
+                        </div>
+                    </div>
+                  </div>
+
                   {/* Smart Editor side trigger (Moved here for better utility grouping) */}
                   <button 
                     onClick={() => setShowAiSidebar(!showAiSidebar)}
@@ -673,42 +738,28 @@ const App: React.FC = () => {
                     <div className="absolute top-full right-0 mt-2 opacity-0 group-hover:opacity-100 pointer-events-none group-hover:pointer-events-auto transition-all duration-200 scale-95 group-hover:scale-100 origin-top-right z-50">
                         <div className="bg-white dark:bg-dark-card rounded-2xl shadow-xl border border-slate-100 dark:border-dark-border p-1.5 min-w-[180px]">
                             <button 
-                              onClick={() => {
-                                navigator.clipboard.writeText(transcription.text || '');
-                                setDriveSaved(true);
-                                setTimeout(() => setDriveSaved(false), 2000);
-                              }}
-                              className="w-full flex items-center gap-2.5 px-3 py-2 text-left text-[11px] font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-white/5 rounded-xl transition-all"
-                            >
-                              <Copy size={14} weight="duotone" className="text-slate-400"/>
-                              Copy Text
-                            </button>
-                            <button 
-                              onClick={() => {
-                                const html = (transcription.text || '').replace(/\*\*(.*?)\*\*/g, '<b>$1</b>').replace(/\*(.*?)\*/g, '<i>$1</i>').replace(/\n/g, '<br>');
-                                navigator.clipboard.writeText(html);
-                                setDriveSaved(true);
-                                setTimeout(() => setDriveSaved(false), 2000);
-                              }}
-                              className="w-full flex items-center gap-2.5 px-3 py-2 text-left text-[11px] font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-white/5 rounded-xl transition-all"
-                            >
-                              <FileCode size={14} weight="duotone" className="text-orange-400"/>
-                              Copy as HTML
-                            </button>
-                            <button 
                               onClick={() => handleSaveToDrive('doc')}
                               className="w-full flex items-center gap-2.5 px-3 py-2.5 text-left text-[11px] font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-white/5 rounded-xl transition-all group"
                             >
-                              <div className="w-6 h-6 rounded-lg bg-emerald-100 dark:bg-emerald-900/20 flex items-center justify-center">
-                                <FloppyDisk size={12} weight="duotone" className="text-emerald-500"/>
+                              <div className="w-6 h-6 rounded-lg bg-emerald-100 dark:bg-emerald-900/20 flex items-center justify-center group-hover:scale-110 transition-transform">
+                                <CloudArrowDown size={12} weight="duotone" className="text-emerald-500"/>
                               </div>
                               Save to Drive
+                            </button>
+                            <button 
+                              onClick={handleExportDocx}
+                              className="w-full flex items-center gap-2.5 px-3 py-2.5 text-left text-[11px] font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-white/5 rounded-xl transition-all group"
+                            >
+                              <div className="w-6 h-6 rounded-lg bg-blue-100 dark:bg-blue-900/20 flex items-center justify-center group-hover:scale-110 transition-transform">
+                                <FileIcon size={12} weight="duotone" className="text-blue-500"/>
+                              </div>
+                              Word Document (.docx)
                             </button>
                             <button 
                               onClick={handleExportTxt}
                               className="w-full flex items-center gap-2.5 px-3 py-2.5 text-left text-[11px] font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-white/5 rounded-xl transition-all group"
                             >
-                              <div className="w-6 h-6 rounded-lg bg-slate-100 dark:bg-dark-border flex items-center justify-center">
+                              <div className="w-6 h-6 rounded-lg bg-slate-100 dark:bg-dark-border flex items-center justify-center group-hover:scale-110 transition-transform">
                                 <FileText size={12} weight="duotone" className="text-slate-400 group-hover:text-primary"/>
                               </div>
                               Text File (.txt)

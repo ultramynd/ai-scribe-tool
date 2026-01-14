@@ -3,14 +3,14 @@ import ReactMarkdown from 'react-markdown';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   PencilSimple, Eye, ArrowArcLeft, ArrowArcRight, TextB, TextItalic, 
-  TextUnderline, TextStrikethrough, CloudArrowDown, FileText, File, 
+  TextUnderline, TextStrikethrough, CloudArrowDown, FileText, File as FileIcon, 
   FileCode, Export, Sparkle, BookOpen, X, Checks, Copy, Check, 
   MagnifyingGlass, Wrench, Trash, TextAlignLeft, TextT, ArrowsClockwise, 
   DotsThreeVertical, CaretDown, UserMinus, Clock, ArrowsIn, Tag, 
   Spinner, VideoCamera, TextHOne, TextHTwo, TextHThree, Palette, 
   Eraser, DotsThree, ArrowRight, Microphone, UploadSimple, Stop, 
   Play, Pause, WarningCircle, MagicWand, Timer, Warning, CaretUp,
-  List, Repeat, ArrowsOutSimple, ArrowsInSimple, Scissors, Funnel, ChatCenteredText, DownloadSimple, DotsSixVertical
+  List, Repeat, ArrowsOutSimple, ArrowsInSimple, Scissors, Funnel, ChatCenteredText, DownloadSimple, DotsSixVertical, Users
 } from '@phosphor-icons/react';
 import PlaybackControl from './PlaybackControl';
 import { generateTxt, generateDoc, generateDocx, generateSrt } from '../utils/exportUtils';
@@ -43,7 +43,7 @@ interface TranscriptionEditorProps {
   useDeepThinking?: boolean;
 }
 
-type ActiveMenu = 'formatting' | 'tools' | 'export' | 'search' | 'ai-features' | 'copy-as' | null;
+type ActiveMenu = 'formatting' | 'tools' | 'export' | 'search' | 'ai-features' | 'copy-as' | 'export-as' | null;
 
 const TranscriptionEditor: React.FC<TranscriptionEditorProps> = ({ 
   initialText, 
@@ -64,7 +64,8 @@ const TranscriptionEditor: React.FC<TranscriptionEditorProps> = ({
   onBackgroundTranscribe,
   onAttachDrive,
   onSeek,
-  useDeepThinking = false
+  useDeepThinking = false,
+  onSaveToDrive
 }) => {
   // --- State ---
   const [history, setHistory] = useState<string[]>([initialText]);
@@ -133,6 +134,20 @@ const TranscriptionEditor: React.FC<TranscriptionEditorProps> = ({
   }, [isEditing]);
 
   // Dragging logic is handled by framer-motion
+
+  const segments = React.useMemo(() => {
+      const segs: { time: number; index: number }[] = [];
+      const regex = /\[(\d{1,2}):(\d{2})(?::(\d{2}))?\]/g;
+      let match;
+      while ((match = regex.exec(text)) !== null) {
+          const hours = match[3] ? parseInt(match[1]) : 0;
+          const minutes = match[3] ? parseInt(match[2]) : parseInt(match[1]);
+          const seconds = match[3] ? parseInt(match[3]) : parseInt(match[2]);
+          const timeInSeconds = hours * 3600 + minutes * 60 + seconds;
+          segs.push({ time: timeInSeconds, index: match.index });
+      }
+      return segs;
+  }, [text]);
 
   // Auto-scroll to active segment in Read mode
   useEffect(() => {
@@ -264,10 +279,19 @@ const TranscriptionEditor: React.FC<TranscriptionEditorProps> = ({
       md = md.replace(/<strike[^>]*>(.*?)<\/strike>/gi, '~~$1~~');
       
       md = md.replace(/<br\s*\/?>/gi, '\n');
-      md = md.replace(/<div>/gi, '\n');
-      md = md.replace(/<\/div>/gi, '');
-      md = md.replace(/&nbsp;/g, ' ');
-      md = md.replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&');
+      
+      // Aggressively strip remaining tags to prevent HTML leak in history
+      md = md.replace(/<p.*?>/gi, '').replace(/<\/p>/gi, '\n')
+             .replace(/<div.*?>/gi, '\n').replace(/<\/div>/gi, '')
+             .replace(/<ul.*?>/gi, '').replace(/<\/ul>/gi, '')
+             .replace(/<li.*?>/gi, '• ').replace(/<\/li>/gi, '\n')
+             .replace(/&nbsp;/g, ' ')
+             .replace(/&lt;/g, '<')
+             .replace(/&gt;/g, '>')
+             .replace(/&amp;/g, '&');
+      
+      // Final catch-all for any other tags
+      md = md.replace(/<[^>]*>/g, '');
       md = md.replace(/\n\s*\n/g, '\n\n'); 
       return md.trim();
   };
@@ -431,7 +455,7 @@ const TranscriptionEditor: React.FC<TranscriptionEditorProps> = ({
   const handleUndo = () => {
       // If user has uncommitted changes (typing), revert to last committed state first
       if (text !== history[historyIndex]) {
-          const stableText = history[historyIndex];
+          const stableText = htmlToMarkdown(history[historyIndex]);
           lastSentTextRef.current = stableText;
           setText(stableText);
           onTextChange(stableText);
@@ -442,7 +466,7 @@ const TranscriptionEditor: React.FC<TranscriptionEditorProps> = ({
 
       if (historyIndex > 0) {
           const newIndex = historyIndex - 1;
-          const newText = history[newIndex];
+          const newText = htmlToMarkdown(history[newIndex]);
           lastSentTextRef.current = newText;
           setText(newText);
           setHistoryIndex(newIndex);
@@ -454,7 +478,7 @@ const TranscriptionEditor: React.FC<TranscriptionEditorProps> = ({
   const handleRedo = () => {
       if (historyIndex < history.length - 1) {
           const newIndex = historyIndex + 1;
-          const newText = history[newIndex];
+          const newText = htmlToMarkdown(history[newIndex]);
           lastSentTextRef.current = newText;
           setText(newText);
           setHistoryIndex(newIndex);
@@ -724,20 +748,6 @@ const TranscriptionEditor: React.FC<TranscriptionEditorProps> = ({
 
   // --- Rendering ---
   
-  const segments = React.useMemo(() => {
-      const segs: { time: number; index: number }[] = [];
-      const regex = /\[(\d{1,2}):(\d{2})(?::(\d{2}))?\]/g;
-      let match;
-      while ((match = regex.exec(text)) !== null) {
-          const hours = match[3] ? parseInt(match[1]) : 0;
-          const minutes = match[3] ? parseInt(match[2]) : parseInt(match[1]);
-          const seconds = match[3] ? parseInt(match[3]) : parseInt(match[2]);
-          const timeInSeconds = hours * 3600 + minutes * 60 + seconds;
-          segs.push({ time: timeInSeconds, index: match.index });
-      }
-      return segs;
-  }, [text]);
-
   const renderHighlightedText = () => {
       if (!text) return null;
       let currentSegmentIndex = -1;
@@ -961,6 +971,66 @@ const TranscriptionEditor: React.FC<TranscriptionEditorProps> = ({
                                 <input value={replaceTerm} onChange={e => setReplaceTerm(e.target.value)} placeholder="Replace with..." className="w-full text-xs pl-8 pr-3 py-2 rounded-lg border border-slate-200 dark:border-dark-border bg-slate-50 dark:bg-dark-bg focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all font-medium"/>
                             </div>
                             <button onClick={() => { handleSearchReplace(); setActiveMenu(null); }} className="w-full bg-primary hover:bg-primary/90 text-white text-xs font-semibold py-2 rounded-lg transition-all shadow-lg shadow-primary/20">Replace All Occurrences</button>
+                        </div>
+                    )}
+                </div>
+
+                <div className="w-px h-5 bg-slate-200 dark:bg-dark-border mx-1"></div>
+
+                {/* Copy As Toolbar Dropdown */}
+                <div className="relative">
+                    <button onClick={() => toggleMenu('copy-as')} className={`flex items-center gap-1 px-3 py-1.5 rounded-2xl text-xs font-semibold transition-all ${activeMenu === 'copy-as' ? 'bg-indigo-500/10 text-indigo-500' : 'text-slate-500 hover:bg-slate-100 dark:hover:bg-dark-bg'}`}>
+                       <Copy size={16} weight="duotone" />
+                       <CaretDown size={12} weight="bold" className={`transition-transform ${activeMenu === 'copy-as' ? 'rotate-180' : ''}`}/>
+                    </button>
+                    {activeMenu === 'copy-as' && (
+                        <div className="absolute top-full right-0 mt-2 bg-white dark:bg-dark-card rounded-2xl shadow-xl border border-slate-100 dark:border-dark-border z-50 p-1.5 min-w-[150px] animate-in fade-in slide-in-from-top-2">
+                             <button onClick={() => { navigator.clipboard.writeText(text); setActiveMenu(null); }} className="w-full flex items-center gap-2.5 px-2.5 py-2 text-left text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-dark-bg rounded-lg group transition-colors">
+                               <Checks size={14} weight="bold" className="text-indigo-500"/> Everything
+                             </button>
+                             <button onClick={() => { 
+                               const clean = text
+                                 .replace(/\[\d{1,2}:\d{2}(?::\d{2})?\]/g, '')
+                                 .replace(/^(.*?):/gm, '')
+                                 .replace(/\*/g, '')
+                                 .replace(/~/g, '')
+                                 .replace(/\s+/g, ' ')
+                                 .trim();
+                               navigator.clipboard.writeText(clean);
+                               setActiveMenu(null);
+                             }} className="w-full flex items-center gap-2.5 px-2.5 py-2 text-left text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-dark-bg rounded-lg group transition-colors">
+                               <FileText size={14} weight="bold" className="text-blue-500"/> Plain Text
+                             </button>
+                             <button onClick={() => { 
+                               const html = text.replace(/\*\*(.*?)\*\*/g, '<b>$1</b>').replace(/\*(.*?)\*/g, '<i>$1</i>').replace(/\n/g, '<br>');
+                               navigator.clipboard.writeText(html); 
+                               setActiveMenu(null); 
+                             }} className="w-full flex items-center gap-2.5 px-2.5 py-2 text-left text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-dark-bg rounded-lg group transition-colors">
+                               <FileCode size={14} weight="bold" className="text-orange-500"/> HTML Code
+                             </button>
+                        </div>
+                    )}
+                </div>
+
+                {/* Export Toolbar Dropdown */}
+                <div className="relative">
+                    <button onClick={() => toggleMenu('export-as')} className={`flex items-center gap-1 px-3 py-1.5 rounded-2xl text-xs font-semibold transition-all ${activeMenu === 'export-as' ? 'bg-emerald-500/10 text-emerald-500' : 'text-slate-500 hover:bg-slate-100 dark:hover:bg-dark-bg'}`}>
+                       <Export size={16} weight="duotone" />
+                       <CaretDown size={12} weight="bold" className={`transition-transform ${activeMenu === 'export-as' ? 'rotate-180' : ''}`}/>
+                    </button>
+                    {activeMenu === 'export-as' && (
+                        <div className="absolute top-full right-0 mt-2 bg-white dark:bg-dark-card rounded-2xl shadow-xl border border-slate-100 dark:border-dark-border z-50 p-1.5 min-w-[160px] animate-in fade-in slide-in-from-top-2">
+                             {onSaveToDrive && (
+                               <button onClick={() => { onSaveToDrive(); setActiveMenu(null); }} className="w-full flex items-center gap-2.5 px-2.5 py-2 text-left text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-white/5 rounded-lg group transition-colors">
+                                 <CloudArrowDown size={14} weight="bold" className="text-emerald-500"/> Save to Drive
+                               </button>
+                             )}
+                             <button onClick={() => { handleExportAI('docx'); setActiveMenu(null); }} className="w-full flex items-center gap-2.5 px-2.5 py-2 text-left text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-white/5 rounded-lg group transition-colors">
+                               <FileIcon size={14} weight="bold" className="text-blue-500"/> Word (.docx)
+                             </button>
+                             <button onClick={() => { handleExportAI('txt'); setActiveMenu(null); }} className="w-full flex items-center gap-2.5 px-2.5 py-2 text-left text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-white/5 rounded-lg group transition-colors">
+                               <FileText size={14} weight="bold" className="text-slate-500"/> Text (.txt)
+                             </button>
                         </div>
                     )}
                 </div>
@@ -1387,7 +1457,7 @@ const TranscriptionEditor: React.FC<TranscriptionEditorProps> = ({
                                                 onClick={() => { handleExportAI('txt'); setActiveMenu(null); }} 
                                                 className="w-full flex items-center gap-2 px-3 py-2.5 text-left text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-white/5 rounded-lg transition-colors"
                                             >
-                                                <File size={16} weight="duotone" className="text-slate-400" />
+                                                <FileIcon size={16} weight="duotone" className="text-slate-400" />
                                                 Text File (.txt)
                                             </button>
                                         </div>
