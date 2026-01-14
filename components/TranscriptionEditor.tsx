@@ -248,25 +248,6 @@ const TranscriptionEditor: React.FC<TranscriptionEditorProps> = ({
     }
   };
 
-  // Clean Up Tools Handlers
-  const handleRemoveTimestamps = () => {
-    // Remove all timestamps in format [ HH:MM:SS ] or [ MM:SS ]
-    const cleaned = text.replace(/\[\s*\d{1,2}:\d{2}(?::\d{2})?\s*\]/g, '').trim();
-    updateText(cleaned);
-  };
-
-  const handleRemoveSpeakers = () => {
-    // Remove speaker labels like "Speaker 1:", "John:", etc.
-    const cleaned = text.replace(/^[A-Za-z0-9\s]+:\s*/gm, '').trim();
-    updateText(cleaned);
-  };
-
-  const handleCompactText = () => {
-    // Remove extra blank lines, keeping only single line breaks
-    const cleaned = text.replace(/\n{3,}/g, '\n\n').trim();
-    updateText(cleaned);
-  };
-
   // --- HTML/Markdown Conversion Helpers ---
 
   const markdownToHtml = (md: string) => {
@@ -871,25 +852,31 @@ const TranscriptionEditor: React.FC<TranscriptionEditorProps> = ({
                     </button>
                     {activeMenu === 'search' && (
                         <div className="absolute top-full right-0 mt-2 bg-white dark:bg-dark-card rounded-2xl shadow-xl border border-slate-100 dark:border-dark-border z-50 p-3 w-72 animate-in fade-in slide-in-from-top-2">
-                            {/* Entity Discovery Section */}
+                            {/* Speaker Discovery Section */}
                             <div className="mb-3">
-                                <p className="px-1 text-[10px] font-bold text-slate-400 dark:text-dark-muted uppercase tracking-wider mb-2">Detected Entities</p>
+                                <p className="px-1 text-[10px] font-bold text-slate-400 dark:text-dark-muted uppercase tracking-wider mb-2">Detected Speakers</p>
                                 <div className="flex flex-wrap gap-1.5 max-h-24 overflow-y-auto custom-scrollbar p-1">
-                                    {Array.from(new Set(text.match(/\*\*(.*?)\*\*/g) || [])).slice(0, 8).map((entity) => {
-                                        const cleanName = entity.replace(/\*\*/g, '');
-                                        return (
+                                    {(() => {
+                                        // Extract speaker names from patterns like "Speaker 1:", "John:", etc.
+                                        const speakerMatches = text.match(/^([A-Z][A-Za-z0-9\\s]{0,20}):/gm) || [];
+                                        const speakers = Array.from(new Set(
+                                            speakerMatches.map(match => match.replace(':', '').trim())
+                                        )).slice(0, 8);
+                                        
+                                        if (speakers.length === 0) {
+                                            return <p className="text-[10px] text-slate-400 italic px-1">No speakers detected</p>;
+                                        }
+                                        
+                                        return speakers.map((speaker) => (
                                             <button 
-                                                key={entity}
-                                                onClick={() => setSearchTerm(cleanName)}
-                                                className="px-2 py-1 rounded-md bg-slate-100 dark:bg-dark-bg text-[10px] font-medium text-slate-600 dark:text-slate-300 hover:bg-primary/10 hover:text-primary transition-all border border-slate-200 dark:border-dark-border"
+                                                key={speaker}
+                                                onClick={() => setSearchTerm(speaker)}
+                                                className="px-2 py-1 rounded-md bg-primary/10 dark:bg-accent/10 text-[10px] font-semibold text-primary dark:text-accent hover:bg-primary/20 dark:hover:bg-accent/20 transition-all border border-primary/30 dark:border-accent/30"
                                             >
-                                                {cleanName}
+                                                {speaker}
                                             </button>
-                                        );
-                                    })}
-                                    {(text.match(/\*\*(.*?)\*\*/g) || []).length === 0 && (
-                                        <p className="text-[10px] text-slate-400 italic px-1">No entities highlighted yet</p>
-                                    )}
+                                        ));
+                                    })()}
                                 </div>
                             </div>
 
