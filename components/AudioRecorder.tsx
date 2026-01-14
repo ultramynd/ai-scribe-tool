@@ -7,9 +7,10 @@ import { transcribeAudioChunk } from '../services/groqService';
 interface AudioRecorderProps {
   onRecordingComplete: (blob: Blob, liveText?: string) => void;
   isTranscribing: boolean;
+  mode?: 'verbatim' | 'polish';
 }
 
-const AudioRecorder: React.FC<AudioRecorderProps> = ({ onRecordingComplete, isTranscribing }) => {
+const AudioRecorder: React.FC<AudioRecorderProps> = ({ onRecordingComplete, isTranscribing, mode = 'verbatim' }) => {
   const [isRecording, setIsRecording] = useState(false);
   const [duration, setDuration] = useState(0);
   const [error, setError] = useState<string | null>(null);
@@ -93,7 +94,7 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({ onRecordingComplete, isTr
         x += barWidth + gap;
       }
     };
-    draw();
+    requestAnimationFrame(draw);
   };
 
   const stopVisualizer = () => {
@@ -117,7 +118,7 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({ onRecordingComplete, isTr
           if (isLiveEnabled) {
             try {
               setInterimTranscript('Transcribing...');
-              const chunkText = await transcribeAudioChunk(chunk, liveTranscript);
+              const chunkText = await transcribeAudioChunk(chunk, liveTranscript, mode);
               setLiveTranscript(prev => prev + ' ' + chunkText);
               setInterimTranscript('');
             } catch (err) {

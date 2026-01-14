@@ -2,7 +2,7 @@ import React from 'react';
 import { 
   X, Clock, CheckCircle, WarningCircle, Spinner, 
   FileText, Trash, ArrowLineUpRight, HardDrive, 
-  DotsThreeVertical, FileAudio, FileVideo 
+  DotsThreeVertical, FileAudio, FileVideo, Plus
 } from '@phosphor-icons/react';
 import { ArchiveItem } from '../types';
 
@@ -12,9 +12,18 @@ interface ArchiveSidebarProps {
   items: ArchiveItem[];
   onSelectItem: (item: ArchiveItem) => void;
   onDeleteItem: (id: string) => void;
+  onUploadFile?: (file: File) => void;
 }
 
-const ArchiveSidebar: React.FC<ArchiveSidebarProps> = ({ isOpen, onClose, items, onSelectItem, onDeleteItem }) => {
+const ArchiveSidebar: React.FC<ArchiveSidebarProps> = ({ isOpen, onClose, items, onSelectItem, onDeleteItem, onUploadFile }) => {
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file && onUploadFile) {
+      onUploadFile(file);
+    }
+  };
   return (
     <>
       {/* Backdrop */}
@@ -47,6 +56,24 @@ const ArchiveSidebar: React.FC<ArchiveSidebarProps> = ({ isOpen, onClose, items,
               className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 hover:bg-slate-100 dark:hover:bg-dark-border transition-all"
             >
               <X size={18} weight="bold" />
+            </button>
+          </div>
+
+          {/* Action Bar */}
+          <div className="px-6 py-4 bg-slate-50/80 dark:bg-dark-bg/50 border-b border-slate-100 dark:border-dark-border">
+            <input 
+              type="file" 
+              ref={fileInputRef} 
+              onChange={handleFileChange} 
+              className="hidden" 
+              accept="audio/*,video/*"
+            />
+            <button 
+              onClick={() => fileInputRef.current?.click()}
+              className="w-full flex items-center justify-center gap-2.5 py-3 px-4 bg-primary text-white rounded-2xl font-bold text-xs shadow-lg shadow-primary/20 hover:scale-[1.02] transition-all active:scale-95"
+            >
+              <Plus size={18} weight="bold" />
+              <span>Import New Media</span>
             </button>
           </div>
 

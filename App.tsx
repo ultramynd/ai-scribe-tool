@@ -4,7 +4,7 @@ import {
   SignIn, SignOut, Users, User, ArrowLeft, ArrowRight, Plus, Checks, 
   FloppyDisk, Lightning, Terminal, Moon, Sun, WarningCircle, X, Brain, 
   SpeakerHigh, Eye, PencilSimple, Copy, CloudArrowDown, Export, Check,
-  CaretDown, List, Trash, Clock
+  CaretDown, List, Trash, Clock, HardDrive
 } from '@phosphor-icons/react';
 import AudioRecorder from './components/AudioRecorder';
 import FileUploader from './components/FileUploader';
@@ -309,14 +309,25 @@ const App: React.FC = () => {
   };
 
   const handleExportTxt = () => {
-    if (!transcription.text) return;
-    const blob = new Blob([transcription.text], { type: 'text/plain' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `Smart_Editor_Export_${new Date().toISOString().slice(0,10)}.txt`;
-    a.click();
-    URL.revokeObjectURL(url);
+    try {
+      if (!transcription.text) {
+        alert("No text available to export.");
+        return;
+      }
+      const fileName = `ScribeAI_Export_${new Date().toISOString().slice(0,10)}.txt`;
+      const blob = new Blob([transcription.text], { type: 'text/plain' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = fileName;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (err: any) {
+      console.error("Export Error:", err);
+      alert(`Export failed: ${err.message || 'Unknown error'}`);
+    }
   };
 
   const handleExportDocx = async () => {
@@ -375,28 +386,34 @@ const App: React.FC = () => {
   const executeTranscription = async (mediaBlob: Blob | File, mimeType: string, onStatus?: (msg: string) => void): Promise<string> => {
     let text: string;
     
-    // VERBATIM MODE: Use Gemini Flash (Fast, Cheap) with Strict Verbatim Prompt
-    // Switching from Groq to Gemini Flash to enable native Speaker Diarization which Groq-Whisper lacks.
+    let finalUseSmartModel = isDeepThinking;
+    
+    // Smart detection logic: Auto-use Pro for complex media (video or large files)
+    const isVideo = mimeType.startsWith('video/');
+    const isLarge = (mediaBlob?.size || 0) > 15 * 1024 * 1024;
+    
+    if ((isVideo || isLarge) && !isDeepThinking) {
+      onStatus?.("⚠️ High-complexity detected. Boosting to Deep Inference (Pro)...");
+      finalUseSmartModel = true;
+    }
+
     if (transcriptionMode === 'verbatim') {
        text = await transcribeAudio(
          mediaBlob!, 
          mimeType, 
          false, // autoEdit = false (Strict Verbatim)
          isSpeakerDetectEnabled, 
-         false, // useSmartModel = false (Use Flash for speed/verbatim)
+         finalUseSmartModel, 
          onStatus
        );
     } 
-    // POLISH MODE: Use Gemini (Flash for Speed, Pro for Thinking/Quality)
     else {
-      // Logic: If Deep Thinking is ON, use Pro. Else use Flash.
-      // We maps "isDeepThinking" to "useSmartModel" (Pro)
       text = await transcribeAudio(
         mediaBlob!, 
         mimeType, 
-        true, // autoEdit = true (Always Polish in Polish mode)
+        true, // autoEdit = true (Polish Mode)
         isSpeakerDetectEnabled, 
-        isDeepThinking, // useSmartModel = true if Thinking is on
+        finalUseSmartModel, 
         onStatus
       );
       
@@ -483,6 +500,16 @@ const App: React.FC = () => {
 
   const handleArchiveDelete = (id: string) => {
     setArchiveItems(prev => prev.filter(item => item.id !== id));
+  };
+
+  const handleArchiveUpload = (file: File) => {
+    const audioFile: AudioFile = {
+      file,
+      previewUrl: URL.createObjectURL(file),
+      base64: null,
+      mimeType: file.type
+    };
+    handleBackgroundTranscribe(audioFile);
   };
 
   const handlePickDriveFile = async (file: { id: string; name: string; mimeType: string }) => {
@@ -737,7 +764,6 @@ const App: React.FC = () => {
               {/* Global Actions Group */}
               <div className="flex items-center gap-4">
                 <div className="hidden sm:flex items-center gap-3">
-                  {/* Archive Button */}
                   <div className="relative">
                     <button 
                       onClick={() => setShowArchiveSidebar(true)}
@@ -748,6 +774,48 @@ const App: React.FC = () => {
                       <span>Archive</span>
                       <div className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse ml-0.5"></div>
                     </button>
+                  </div>
+
+                  {/* New Session Button */}
+                  <div className="relative group/new">
+                    <button 
+                      className="flex items-center gap-2.5 px-5 py-2.5 rounded-2xl bg-slate-900 dark:bg-white text-white dark:text-slate-900 border border-transparent text-xs font-bold hover:shadow-lg transition-all shadow-xl shadow-primary/20"
+                    >
+                      <Plus size={18} weight="bold" />
+                      <span>New</span>
+                    </button>
+                    
+                    <div className="absolute top-full right-0 mt-2 opacity-0 group-hover/new:opacity-100 pointer-events-none group-hover/new:pointer-events-auto transition-all duration-200 scale-95 group-hover/new:scale-100 origin-top-right z-50">
+                      <div className="bg-white dark:bg-dark-card rounded-2xl shadow-xl border border-slate-100 dark:border-dark-border p-1.5 min-w-[180px]">
+                        <button 
+                          onClick={() => safeNavigation(() => { clearAll(); setActiveTab(AudioSource.MICROPHONE); })}
+                          className="w-full flex items-center gap-3 px-3 py-2.5 text-left text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-white/5 rounded-xl transition-all group"
+                        >
+                          <div className="w-7 h-7 rounded-lg bg-amber-100 dark:bg-amber-900/20 flex items-center justify-center group-hover:scale-110 transition-transform">
+                            <Microphone size={16} weight="duotone" className="text-amber-500"/>
+                          </div>
+                          Record Session
+                        </button>
+                        <button 
+                          onClick={() => safeNavigation(() => { clearAll(); setActiveTab(AudioSource.FILE); })}
+                          className="w-full flex items-center gap-3 px-3 py-2.5 text-left text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-white/5 rounded-xl transition-all group"
+                        >
+                          <div className="w-7 h-7 rounded-lg bg-blue-100 dark:bg-blue-900/20 flex items-center justify-center group-hover:scale-110 transition-transform">
+                            <UploadSimple size={16} weight="duotone" className="text-blue-500"/>
+                          </div>
+                          Upload Media
+                        </button>
+                        <button 
+                          onClick={() => safeNavigation(() => { clearAll(); setActiveTab(AudioSource.URL); })}
+                          className="w-full flex items-center gap-3 px-3 py-2.5 text-left text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-white/5 rounded-xl transition-all group"
+                        >
+                          <div className="w-7 h-7 rounded-lg bg-emerald-100 dark:bg-emerald-900/20 flex items-center justify-center group-hover:scale-110 transition-transform">
+                            <HardDrive size={16} weight="duotone" className="text-emerald-500"/>
+                          </div>
+                          Cloud Import
+                        </button>
+                      </div>
+                    </div>
                   </div>
 
                   {/* Dark Mode Toggle */}
@@ -767,6 +835,13 @@ const App: React.FC = () => {
                   </button>
                   <div className="absolute top-full right-0 mt-2 opacity-0 group-hover:opacity-100 pointer-events-none group-hover:pointer-events-auto transition-all duration-200 scale-95 group-hover:scale-100 origin-top-right z-50">
                     <div className="bg-white dark:bg-dark-card rounded-2xl shadow-xl border border-slate-100 dark:border-dark-border p-1.5 min-w-[160px]">
+                      <button 
+                        onClick={() => safeNavigation(() => { clearAll(); setActiveTab(null); })}
+                        className="w-full flex items-center gap-3 px-3 py-2.5 text-left text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-white/5 rounded-xl transition-all"
+                      >
+                        <Plus size={16} weight="bold" className="text-primary" />
+                        New Transcription
+                      </button>
                       <button 
                         onClick={() => setShowArchiveSidebar(true)}
                         className="w-full flex items-center gap-3 px-3 py-2.5 text-left text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-white/5 rounded-xl transition-all"
@@ -1155,21 +1230,22 @@ const App: React.FC = () => {
 
                   <div className="flex-1 flex flex-col justify-center items-center relative z-10">
                     {activeTab === AudioSource.MICROPHONE && (
-                      <AudioRecorder 
-                        onRecordingComplete={(blob, liveText) => {
-                          setRecordedBlob(blob);
-                          setMicUrl(URL.createObjectURL(blob));
-                          if (liveText) {
-                            setTranscription({ 
-                              isLoading: false, 
-                              text: `**Live Intelligence Transcription**\n\n---\n\n${liveText}`, 
-                              error: null 
-                            });
-                            setContentType("Live Session");
-                          }
-                        }}
-                        isTranscribing={false}
-                      />
+                        <AudioRecorder 
+                          onRecordingComplete={(blob, liveText) => {
+                            setRecordedBlob(blob);
+                            setMicUrl(URL.createObjectURL(blob));
+                            if (liveText) {
+                              setTranscription({ 
+                                isLoading: false, 
+                                text: `**Live Intelligence Transcription**\n\n---\n\n${liveText}`, 
+                                error: null 
+                              });
+                              setContentType("Live Session");
+                            }
+                          }}
+                          isTranscribing={false}
+                          mode={transcriptionMode}
+                        />
                     )}
 
                     {activeTab === AudioSource.FILE && (
@@ -1322,6 +1398,7 @@ const App: React.FC = () => {
         items={archiveItems}
         onSelectItem={handleArchiveSelect}
         onDeleteItem={handleArchiveDelete}
+        onUploadFile={handleArchiveUpload}
       />
 
       {googleAccessToken && (

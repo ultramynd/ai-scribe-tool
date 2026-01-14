@@ -51,6 +51,9 @@ export const transcribeWithGroq = async (
   
   if (options.prompt) {
     formData.append('prompt', options.prompt);
+  } else {
+    // Default system prompt for better rule adherence if none provided
+    formData.append('prompt', "This is a transcript. Maintain all speaker technicalities. If verbatim, keep stutters. If polish, clean up fillers but keep meaning.");
   }
 
   formData.append('response_format', 'text');
@@ -86,11 +89,16 @@ export const transcribeWithGroq = async (
  */
 export const transcribeAudioChunk = async (
   audioChunk: Blob,
-  previousContext?: string
+  previousContext?: string,
+  mode: 'verbatim' | 'polish' = 'verbatim'
 ): Promise<string> => {
+  const prompt = mode === 'verbatim' 
+    ? `STRICT VERBATIM. Do not remove stutters or fillers like um, uh. Previous: ${previousContext?.slice(-200) || ''}`
+    : `SMART POLISH. Clean up fillers but keep the original meaning and tone. Previous: ${previousContext?.slice(-200) || ''}`;
+
   return transcribeWithGroq(audioChunk, {
     model: 'whisper-large-v3',
-    prompt: previousContext ? `Previous context: ${previousContext.slice(-200)}` : undefined,
+    prompt: prompt,
     onStatus: (msg) => console.log(`[Chunk] ${msg}`)
   });
 };
