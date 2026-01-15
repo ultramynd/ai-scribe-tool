@@ -29,3 +29,15 @@ export interface ArchiveItem {
   error?: string;
   audioUrl?: string | null;
 }
+
+export interface EditorTab {
+  id: string;
+  title: string;
+  transcription: TranscriptionState;
+  contentType: string | null;
+  recordedBlob: Blob | null;
+  micUrl: string | null;
+  uploadedFile: AudioFile | null;
+  isEditorMode: boolean;
+  showAiSidebar: boolean;
+}

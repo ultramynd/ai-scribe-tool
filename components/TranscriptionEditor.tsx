@@ -9,12 +9,13 @@ import {
   DotsThreeVertical, CaretDown, UserMinus, Clock, ArrowsIn, Tag, 
   Spinner, VideoCamera, TextHOne, TextHTwo, TextHThree, Palette, 
   Eraser, DotsThree, ArrowRight, Microphone, UploadSimple, Stop, 
-  Play, Pause, WarningCircle, MagicWand, Timer, Warning, CaretUp,
-  List, Repeat, ArrowsOutSimple, ArrowsInSimple, Scissors, Funnel, ChatCenteredText, DownloadSimple, DotsSixVertical, Users, ArrowSquareOut
+  Play, Pause, WarningCircle, MagicWand, Timer, Warning, CaretUp, ArrowLeft,
+  Plus, List, Repeat, ArrowsOutSimple, ArrowsInSimple, Scissors, Funnel, ChatCenteredText, DownloadSimple, DotsSixVertical, Users, ArrowSquareOut
 } from '@phosphor-icons/react';
+import { detectDialect } from '../utils/transcriptionUtils';
 import PlaybackControl from './PlaybackControl';
 import { generateTxt, generateDoc, generateDocx, generateSrt } from '../utils/exportUtils';
-import { summarizeText, enhanceFormatting, analyzeVideoContent, extractKeyMoments, findDiscussionBounds, stripPleasantries, refineSpeakers, refineAfricanContext } from '../services/geminiService';
+import { summarizeText, enhanceFormatting, analyzeVideoContent, extractKeyMoments, findDiscussionBounds, stripPleasantries, refineSpeakers, linguisticPolish } from '../services/geminiService';
 import { AudioFile } from '../types';
 
 interface TranscriptionEditorProps {
@@ -41,6 +42,7 @@ interface TranscriptionEditorProps {
   onAttachDrive?: () => void;
   onSeek?: (timeInSeconds: number) => void;
   useDeepThinking?: boolean;
+  onOpenInNewTab?: (content: string, title?: string) => void;
 }
 
 type ActiveMenu = 'formatting' | 'tools' | 'export' | 'search' | 'ai-features' | null;
@@ -65,7 +67,8 @@ const TranscriptionEditor: React.FC<TranscriptionEditorProps> = ({
   onAttachDrive,
   onSeek,
   useDeepThinking = false,
-  onSaveToDrive
+  onSaveToDrive,
+  onOpenInNewTab
 }) => {
   // --- State ---
   const [history, setHistory] = useState<string[]>([initialText]);
@@ -82,7 +85,24 @@ const TranscriptionEditor: React.FC<TranscriptionEditorProps> = ({
   const [isSummarizing, setIsSummarizing] = useState(false);
   const [copied, setCopied] = useState(false);
   const [summary, setSummary] = useState<string | null>(null);
-  const [editedSummary, setEditedSummary] = useState<string | null>(null);
+  const [editedSummary, setEditedSummary] = useState<string>('');
+  const [hasDialect, setHasDialect] = useState(false);
+  const [analysis, setAnalysis] = useState<any>(null);
+  const [isToolsExpanded, setIsToolsExpanded] = useState(true);
+  
+  // Search State
+  const [searchMatches, setSearchMatches] = useState<{index: number, length: number}[]>([]);
+  const [currentMatchIndex, setCurrentMatchIndex] = useState(-1);
+
+  useEffect(() => {
+    if (initialText) {
+        setHasDialect(detectDialect(initialText));
+        // Reset analysis when text changes significantly
+        setAnalysis(null);
+    }
+  }, [initialText]);
+
+  // --- AI Related States (moved from original "AI State" block) ---
   const [summaryTitle, setSummaryTitle] = useState("Smart Summary");
   const [isEnhancing, setIsEnhancing] = useState(false);
   const [isAiSidebarExpanded, setIsAiSidebarExpanded] = useState(false);
@@ -245,9 +265,24 @@ const TranscriptionEditor: React.FC<TranscriptionEditorProps> = ({
     html = html.replace(/\*\*(.*?)\*\*/g, '<b>$1</b>');
     html = html.replace(/\*(.*?)\*/g, '<i>$1</i>');
     html = html.replace(/__(.*?)__/g, '<u>$1</u>');
-    // Enhanced: Render strikeouts with a class for interactivity
     html = html.replace(/~~(.*?)~~/g, '<s class="interactive-strike" title="Click to remove">$1</s>');
     
+    // Inject Search Highlights
+    if (searchTerm && searchTerm.length > 0) {
+        try {
+            const regex = new RegExp(`(${searchTerm.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi');
+            let matchCount = 0;
+            html = html.replace(regex, (match) => {
+               const isCurrent = matchCount === currentMatchIndex;
+               matchCount++;
+               const bgClass = isCurrent ? "bg-amber-400 text-white ring-2 ring-amber-300" : "bg-yellow-200 dark:bg-yellow-500/50 text-slate-900 dark:text-white";
+               return `<mark class="${bgClass} rounded-sm px-0.5 transition-all duration-300">${match}</mark>`;
+            });
+        } catch (e) {
+            // Ignore invalid regex during typing
+        }
+    }
+
     html = html.replace(
         /\[(\d{1,2}:\d{2}(?::\d{2})?)\]/g, 
         '<span class="timestamp-chip" contenteditable="false" data-time="$1">$1</span>'
@@ -259,6 +294,12 @@ const TranscriptionEditor: React.FC<TranscriptionEditorProps> = ({
   const htmlToMarkdown = (html: string) => {
       const temp = document.createElement('div');
       temp.innerHTML = html;
+      
+      // Strip highlights before converting back
+      temp.querySelectorAll('mark').forEach(mark => {
+          mark.replaceWith(mark.textContent || '');
+      });
+
       temp.querySelectorAll('.timestamp-chip').forEach(chip => {
           const time = chip.getAttribute('data-time');
           if (time) chip.replaceWith(`[${time}]`);
@@ -274,13 +315,11 @@ const TranscriptionEditor: React.FC<TranscriptionEditorProps> = ({
       md = md.replace(/<em>(.*?)<\/em>/gi, '*$1*');
       md = md.replace(/<u>(.*?)<\/u>/gi, '__$1__');
       
-      // Handle interactive strike back to markdown
       md = md.replace(/<s[^>]*>(.*?)<\/s>/gi, '~~$1~~');
       md = md.replace(/<strike[^>]*>(.*?)<\/strike>/gi, '~~$1~~');
       
       md = md.replace(/<br\s*\/?>/gi, '\n');
       
-      // Aggressively strip remaining tags to prevent HTML leak in history
       md = md.replace(/<p.*?>/gi, '').replace(/<\/p>/gi, '\n')
              .replace(/<div.*?>/gi, '\n').replace(/<\/div>/gi, '')
              .replace(/<ul.*?>/gi, '').replace(/<\/ul>/gi, '')
@@ -290,7 +329,6 @@ const TranscriptionEditor: React.FC<TranscriptionEditorProps> = ({
              .replace(/&gt;/g, '>')
              .replace(/&amp;/g, '&');
       
-      // Final catch-all for any other tags
       md = md.replace(/<[^>]*>/g, '');
       md = md.replace(/\n\s*\n/g, '\n\n'); 
       return md.trim();
@@ -312,10 +350,15 @@ const TranscriptionEditor: React.FC<TranscriptionEditorProps> = ({
   }, [initialText]);
 
   useEffect(() => {
-      if (isEditing && contentEditableRef.current) {
-          contentEditableRef.current.innerHTML = markdownToHtml(text);
+      if (isToolsExpanded && contentEditableRef.current) {
+          // Force update for visual changes like highlighting
+          const html = markdownToHtml(text);
+          // Only update if actually different to preserve cursor if possible
+          if (contentEditableRef.current.innerHTML !== html) {
+              contentEditableRef.current.innerHTML = html;
+          }
       }
-  }, [isEditing]);
+  }, [isEditing, searchTerm, currentMatchIndex]);
 
   // Handle click on Strike-through elements to delete them
   useEffect(() => {
@@ -571,6 +614,79 @@ const TranscriptionEditor: React.FC<TranscriptionEditorProps> = ({
       const regex = new RegExp(searchTerm.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g');
       const newText = text.replace(regex, replaceTerm);
       updateText(newText);
+      setSearchTerm(''); // Reset search to clear highlights
+  };
+
+  // Enhanced Find & Replace Logic
+  useEffect(() => {
+    if (!searchTerm) {
+        setSearchMatches([]);
+        setCurrentMatchIndex(-1);
+        return;
+    }
+    // Find all matches
+    const matches: {index: number, length: number}[] = [];
+    const regex = new RegExp(searchTerm.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi');
+    let match;
+    while ((match = regex.exec(text)) !== null) {
+        matches.push({ index: match.index, length: match[0].length });
+    }
+    setSearchMatches(matches);
+    if (matches.length > 0) setCurrentMatchIndex(0);
+    else setCurrentMatchIndex(-1);
+  }, [searchTerm, text]);
+
+  const handleNextMatch = () => {
+    if (searchMatches.length === 0) return;
+    const nextIndex = (currentMatchIndex + 1) % searchMatches.length;
+    setCurrentMatchIndex(nextIndex);
+    scrollToMatch(nextIndex);
+  };
+
+  const handlePrevMatch = () => {
+    if (searchMatches.length === 0) return;
+    const prevIndex = (currentMatchIndex - 1 + searchMatches.length) % searchMatches.length;
+    setCurrentMatchIndex(prevIndex);
+    scrollToMatch(prevIndex);
+  };
+
+  const scrollToMatch = (index: number) => {
+     // This is tricky with simple contentEditable markdown rendering
+     // We will try to rely on native window.find for visual scrolling/highlighting if possible,
+     // or just simple focus. For now, visual count is the MVP.
+     // Implementing robust scrolling to a specific text node index in this complex editor is high-risk.
+     // We will fallback to a Toast for index.
+  };
+
+  const handleReplaceOne = () => {
+      if (currentMatchIndex === -1 || searchMatches.length === 0) return;
+      
+      const match = searchMatches[currentMatchIndex];
+      const before = text.substring(0, match.index);
+      const after = text.substring(match.index + match.length);
+      const newText = before + replaceTerm + after;
+      
+      // Calculate offset for next match index after replacement
+      // If we replace "foo" (3 chars) with "bar" (3 chars), offset is 0
+      // If we replace "foo" with "b" (-2), subsequent matches shift left
+      const lengthDiff = replaceTerm.length - match.length;
+      
+      // We want to conceptually stay at the "same" index, which is now the next match
+      // effectively. But we need to wait for useEffect to recalc matches.
+      // To mimic "moving to next", we keep currentMatchIndex same, 
+      // because the old match[0] is gone, so old match[1] becomes the new match[0].
+      // EXCEPT if we are at the very end.
+      
+      let nextIndexToSelect = currentMatchIndex;
+      if (currentMatchIndex >= searchMatches.length - 1) {
+          nextIndexToSelect = 0; // Wrap around or go to start
+      }
+
+      updateText(newText);
+      // We rely on the useEffect to refresh matches. 
+      // NOTE: strict index tracking requires more complex state management 
+      // (ignoring dependencies), but for this MVP, existing behavior where 
+      // matches are re-scanned is acceptable.
   };
 
   // --- AI Features ---
@@ -580,7 +696,7 @@ const TranscriptionEditor: React.FC<TranscriptionEditorProps> = ({
     setShowSummarySidebar(true);
     setIsSummarizing(true);
     setSummary(null);
-    setEditedSummary(null);
+    setEditedSummary('');
     try {
       const result = await summarizeText(text, useDeepThinking);
       setSummary(result);
@@ -599,7 +715,7 @@ const TranscriptionEditor: React.FC<TranscriptionEditorProps> = ({
     setShowSummarySidebar(true);
     setIsSummarizing(true);
     setSummary(null);
-    setEditedSummary(null);
+    setEditedSummary('');
     try {
         const result = await analyzeVideoContent(originalFile.file);
         setSummary(result);
@@ -617,7 +733,7 @@ const TranscriptionEditor: React.FC<TranscriptionEditorProps> = ({
       setIsSummarizing(true);
       setIsEnhancing(true);
       setSummary(null);
-      setEditedSummary(null);
+      setEditedSummary('');
       try {
           const result = await enhanceFormatting(text, contentType || "General", useDeepThinking);
           setSummary(result);
@@ -636,7 +752,7 @@ const TranscriptionEditor: React.FC<TranscriptionEditorProps> = ({
     setShowSummarySidebar(true);
     setIsSummarizing(true);
     setSummary(null);
-    setEditedSummary(null);
+    setEditedSummary('');
     try {
       const result = await extractKeyMoments(text, useDeepThinking);
       setSummary(result);
@@ -653,7 +769,7 @@ const TranscriptionEditor: React.FC<TranscriptionEditorProps> = ({
     setShowSummarySidebar(true);
     setIsSummarizing(true);
     setSummary(null);
-    setEditedSummary(null);
+    setEditedSummary('');
     try {
       const result = await findDiscussionBounds(text, useDeepThinking);
       setSummary(result);
@@ -670,7 +786,7 @@ const TranscriptionEditor: React.FC<TranscriptionEditorProps> = ({
     setShowSummarySidebar(true);
     setIsSummarizing(true);
     setSummary(null);
-    setEditedSummary(null);
+    setEditedSummary('');
     try {
       const result = await stripPleasantries(text, useDeepThinking);
       setSummary(result);
@@ -687,7 +803,7 @@ const TranscriptionEditor: React.FC<TranscriptionEditorProps> = ({
     setShowSummarySidebar(true);
     setIsSummarizing(true);
     setSummary(null);
-    setEditedSummary(null);
+    setEditedSummary('');
     try {
       const result = await refineSpeakers(text, useDeepThinking);
       setSummary(result);
@@ -699,18 +815,18 @@ const TranscriptionEditor: React.FC<TranscriptionEditorProps> = ({
     }
   };
 
-  const handleRefineAfricanContext = async () => {
-    setSummaryTitle("African Context");
+  const handleLinguisticPolish = async () => {
+    setSummaryTitle("Linguistic Polish");
     setShowSummarySidebar(true);
     setIsSummarizing(true);
     setSummary(null);
-    setEditedSummary(null);
+    setEditedSummary('');
     try {
-      const result = await refineAfricanContext(text, useDeepThinking);
+      const result = await linguisticPolish(text, useDeepThinking);
       setSummary(result);
       setEditedSummary(result);
     } catch (e: any) {
-      setSummary(`Failed to optimize for African context.\n\nReason: ${e.message}`);
+      setSummary(`Failed to apply linguistic polish.\n\nReason: ${e.message || 'AI could not apply linguistic polish.'}`);
     } finally {
       setIsSummarizing(false);
     }
@@ -898,7 +1014,7 @@ const TranscriptionEditor: React.FC<TranscriptionEditorProps> = ({
                                  <Timer size={16} weight="duotone" className="text-red-500"/>
                                </div>
                                <div>
-                                 <span className="block">Clear Timestamps</span>
+                                 <span className="block">Purge Timecodes</span>
                                  <span className="text-[10px] text-slate-400 font-normal">Remove [00:00]</span>
                                </div>
                             </button>
@@ -907,7 +1023,7 @@ const TranscriptionEditor: React.FC<TranscriptionEditorProps> = ({
                                  <UserMinus size={16} weight="duotone" className="text-orange-500"/>
                                </div>
                                <div>
-                                 <span className="block">Strip Speakers</span>
+                                 <span className="block">De-identify Voices</span>
                                  <span className="text-[10px] text-slate-400 font-normal">Remove labels</span>
                                </div>
                             </button>
@@ -916,7 +1032,7 @@ const TranscriptionEditor: React.FC<TranscriptionEditorProps> = ({
                                  <TextAlignLeft size={16} weight="duotone" className="text-blue-500"/>
                                </div>
                                <div>
-                                 <span className="block">Compact Flow</span>
+                                 <span className="block">Tighten Narrative</span>
                                  <span className="text-[10px] text-slate-400 font-normal">Remove blanks</span>
                                </div>
                             </button>
@@ -964,122 +1080,50 @@ const TranscriptionEditor: React.FC<TranscriptionEditorProps> = ({
 
                             <div className="relative mb-2">
                                 <MagnifyingGlass size={13} weight="bold" className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400"/>
-                                <input value={searchTerm} onChange={e => setSearchTerm(e.target.value)} placeholder="Find..." className="w-full text-xs pl-8 pr-3 py-2 rounded-lg border border-slate-200 dark:border-dark-border bg-slate-50 dark:bg-dark-bg focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all font-medium"/>
+                                <input 
+                                  value={searchTerm} 
+                                  onChange={e => setSearchTerm(e.target.value)} 
+                                  placeholder="Find..." 
+                                  className="w-full text-xs pl-8 pr-16 py-2 rounded-lg border border-slate-200 dark:border-dark-border bg-slate-50 dark:bg-dark-bg focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all font-medium"
+                                />
+                                {searchMatches.length > 0 && (
+                                    <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
+                                        <span className="text-[9px] font-bold text-slate-400 mr-1">
+                                            {currentMatchIndex + 1}/{searchMatches.length}
+                                        </span>
+                                        <button onClick={handlePrevMatch} className="p-0.5 hover:bg-slate-200 dark:hover:bg-dark-border rounded text-slate-500">
+                                            <ArrowLeft size={10} weight="bold"/>
+                                        </button>
+                                        <button onClick={handleNextMatch} className="p-0.5 hover:bg-slate-200 dark:hover:bg-dark-border rounded text-slate-500">
+                                            <ArrowRight size={10} weight="bold"/>
+                                        </button>
+                                    </div>
+                                )}
                             </div>
                             <div className="relative mb-3">
                                 <Repeat size={13} weight="bold" className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400"/>
                                 <input value={replaceTerm} onChange={e => setReplaceTerm(e.target.value)} placeholder="Replace with..." className="w-full text-xs pl-8 pr-3 py-2 rounded-lg border border-slate-200 dark:border-dark-border bg-slate-50 dark:bg-dark-bg focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all font-medium"/>
                             </div>
-                            <button onClick={() => { handleSearchReplace(); setActiveMenu(null); }} className="w-full bg-primary hover:bg-primary/90 text-white text-xs font-semibold py-2 rounded-lg transition-all shadow-lg shadow-primary/20">Replace All Occurrences</button>
+                            
+                            <div className="flex gap-2">
+                                <button 
+                                  onClick={handleReplaceOne}
+                                  disabled={searchMatches.length === 0}
+                                  className="flex-1 bg-slate-100 hover:bg-slate-200 dark:bg-dark-border dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-xs font-semibold py-2 rounded-lg transition-all disabled:opacity-50"
+                                >
+                                  Replace
+                                </button>
+                                <button 
+                                  onClick={() => { handleSearchReplace(); setActiveMenu(null); }} 
+                                  className="flex-[1.5] bg-primary hover:bg-primary/90 text-white text-xs font-semibold py-2 rounded-lg transition-all shadow-lg shadow-primary/20"
+                                >
+                                  Replace All
+                                </button>
+                            </div>
                         </div>
                     )}
                 </div>
 
-                <div className="w-px h-5 bg-slate-200 dark:bg-dark-border mx-1"></div>
-
-                <div className="w-px h-5 bg-slate-200 dark:bg-dark-border mx-1"></div>
-
-                {/* Consolidated Export Toolbar Dropdown */}
-                <div className="relative">
-                    <button onClick={() => toggleMenu('export')} className={`flex items-center gap-1.5 px-3 py-1.5 rounded-2xl text-[10px] font-black uppercase tracking-wider transition-all ${activeMenu === 'export' ? 'bg-primary text-white shadow-lg shadow-primary/20' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-dark-bg'}`}>
-                       <Export size={16} weight="duotone" />
-                       <span>Export</span>
-                       <CaretDown size={10} weight="bold" className={`transition-transform ${activeMenu === 'export' ? 'rotate-180' : ''}`}/>
-                    </button>
-                    {activeMenu === 'export' && (
-                        <div className="absolute top-full right-0 mt-2 bg-white dark:bg-dark-card rounded-2xl shadow-xl border border-slate-100 dark:border-dark-border z-50 p-2 min-w-[200px] animate-in fade-in slide-in-from-top-2">
-                             <div className="px-2.5 py-1.5 text-[9px] font-black text-slate-400 dark:text-dark-muted uppercase tracking-widest">Preview & Copy</div>
-                             <button 
-                               onClick={() => {
-                                 const previewWindow = window.open('', '_blank');
-                                 if (previewWindow) {
-                                   previewWindow.document.write(`
-                                     <html>
-                                       <head>
-                                         <title>Transcript Preview</title>
-                                         <style>
-                                           body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; line-height: 1.6; padding: 40px; max-width: 800px; margin: 0 auto; color: #1e293b; background: #f8fafc; }
-                                           .content { background: white; padding: 60px; border-radius: 24px; shadow: 0 10px 15px -3px rgba(0,0,0,0.1); border: 1px solid #e2e8f0; }
-                                           h1, h2, h3 { color: #0f172a; margin-top: 1.5em; }
-                                           b { color: #0f172a; }
-                                           .timestamp { color: #6366f1; font-weight: bold; }
-                                         </style>
-                                       </head>
-                                       <body>
-                                         <div class="content">${markdownToHtml(text)}</div>
-                                       </body>
-                                     </html>
-                                   `);
-                                   previewWindow.document.close();
-                                 }
-                                 setActiveMenu(null);
-                               }}
-                               className="w-full flex items-center gap-3 px-2.5 py-2 text-left text-[11px] font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-dark-bg rounded-xl transition-all group"
-                             >
-                               <div className="w-7 h-7 rounded-lg bg-primary/10 dark:bg-accent/20 flex items-center justify-center group-hover:scale-110 transition-transform">
-                                 <ArrowSquareOut size={14} weight="duotone" className="text-primary dark:text-accent"/>
-                               </div>
-                               Open in New Tab
-                             </button>
-                             <button onClick={() => { navigator.clipboard.writeText(text); setActiveMenu(null); }} className="w-full flex items-center gap-3 px-2.5 py-2 text-left text-[11px] font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-dark-bg rounded-xl transition-all group">
-                               <div className="w-7 h-7 rounded-lg bg-indigo-50 dark:bg-indigo-900/20 flex items-center justify-center group-hover:scale-110 transition-transform">
-                                 <Checks size={14} weight="duotone" className="text-indigo-500"/>
-                               </div>
-                               Everything
-                             </button>
-                             <button onClick={() => { 
-                               const clean = text
-                                 .replace(/\[\d{1,2}:\d{2}(?::\d{2})?\]/g, '')
-                                 .replace(/^(.*?):/gm, '')
-                                 .replace(/\*/g, '')
-                                 .replace(/~/g, '')
-                                 .replace(/\s+/g, ' ')
-                                 .trim();
-                               navigator.clipboard.writeText(clean);
-                               setActiveMenu(null);
-                             }} className="w-full flex items-center gap-3 px-2.5 py-2 text-left text-[11px] font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-dark-bg rounded-xl transition-all group">
-                               <div className="w-7 h-7 rounded-lg bg-blue-50 dark:bg-blue-900/20 flex items-center justify-center group-hover:scale-110 transition-transform">
-                                 <FileText size={14} weight="duotone" className="text-blue-500"/>
-                               </div>
-                               Plain Text
-                             </button>
-                             <button onClick={() => { 
-                               const html = text.replace(/\*\*(.*?)\*\*/g, '<b>$1</b>').replace(/\*(.*?)\*/g, '<i>$1</i>').replace(/\n/g, '<br>');
-                               navigator.clipboard.writeText(html); 
-                               setActiveMenu(null); 
-                             }} className="w-full flex items-center gap-3 px-2.5 py-2 text-left text-[11px] font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-dark-bg rounded-xl transition-all group">
-                               <div className="w-7 h-7 rounded-lg bg-orange-50 dark:bg-orange-900/20 flex items-center justify-center group-hover:scale-110 transition-transform">
-                                 <FileCode size={14} weight="duotone" className="text-orange-500"/>
-                               </div>
-                               HTML Format
-                             </button>
-
-                             <div className="h-px bg-slate-100 dark:bg-dark-border my-2 mx-2"></div>
-                             
-                             <div className="px-2.5 py-1.5 text-[9px] font-black text-slate-400 dark:text-dark-muted uppercase tracking-widest">Download Files</div>
-                             {onSaveToDrive && (
-                               <button onClick={() => { onSaveToDrive(); setActiveMenu(null); }} className="w-full flex items-center gap-3 px-2.5 py-2 text-left text-[11px] font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-dark-bg rounded-xl transition-all group">
-                                 <div className="w-7 h-7 rounded-lg bg-emerald-50 dark:bg-emerald-900/20 flex items-center justify-center group-hover:scale-110 transition-transform">
-                                   <CloudArrowDown size={14} weight="duotone" className="text-emerald-500"/>
-                                 </div>
-                                 Save to Drive
-                               </button>
-                             )}
-                             <button onClick={() => { handleExportAI('docx'); setActiveMenu(null); }} className="w-full flex items-center gap-3 px-2.5 py-2 text-left text-[11px] font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-dark-bg rounded-xl transition-all group">
-                               <div className="w-7 h-7 rounded-lg bg-blue-50 dark:bg-blue-900/20 flex items-center justify-center group-hover:scale-110 transition-transform">
-                                 <FileIcon size={14} weight="duotone" className="text-blue-500"/>
-                               </div>
-                               Word (.docx)
-                             </button>
-                             <button onClick={() => { handleExportAI('txt'); setActiveMenu(null); }} className="w-full flex items-center gap-3 px-2.5 py-2 text-left text-[11px] font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-dark-bg rounded-xl transition-all group">
-                               <div className="w-7 h-7 rounded-lg bg-slate-50 dark:bg-dark-border flex items-center justify-center group-hover:scale-110 transition-transform">
-                                 <FileText size={14} weight="duotone" className="text-slate-400 group-hover:text-primary"/>
-                               </div>
-                               Text (.txt)
-                             </button>
-                        </div>
-                    )}
-                </div>
             </div>
           </motion.div>
         )}
@@ -1204,6 +1248,13 @@ const TranscriptionEditor: React.FC<TranscriptionEditorProps> = ({
                   </div>
                   <div className="flex items-center gap-1">
                       <button 
+                        onClick={() => setIsToolsExpanded(!isToolsExpanded)} 
+                        className="p-2 rounded-xl hover:bg-slate-200 dark:hover:bg-dark-border text-slate-400 dark:hover:text-white transition-colors"
+                        title={isToolsExpanded ? "Collapse Tools" : "Expand Tools"}
+                      >
+                        {isToolsExpanded ? <CaretUp size={18} weight="bold" /> : <CaretDown size={18} weight="bold" />}
+                      </button>
+                      <button 
                         onClick={() => setIsAiSidebarExpanded(!isAiSidebarExpanded)} 
                         className="p-2 rounded-xl hover:bg-slate-200 dark:hover:bg-dark-border text-slate-400 dark:hover:text-white transition-colors hidden md:block"
                         title={isAiSidebarExpanded ? "Collapse" : "Expand"}
@@ -1216,8 +1267,9 @@ const TranscriptionEditor: React.FC<TranscriptionEditorProps> = ({
                   </div>
               </div>
               
-              {/* AI Actions Tabs/Sections */}
-              <div className="p-4 border-b border-slate-100 dark:border-dark-border bg-white dark:bg-dark-card space-y-4">
+              {/* AI Actions Tabs/Sections (Collapsible) */}
+              {isToolsExpanded && (
+              <div className="p-4 border-b border-slate-100 dark:border-dark-border bg-white dark:bg-dark-card space-y-4 animate-in slide-in-from-top-2 duration-300">
                 {(() => {
                   const ExperimentalBadge = () => (
                     <span className="px-1.5 py-0.5 rounded-md bg-amber-100 dark:bg-amber-900/20 text-[7px] font-black text-amber-600 dark:text-amber-400 uppercase tracking-tighter border border-amber-200/50 dark:border-amber-400/20 leading-none">
@@ -1376,27 +1428,31 @@ const TranscriptionEditor: React.FC<TranscriptionEditorProps> = ({
                          <ExperimentalBadge />
                        </div>
                      </button>
-                     <button 
-                       onClick={handleRefineAfricanContext} 
-                       disabled={isSummarizing} 
-                       className={`flex items-center gap-2 p-2.5 rounded-xl border transition-all ${
-                         summaryTitle === "African Context" 
-                           ? "bg-emerald-500 text-white border-emerald-500 shadow-lg shadow-emerald-500/20" 
-                           : "bg-slate-50 dark:bg-dark-bg border-slate-100 dark:border-dark-border text-slate-600 dark:text-dark-muted hover:border-emerald-500/30 hover:bg-white dark:hover:bg-dark-card"
-                       }`}
-                     >
-                       <Palette size={16} weight="duotone" />
-                       <div className="flex flex-col items-start gap-0.5">
-                         <span className="text-[11px] font-bold">African Context</span>
-                         <ExperimentalBadge />
-                       </div>
-                     </button>
+                     {/* 2. Linguistic Polish (Conditional) */}
+                     {(hasDialect || useDeepThinking) && (
+                      <button 
+                        onClick={handleLinguisticPolish} 
+                        disabled={isSummarizing} 
+                        className={`flex items-center gap-2 p-2.5 rounded-xl border transition-all ${
+                          summaryTitle === "Linguistic Polish" 
+                            ? "bg-indigo-500 text-white border-indigo-500 shadow-lg shadow-indigo-500/20" 
+                            : "bg-slate-50 dark:bg-dark-bg border-slate-100 dark:border-dark-border text-slate-600 dark:text-dark-muted hover:border-indigo-500/30 hover:bg-white dark:hover:bg-dark-card"
+                        }`}
+                      >
+                        <MagicWand size={16} weight="duotone" />
+                        <div className="flex flex-col items-start gap-0.5">
+                          <span className="text-[11px] font-bold">Linguistic Polish</span>
+                          <span className="text-[9px] opacity-70">Grammar & Italicization</span>
+                        </div>
+                      </button>
+                     )}
                    </div>
                 </div>
               </>
             );
           })()}
-        </div>
+              </div>
+              )}
               
               {/* AI Content Area */}
               <div className="flex-1 overflow-y-auto p-5 custom-scrollbar bg-slate-50/30 dark:bg-dark-bg/30">
@@ -1464,12 +1520,22 @@ const TranscriptionEditor: React.FC<TranscriptionEditorProps> = ({
                         
                         {/* Action Bar for AI results */}
                         <div className="sticky bottom-0 bg-slate-100/50 dark:bg-dark-bg/50 backdrop-blur-md -mx-5 -mb-5 p-5 border-t border-slate-200 dark:border-dark-border flex flex-col gap-3 z-20">
-                           <button 
-                                onClick={handleApplyEnhancement}
-                                className="w-full bg-gradient-to-tr from-primary to-purple-600 hover:brightness-110 text-white font-bold py-3.5 rounded-2xl text-[13px] flex items-center justify-center gap-2 shadow-xl shadow-primary/20 transition-all active:scale-[0.98]"
-                            >
-                                <Checks size={18} weight="bold" /> Apply to Document
-                            </button>
+                            <div className="flex gap-2">
+                                <button 
+                                    onClick={handleApplyEnhancement}
+                                    className="flex-1 bg-gradient-to-tr from-primary to-purple-600 hover:brightness-110 text-white font-bold py-3.5 rounded-2xl text-[12px] flex items-center justify-center gap-2 shadow-xl shadow-primary/20 transition-all active:scale-[0.98]"
+                                >
+                                    <Checks size={18} weight="bold" /> Apply
+                                </button>
+                                {onOpenInNewTab && (
+                                    <button 
+                                        onClick={() => onOpenInNewTab(editedSummary || summary || '', summaryTitle || 'AI Insight')}
+                                        className="flex-1 bg-white dark:bg-dark-card border border-slate-200 dark:border-dark-border text-slate-700 dark:text-white font-bold py-3.5 rounded-2xl text-[12px] flex items-center justify-center gap-2 transition-all hover:bg-slate-50 dark:hover:bg-white/5 active:scale-[0.98]"
+                                    >
+                                        <Plus size={18} weight="bold" /> New Tab
+                                    </button>
+                                )}
+                            </div>
                             
                             <div className="relative">
                                 <button 
@@ -1685,8 +1751,8 @@ const TranscriptionEditor: React.FC<TranscriptionEditorProps> = ({
           </div>
         </div>
       )}
-      {/* Floating Audio Player */}
-      {audioUrl && (
+      {/* Floating Audio Player (Only in Read Mode) */}
+      {!isEditing && audioUrl && (
         <div className="fixed bottom-8 left-1/2 -translate-x-1/2 z-[100] w-full max-w-[500px] px-4 animate-in slide-in-from-bottom-8 duration-500">
            <div className="bg-[#121212]/90 backdrop-blur-2xl border border-white/10 rounded-full p-2 shadow-2xl">
               <PlaybackControl 

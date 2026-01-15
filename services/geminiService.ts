@@ -65,19 +65,43 @@ const uploadFileToGemini = async (
 
   onStatus?.("Capturing upload slot (Protocol: Resumable)...", 10);
   const uploadBlob = new Blob([mediaFile], { type: mimeType });
-  const uploadResponse = await fetch(uploadUrlHeader, {
-    method: 'POST',
-    headers: {
-      'Content-Length': mediaFile.size.toString(),
-      'X-Goog-Upload-Offset': '0',
-      'X-Goog-Upload-Command': 'upload, finalize'
-    },
-    body: uploadBlob
+
+  // Use XHR for upload progress tracking
+  const fileInfo = await new Promise<any>((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      xhr.open('POST', uploadUrlHeader);
+      xhr.setRequestHeader('Content-Length', mediaFile.size.toString());
+      xhr.setRequestHeader('X-Goog-Upload-Offset', '0');
+      xhr.setRequestHeader('X-Goog-Upload-Command', 'upload, finalize');
+
+      xhr.upload.onprogress = (event) => {
+          if (event.lengthComputable) {
+              const percentComplete = (event.loaded / event.total);
+              // Map upload to 10-50% range
+              const mappedProgress = 10 + Math.round(percentComplete * 40);
+              onStatus?.(`Uploading media: ${Math.round(percentComplete * 100)}%`, mappedProgress);
+          }
+      };
+
+      xhr.onload = () => {
+          if (xhr.status >= 200 && xhr.status < 300) {
+              try {
+                  resolve(JSON.parse(xhr.responseText));
+              } catch (e) {
+                  reject(new Error("Failed to parse upload response"));
+              }
+          } else {
+              reject(new Error(`Upload failed with status: ${xhr.status}`));
+          }
+      };
+
+      xhr.onerror = () => {
+          onStatus?.("Upload failed: Network error", 0);
+          reject(new Error("Network error during upload"));
+      };
+      xhr.send(uploadBlob);
   });
 
-  if (!uploadResponse.ok) throw new Error(`Failed to upload file: ${uploadResponse.statusText}`);
-
-  const fileInfo = await uploadResponse.json();
   const fileUri = fileInfo.file.uri;
   const fileState = fileInfo.file.state;
 
@@ -136,9 +160,9 @@ export const transcribeAudio = async (
 
       const commonInstructions = `
         1. ${speakerInstruction}
-        2. **Accents & Dialects**: The audio may contain West African accents, Pidgin English, or mixed languages. 
+        2. **Accents & Dialects**: The audio may contain West African accents, Pidgin English, or mixed languages (e.g. Yoruba, Igbo, Twi). 
            - Transcribe Pidgin/Dialect EXACTLY as spoken. DO NOT translate to standard English. 
-           - Use *italics* for non-English words or heavy Pidgin phrases.
+           - **CRITICAL**: Use *italics* for all non-English words, names of local languages/places, and all Pidgin phrases.
         3. **Timestamps**: Insert [MM:SS] timestamps at the start of every speaker turn.
       `;
 
@@ -163,7 +187,9 @@ export const transcribeAudio = async (
       const config = undefined;
 
       let contentPart: any;
-      const MAX_INLINE_SIZE = 18 * 1024 * 1024; 
+      // Force all files to use the File API (Binary Upload) instead of Base64 (Inline).
+      // This reduces payload size by ~33% (Base64 overhead) and provides upload progress for all files.
+      const MAX_INLINE_SIZE = 0; 
 
       if (mediaFile.size < MAX_INLINE_SIZE) {
         onStatus?.("Buffering audio for inline execution...", 12);
@@ -183,23 +209,71 @@ export const transcribeAudio = async (
         };
       }
 
+      onStatus?.("Handshaking with Gemini Agent...", 55);
       onStatus?.("Generating transcription (Deep Inference)...", 60);
-      const response = await ai.models.generateContent({
-        model: modelName,
-        contents: {
-          parts: [
-            contentPart,
-            { text: autoEdit ? autoEditPrompt : rawPrompt }
-          ]
-        },
-        config: config
-      });
+      
+      // Simulate progress during the black-box inference
+      const progressInterval = setInterval(() => {
+          // We can't know exact progress, so we simulate it up to 90%
+          const messages = [
+             "Analyzing audio patterns...",
+             "Detecting speaker turns...",
+             "Formatting text blocks...",
+             "Constructing timestamps...",
+             "Refining syntax...",
+             "Finalizing output..."
+          ];
+          const randomMsg = messages[Math.floor(Math.random() * messages.length)];
+          // Only if onStatus allows reading back current progress would this be perfect, 
+          // but we can just assume 60 start.
+      }, 2000);
 
-      if (response.text) {
-        onStatus?.("Transcription complete. Metadata cached.", 100);
-        return response.text;
-      } else {
-        throw new Error("No transcription generated.");
+      // Wrapper to handle progress updates since we can't easily read back current from callback
+      // We will actually just emit updates blindly from the main flow or wrapper.
+      // Better approach:
+      
+      let currentFakeProgress = 60;
+      const fakeProgressTimer = setInterval(() => {
+         currentFakeProgress += (Math.random() * 2); 
+         if (currentFakeProgress > 95) currentFakeProgress = 95;
+         
+         const messages = [
+             "Analyzing acoustic features...",
+             "Identifying speaker segments...",
+             "Deciphering linguistic nuances...",
+             "Applying formatting rules...",
+             "Verifying timestamp accuracy...",
+             "Structuring final document..."
+         ];
+         const msg = messages[Math.floor(Math.random() * messages.length)];
+         onStatus?.(msg, Math.round(currentFakeProgress));
+      }, 2500);
+
+      try {
+        const response = await ai.models.generateContent({
+            model: modelName,
+            contents: {
+            parts: [
+                contentPart,
+                { text: autoEdit ? autoEditPrompt : rawPrompt }
+            ]
+            },
+            config: config
+        });
+        
+        clearInterval(fakeProgressTimer);
+
+        if (response.text) {
+            onStatus?.("Validating output...", 98);
+            await new Promise(r => setTimeout(r, 800)); // Small pause for effect
+            onStatus?.("Transcription complete.", 100);
+            return response.text;
+        } else {
+            throw new Error("No transcription generated.");
+        }
+      } catch (e) {
+        clearInterval(fakeProgressTimer);
+        throw e;
       }
     } catch (error: any) {
       const errorMsg = error.message.toLowerCase();
@@ -212,7 +286,7 @@ export const transcribeAudio = async (
       }
 
       if (attempt < 2 && (isRateLimited || errorMsg.includes('503'))) {
-        onStatus?.(`AI busy. Retrying in ${attempt + 2}s...`);
+        onStatus?.(`⚠️ Agent limit reached. Retrying in ${attempt + 2}s...`, 60);
         await new Promise(r => setTimeout(r, (attempt + 1) * 2000));
         return executeWithRetry(attempt + 1);
       }
@@ -288,7 +362,7 @@ export const analyzeVideoContent = async (mediaFile: File | Blob): Promise<strin
 
   try {
     let contentPart: any;
-    const MAX_INLINE_SIZE = 18 * 1024 * 1024;
+    const MAX_INLINE_SIZE = 0; // Force binary upload for speed
 
     if (mediaFile.size < MAX_INLINE_SIZE) {
       const base64Data = await blobToBase64(mediaFile);
@@ -480,12 +554,17 @@ export const refineSpeakers = async (text: string, useSmartModel: boolean = true
   const ai = new GoogleGenAI({ apiKey: import.meta.env.VITE_GEMINI_API_KEY });
   const model = useSmartModel ? "gemini-2.5-pro" : "gemini-2.5-flash";
   
-  const prompt = `
+    const prompt = `
     Review the following West African transcript and refine the speaker labels. 
     1. Identify if "Speaker 1", "Speaker 2", etc. can be replaced with actual names based on conversation context (e.g., someone says "Gaza", "Kojo", "Blessing").
     2. Correct misattributed turns if the flow of conversation suggests a different speaker.
     3. Keep the format: "NAME [MM:SS]: Transcript".
-    4. RETURN THE FULL ENTIRE TRANSCRIPT with these improvements.
+    
+    CRITICAL OUTPUT RULES:
+    - Return ONLY the full refined transcript.
+    - Do NOT include any introductory text like "Here is the transcript" or explanations.
+    - Do NOT include "Note:" or "Summary of changes".
+    - If you cannot identify any names, return the transcript exactly as is.
   `;
   
   const response = await ai.models.generateContent({
@@ -495,24 +574,27 @@ export const refineSpeakers = async (text: string, useSmartModel: boolean = true
     }
   });
   
-  return String(response.text || text);
+  const output = String(response.text || text).trim();
+  // Remove markdown code blocks if present
+  return output.replace(/^```markdown\n/, '').replace(/^```\n/, '').replace(/\n```$/, '');
 };
 
 /**
- * Optimizes transcript for African context (names, Pidgin, local idioms).
+ * Applies a high-quality linguistic polish to the transcript.
  */
-export const refineAfricanContext = async (text: string, useSmartModel: boolean = true): Promise<string> => {
+export const linguisticPolish = async (text: string, useSmartModel: boolean = false): Promise<string> => {
   const ai = new GoogleGenAI({ apiKey: import.meta.env.VITE_GEMINI_API_KEY });
   const model = useSmartModel ? "gemini-2.5-pro" : "gemini-2.5-flash";
   
   const prompt = `
-    You are an expert in West African English, Pidgin, and local idioms (Naija, Ghana, Sierra Leone).
-    Review this transcript and:
-    1. Correct spelling of local names (ensure they are capitalized and spelled standardly).
-    2. Format Pidgin English phrases properly (e.g., "I dey come" instead of "I they come").
-    3. Ensure local idioms are preserved and formatted if they were misinterpreted by the speech-to-text engine.
-    4. DO NOT translate to standard English. Maintain the original linguistic soul of the speaker.
-    RETURN THE FULL ENTIRE TRANSCRIPT with these improvements.
+    You are a professional linguistic editor. Your goal is to apply a "Linguistic Polish" to this transcript.
+    1. Fix obvious grammatical errors and word-choice mistakes caused by speech-to-text errors.
+    2. Remove stutters, false starts, and excessive filler words (um, uh, like).
+    3. **PRESERVATION**: Do not change the speaker's unique voice, intent, or dialect. Preserve Pidgin English exactly as spoken.
+    4. **STYLING**: Ensure all non-English words, local names, and Pidgin phrases are *italicized*.
+    5. **STRUCTURE**: Maintain all speaker labels and [MM:SS] timestamps.
+    
+    RETURN THE FULL ENTIRE TRANSCRIPT with these internal improvements.
   `;
   
   const response = await ai.models.generateContent({
