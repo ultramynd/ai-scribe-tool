@@ -160,9 +160,11 @@ export const transcribeAudio = async (
 
       const commonInstructions = `
         1. ${speakerInstruction}
-        2. **Accents & Dialects**: The audio may contain West African accents, Pidgin English, or mixed languages (e.g. Yoruba, Igbo, Twi). 
-           - Transcribe Pidgin/Dialect EXACTLY as spoken. DO NOT translate to standard English. 
-           - **CRITICAL**: Use *italics* for all non-English words, names of local languages/places, and all Pidgin phrases.
+        2. **Linguistic Context (Pidgin English & Dialects)**: 
+           - The audio likely contains West African English, Nigerian/Ghanaian/Liberian Pidgin, or mixed languages.
+           - **Markers**: Look for "wey" (who/which), "dey" (is/are/am), "don" (past tense indicator), "no be" (is not), "sabi" (know), "comot" (leave), "abi/shey" (right?), "pikin" (child).
+           - **CRITICAL**: Transcribe Pidgin EXACTLY as spoken. DO NOT translate to standard English or "correct" the grammar. 
+           - **STYLING**: Use *italics* for all non-English words and Pidgin-specific phrases.
         3. **Timestamps**: Insert [MM:SS] timestamps at the start of every speaker turn.
       `;
 
@@ -430,13 +432,17 @@ export const summarizeText = async (text: string, useSmartModel: boolean = false
     Structure your response with these sections:
     
     1. **Executive Synthesis**: A high-density overview of the discussion, capturing the core themes, objectives, and atmosphere. (2-3 paragraphs).
-    2. **Key Moments & Chronology**: Identify the 5-8 most critical segments. Include their exact [MM:SS] timestamps. For each, explain:
+    2. **Insight Toolbox**:
+       - **Glossary of Terms**: Extract and define specific technical terms, local slang, or Pidgin English used in this context.
+       - **Implicit Meanings**: What was hinted at but not explicitly said? Identify subtext.
+    3. **Key Moments & Chronology**: Identify the most critical segments. Include exact [MM:SS] timestamps. For each, explain:
        - **What happened**: A brief summary.
        - **Significance**: Why this moment is vital to the overall context.
-    3. **Actionable Outcomes**: Extract explicit or implied next steps, commitments, or decisions made.
-    4. **Sentiment & Tone**: Brief analysis of the conversation's dynamic (e.g., collaborative, confrontational, informational).
+    4. **Critical Questions & Gaps**: List important questions that were asked but not answered, or key topics that were notably absent.
+    5. **Actionable Outcomes**: Extract explicit or implied next steps, commitments, or decisions made.
+    6. **Sentiment & Tone**: A nuanced analysis of the conversation's dynamic (e.g., collaborative, confrontational, informational) and how it shifted over time.
 
-    Use professional Markdown formatting. Do not be generic; find the "soul" of the conversation.
+    Use professional Markdown formatting with tables where appropriate. Do not be generic; find the "soul" and unique linguistic footprint of the conversation.
     
     Transcript:
     ${text}
@@ -464,12 +470,14 @@ export const enhanceFormatting = async (text: string, contextType: string = "Gen
        - If you add or correct a word for clarity/grammar, wrap it in **bold** (e.g., **correction**).
     3. **Professional Structure**: 
        - Insert thematic Markdown headings (# or ##) where the topic shifts.
-       - Use bullet points for lists.
+       - Use horizontal rules (---) to separate major sections.
+       - Use bullet points for structured lists.
     4. **Diarization Preservation**: Keep all speaker labels (e.g., Speaker 1:) and [MM:SS] timestamps exactly where they are. 
-    5. **Tone Consistency**: If the speaker uses Pidgin, slang, or technical jargon, PRESERVE IT. Do not "over-sanitize".
-    6. **Typography**: Use *italics* for emphasis or non-English terms.
+    5. **Dialect & Identity**: If the speaker uses Pidgin, local slang, or technical jargon, **DO NOT REMOVE OR CORRECT IT**. Preserve the linguistic identity of the speakers.
+    6. **Nuance Highlighting**: Use *italics* for emphasis, non-English terms, or soft corrections that clarify intent without changing words.
+    7. **Formatting Density**: Bold key entities, dates, and core concepts to make the document highly scannable.
 
-    Produce the final document in clean Markdown.
+    Produce the final document in clean, high-density Markdown.
     
     Transcript:
     ${text}
@@ -556,14 +564,15 @@ export const refineSpeakers = async (text: string, useSmartModel: boolean = true
   
     const prompt = `
     Review the following West African transcript and refine the speaker labels. 
-    1. Identify if "Speaker 1", "Speaker 2", etc. can be replaced with actual names based on conversation context (e.g., someone says "Gaza", "Kojo", "Blessing").
-    2. Correct misattributed turns if the flow of conversation suggests a different speaker.
-    3. Keep the format: "NAME [MM:SS]: Transcript".
+    1. **Identity Extraction**: Identify if "Speaker 1", "Speaker 2", etc. can be replaced with actual names based on conversation context (e.g., someone says "Gaza", "Kojo", "Blessing").
+    2. **Role Mapping**: If the speaker's role is clear (e.g., Interviewer, Host, Guest, Doctor), append it in parentheses like "KOJO (Host)".
+    3. **Turn Correction**: Correct misattributed turns if the flow of conversation suggests a different speaker.
+    4. **Format Hook**: Keep the format: "NAME (ROLE if known) [MM:SS]: Transcript".
     
     CRITICAL OUTPUT RULES:
     - Return ONLY the full refined transcript.
-    - Do NOT include any introductory text like "Here is the transcript" or explanations.
-    - Do NOT include "Note:" or "Summary of changes".
+    - Preserve all original formatting, bolding, and italics.
+    - Do NOT include any introductory text, notes, or concluding summaries.
     - If you cannot identify any names, return the transcript exactly as is.
   `;
   
@@ -579,30 +588,3 @@ export const refineSpeakers = async (text: string, useSmartModel: boolean = true
   return output.replace(/^```markdown\n/, '').replace(/^```\n/, '').replace(/\n```$/, '');
 };
 
-/**
- * Applies a high-quality linguistic polish to the transcript.
- */
-export const linguisticPolish = async (text: string, useSmartModel: boolean = false): Promise<string> => {
-  const ai = new GoogleGenAI({ apiKey: import.meta.env.VITE_GEMINI_API_KEY });
-  const model = useSmartModel ? "gemini-2.5-pro" : "gemini-2.5-flash";
-  
-  const prompt = `
-    You are a professional linguistic editor. Your goal is to apply a "Linguistic Polish" to this transcript.
-    1. Fix obvious grammatical errors and word-choice mistakes caused by speech-to-text errors.
-    2. Remove stutters, false starts, and excessive filler words (um, uh, like).
-    3. **PRESERVATION**: Do not change the speaker's unique voice, intent, or dialect. Preserve Pidgin English exactly as spoken.
-    4. **STYLING**: Ensure all non-English words, local names, and Pidgin phrases are *italicized*.
-    5. **STRUCTURE**: Maintain all speaker labels and [MM:SS] timestamps.
-    
-    RETURN THE FULL ENTIRE TRANSCRIPT with these internal improvements.
-  `;
-  
-  const response = await ai.models.generateContent({
-    model: model,
-    contents: {
-      parts: [{ text: prompt }, { text: text }]
-    }
-  });
-  
-  return String(response.text || text);
-};

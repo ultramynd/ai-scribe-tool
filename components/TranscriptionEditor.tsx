@@ -15,7 +15,7 @@ import {
 import { detectDialect } from '../utils/transcriptionUtils';
 import PlaybackControl from './PlaybackControl';
 import { generateTxt, generateDoc, generateDocx, generateSrt } from '../utils/exportUtils';
-import { summarizeText, enhanceFormatting, analyzeVideoContent, extractKeyMoments, findDiscussionBounds, stripPleasantries, refineSpeakers, linguisticPolish } from '../services/geminiService';
+import { summarizeText, enhanceFormatting, analyzeVideoContent, extractKeyMoments, findDiscussionBounds, stripPleasantries, refineSpeakers } from '../services/geminiService';
 import { AudioFile } from '../types';
 
 interface TranscriptionEditorProps {
@@ -262,9 +262,11 @@ const TranscriptionEditor: React.FC<TranscriptionEditorProps> = ({
     html = html.replace(/^### (.*$)/gim, '<h3>$1</h3>');
     html = html.replace(/^## (.*$)/gim, '<h2>$1</h2>');
     html = html.replace(/^# (.*$)/gim, '<h1>$1</h1>');
+    html = html.replace(/\*\*\*(.*?)\*\*\*/g, '<b><i>$1</i></b>');
     html = html.replace(/\*\*(.*?)\*\*/g, '<b>$1</b>');
+    html = html.replace(/__(.*?)__/g, '<b>$1</b>');
     html = html.replace(/\*(.*?)\*/g, '<i>$1</i>');
-    html = html.replace(/__(.*?)__/g, '<u>$1</u>');
+    html = html.replace(/_(\S.*?\S)_/g, '<i>$1</i>');
     html = html.replace(/~~(.*?)~~/g, '<s class="interactive-strike" title="Click to remove">$1</s>');
     
     // Inject Search Highlights
@@ -283,9 +285,10 @@ const TranscriptionEditor: React.FC<TranscriptionEditorProps> = ({
         }
     }
 
+    // Unified Timestamp Chip Rendering (Handles [00:00] and 00:00)
     html = html.replace(
-        /\[(\d{1,2}:\d{2}(?::\d{2})?)\]/g, 
-        '<span class="timestamp-chip" contenteditable="false" data-time="$1">$1</span>'
+        /(?:^|\s|\[)(\d{1,2}:\d{2}(?::\d{2})?)(?:\]|\s|$)/gm, 
+        (match, p1) => `<span class="timestamp-chip" contenteditable="false" data-time="${p1}">${p1}</span>`
     );
     html = html.replace(/\n/g, '<br>');
     return html;
@@ -311,9 +314,8 @@ const TranscriptionEditor: React.FC<TranscriptionEditorProps> = ({
       md = md.replace(/<h3>(.*?)<\/h3>/gi, '### $1\n');
       md = md.replace(/<b>(.*?)<\/b>/gi, '**$1**');
       md = md.replace(/<strong>(.*?)<\/strong>/gi, '**$1**');
-      md = md.replace(/<i>(.*?)<\/i>/gi, '*$1*');
-      md = md.replace(/<em>(.*?)<\/em>/gi, '*$1*');
-      md = md.replace(/<u>(.*?)<\/u>/gi, '__$1__');
+      md = md.replace(/<i>(.*?)<\/i>/gi, '_$1_');
+      md = md.replace(/<em>(.*?)<\/em>/gi, '_$1_');
       
       md = md.replace(/<s[^>]*>(.*?)<\/s>/gi, '~~$1~~');
       md = md.replace(/<strike[^>]*>(.*?)<\/strike>/gi, '~~$1~~');
@@ -815,22 +817,6 @@ const TranscriptionEditor: React.FC<TranscriptionEditorProps> = ({
     }
   };
 
-  const handleLinguisticPolish = async () => {
-    setSummaryTitle("Linguistic Polish");
-    setShowSummarySidebar(true);
-    setIsSummarizing(true);
-    setSummary(null);
-    setEditedSummary('');
-    try {
-      const result = await linguisticPolish(text, useDeepThinking);
-      setSummary(result);
-      setEditedSummary(result);
-    } catch (e: any) {
-      setSummary(`Failed to apply linguistic polish.\n\nReason: ${e.message || 'AI could not apply linguistic polish.'}`);
-    } finally {
-      setIsSummarizing(false);
-    }
-  };
   
   const handleCopySummary = () => {
     if (editedSummary) {
@@ -1232,8 +1218,8 @@ const TranscriptionEditor: React.FC<TranscriptionEditorProps> = ({
 
       {/* AI Sidebar */}
       {showAiSidebar && (
-          <div className={`flex-none bg-white dark:bg-dark-card border-l border-slate-200 dark:border-dark-border flex flex-col overflow-hidden animate-in slide-in-from-right-10 duration-200 shadow-2xl transition-all duration-300 ${isAiSidebarExpanded ? 'w-[600px]' : 'w-[340px]'}`}>
-              <div className="flex items-center justify-between p-4 border-b border-slate-100 dark:border-dark-border bg-slate-50/50 dark:bg-dark-bg/50">
+          <div className={`flex-none bg-white dark:bg-slate-900 border-l border-slate-200 dark:border-slate-800 flex flex-col overflow-hidden animate-in slide-in-from-right-10 duration-200 shadow-2xl transition-all duration-300 ${isAiSidebarExpanded ? 'w-[600px]' : 'w-[340px]'}`}>
+              <div className="flex items-center justify-between p-4 border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50">
                   <div className="flex items-center gap-2.5">
                       <div className="bg-primary/10 dark:bg-accent/10 p-2 rounded-xl">
                           <Sparkle size={18} weight="duotone" className="text-primary dark:text-accent" />
@@ -1271,11 +1257,6 @@ const TranscriptionEditor: React.FC<TranscriptionEditorProps> = ({
               {isToolsExpanded && (
               <div className="p-4 border-b border-slate-100 dark:border-dark-border bg-white dark:bg-dark-card space-y-4 animate-in slide-in-from-top-2 duration-300">
                 {(() => {
-                  const ExperimentalBadge = () => (
-                    <span className="px-1.5 py-0.5 rounded-md bg-amber-100 dark:bg-amber-900/20 text-[7px] font-black text-amber-600 dark:text-amber-400 uppercase tracking-tighter border border-amber-200/50 dark:border-amber-400/20 leading-none">
-                      Exp.
-                    </span>
-                  );
                   const context = analyzeDocumentContext();
                   const canShowSummary = context.wordCount > 200 || context.hasMultipleParagraphs;
                   const canShowKeyMoments = context.hasTimestamps && context.wordCount > 300;
@@ -1286,11 +1267,11 @@ const TranscriptionEditor: React.FC<TranscriptionEditorProps> = ({
                   if (context.isEmpty) {
                     return (
                       <div className="text-center py-12 px-4">
-                        <div className="w-16 h-16 bg-slate-50 dark:bg-dark-bg rounded-2xl flex items-center justify-center mb-4 mx-auto border border-slate-100 dark:border-dark-border">
-                          <Sparkle size={28} className="text-slate-300 dark:text-dark-border" />
+                        <div className="w-16 h-16 bg-slate-50 dark:bg-white/5 rounded-2xl flex items-center justify-center mb-4 mx-auto border border-slate-100 dark:border-white/10">
+                          <Sparkle size={28} className="text-slate-300 dark:text-slate-500" />
                         </div>
-                        <h4 className="text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">Add Content to Unlock AI</h4>
-                        <p className="text-xs text-slate-400 dark:text-dark-muted leading-relaxed max-w-[200px] mx-auto">
+                        <h4 className="text-sm font-bold text-slate-700 dark:text-slate-200 mb-2">Add Content to Unlock AI</h4>
+                        <p className="text-xs text-slate-400 dark:text-slate-500 leading-relaxed max-w-[200px] mx-auto">
                           Write or transcribe to unlock AI features
                         </p>
                       </div>
@@ -1316,7 +1297,7 @@ const TranscriptionEditor: React.FC<TranscriptionEditorProps> = ({
                       <BookOpen size={16} weight="duotone" />
                       <div className="flex flex-col items-start gap-0.5">
                         <span className="text-[11px] font-bold">Summary</span>
-                        <ExperimentalBadge />
+                        <span className="text-[9px] opacity-70">Concise overview</span>
                       </div>
                     </button>
                     <button 
@@ -1331,7 +1312,7 @@ const TranscriptionEditor: React.FC<TranscriptionEditorProps> = ({
                       <Timer size={16} weight="duotone" />
                       <div className="flex flex-col items-start gap-0.5">
                         <span className="text-[11px] font-bold">Key Moments</span>
-                        <ExperimentalBadge />
+                        <span className="text-[9px] opacity-70">Vital segments</span>
                       </div>
                     </button>
                   </div>
@@ -1356,7 +1337,7 @@ const TranscriptionEditor: React.FC<TranscriptionEditorProps> = ({
                       <MagicWand size={16} weight="duotone" />
                       <div className="flex flex-col items-start gap-0.5">
                         <span className="text-[11px] font-bold">Smart Fix</span>
-                        <ExperimentalBadge />
+                        <span className="text-[9px] opacity-70">Polish & clarity</span>
                       </div>
                     </button>
                     )}
@@ -1373,7 +1354,7 @@ const TranscriptionEditor: React.FC<TranscriptionEditorProps> = ({
                       <Funnel size={16} weight="duotone" />
                       <div className="flex flex-col items-start gap-0.5">
                         <span className="text-[11px] font-bold">Strip Pleasantries</span>
-                        <ExperimentalBadge />
+                        <span className="text-[9px] opacity-70">Remove filler</span>
                       </div>
                     </button>
                     )}
@@ -1389,7 +1370,7 @@ const TranscriptionEditor: React.FC<TranscriptionEditorProps> = ({
                       <ChatCenteredText size={16} weight="duotone" />
                       <div className="flex flex-col items-start gap-0.5">
                         <span className="text-[11px] font-bold">Identify Core</span>
-                        <ExperimentalBadge />
+                        <span className="text-[9px] opacity-70">Find discussion</span>
                       </div>
                     </button>
                     {isVideoFile && (
@@ -1401,7 +1382,7 @@ const TranscriptionEditor: React.FC<TranscriptionEditorProps> = ({
                         <VideoCamera size={16} weight="duotone" />
                         <div className="flex flex-col items-start gap-0.5">
                           <span className="text-[11px] font-bold">Visual Analysis</span>
-                          <ExperimentalBadge />
+                          <span className="text-[9px] opacity-70">Video insights</span>
                         </div>
                       </button>
                     )}
@@ -1425,27 +1406,9 @@ const TranscriptionEditor: React.FC<TranscriptionEditorProps> = ({
                        <Users size={16} weight="duotone" />
                        <div className="flex flex-col items-start gap-0.5">
                          <span className="text-[11px] font-bold">Refine Speakers</span>
-                         <ExperimentalBadge />
+                         <span className="text-[9px] opacity-70">Detect names</span>
                        </div>
                      </button>
-                     {/* 2. Linguistic Polish (Conditional) */}
-                     {(hasDialect || useDeepThinking) && (
-                      <button 
-                        onClick={handleLinguisticPolish} 
-                        disabled={isSummarizing} 
-                        className={`flex items-center gap-2 p-2.5 rounded-xl border transition-all ${
-                          summaryTitle === "Linguistic Polish" 
-                            ? "bg-indigo-500 text-white border-indigo-500 shadow-lg shadow-indigo-500/20" 
-                            : "bg-slate-50 dark:bg-dark-bg border-slate-100 dark:border-dark-border text-slate-600 dark:text-dark-muted hover:border-indigo-500/30 hover:bg-white dark:hover:bg-dark-card"
-                        }`}
-                      >
-                        <MagicWand size={16} weight="duotone" />
-                        <div className="flex flex-col items-start gap-0.5">
-                          <span className="text-[11px] font-bold">Linguistic Polish</span>
-                          <span className="text-[9px] opacity-70">Grammar & Italicization</span>
-                        </div>
-                      </button>
-                     )}
                    </div>
                 </div>
               </>
@@ -1455,7 +1418,7 @@ const TranscriptionEditor: React.FC<TranscriptionEditorProps> = ({
               )}
               
               {/* AI Content Area */}
-              <div className="flex-1 overflow-y-auto p-5 custom-scrollbar bg-slate-50/30 dark:bg-dark-bg/30">
+              <div className="flex-1 overflow-y-auto p-5 custom-scrollbar bg-slate-50/30 dark:bg-black/20">
                   {isSummarizing ? (
                       <div className="flex flex-col items-center justify-center h-full gap-4 text-slate-400">
                           <div className="relative">
@@ -1710,7 +1673,7 @@ const TranscriptionEditor: React.FC<TranscriptionEditorProps> = ({
                                 />
                              )}
                           </div>
-                          {summaryTitle === "Smart Suggestions" && (
+                          {summaryTitle === "Smart Fix" && (
                               <button 
                                   onClick={handleApplyEnhancement}
                                   className="w-full mt-4 bg-gradient-to-r from-primary to-purple-600 hover:from-primary/90 hover:to-purple-600/90 text-white font-bold py-3 rounded-xl text-sm flex items-center justify-center gap-2 shadow-lg shadow-primary/20 transition-all active:scale-[0.98] flex-shrink-0"

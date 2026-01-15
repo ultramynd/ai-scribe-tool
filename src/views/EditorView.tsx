@@ -3,7 +3,7 @@ import {
   Lightning, Eye, PencilSimple, Sparkle, Export, CaretDown, 
   ArrowSquareOut, Checks, FileText, FileCode, CloudArrowDown, 
   File as FileIcon, Plus, Microphone, UploadSimple, User, 
-  Clock, SignOut, Spinner, SignIn, Sun, Moon, List, WarningCircle
+  Clock, SignOut, Spinner, SignIn, Sun, Moon, List, WarningCircle, Check
 } from '@phosphor-icons/react';
 import { AudioSource, TranscriptionState, AudioFile, ArchiveItem } from '../../types';
 import TranscriptionEditor from '../../components/TranscriptionEditor';
@@ -64,6 +64,14 @@ const EditorView: React.FC<EditorViewProps> = ({
   setIsPickerOpen, isPickerOpen, handlePickDriveFile,
   onOpenInNewTab
 }) => {
+  // Local state for copy feedback
+  const [copiedStatus, setCopiedStatus] = React.useState<'text' | 'plain' | 'html' | null>(null);
+
+  const handleCopyFeedback = (type: 'text' | 'plain' | 'html') => {
+    setCopiedStatus(type);
+    setTimeout(() => setCopiedStatus(null), 2000);
+  };
+
   return (
     <div className="h-screen bg-slate-50 dark:bg-dark-bg font-sans flex flex-col overflow-hidden transition-colors duration-300">
       
@@ -164,46 +172,52 @@ const EditorView: React.FC<EditorViewProps> = ({
                           <button 
                             onClick={() => {
                               navigator.clipboard.writeText(transcription.text || '');
+                              handleCopyFeedback('text');
                             }}
                             className="w-full flex items-center gap-3 px-3 py-2 text-left text-[11px] font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-white/5 rounded-xl transition-all group"
                           >
                             <div className="w-7 h-7 rounded-lg bg-indigo-100 dark:bg-indigo-900/20 flex items-center justify-center group-hover:scale-110 transition-transform">
-                              <Checks size={12} weight="duotone" className="text-indigo-500"/>
+                              {copiedStatus === 'text' ? <Check size={12} weight="bold" className="text-emerald-500" /> : <Checks size={12} weight="duotone" className="text-indigo-500" />}
                             </div>
-                            Copy Text
+                            {copiedStatus === 'text' ? 'Copied!' : 'Copy Text'}
                           </button>
                           <button 
                             onClick={() => {
                               const clean = (transcription.text || '')
-                                .replace(/\[\d{1,2}:\d{2}(?::\d{2})?\]/g, '')
-                                .replace(/^(.*?):/gm, '')
-                                .replace(/\*/g, '')
-                                .replace(/~/g, '')
-                                .replace(/\s+/g, ' ')
+                                .replace(/\[\d{1,2}:\d{2}(?::\d{2})?\]/g, '') // Remove timestamps
+                                .replace(/^(.*?):/gm, '') // Remove speaker labels
+                                .replace(/\*\*/g, '').replace(/\*/g, '') // Remove asterisks
+                                .replace(/__/g, '').replace(/_/g, '') // Remove underscores
+                                .replace(/~~/g, '') // Remove strikethrough
+                                .replace(/\s+/g, ' ') // Normalize spaces
                                 .trim();
                               navigator.clipboard.writeText(clean);
+                              handleCopyFeedback('plain');
                             }}
                             className="w-full flex items-center gap-3 px-3 py-2 text-left text-[11px] font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-white/5 rounded-xl transition-all group"
                           >
                             <div className="w-7 h-7 rounded-lg bg-blue-100 dark:bg-blue-900/20 flex items-center justify-center group-hover:scale-110 transition-transform">
-                              <FileText size={12} weight="duotone" className="text-blue-500"/>
+                              {copiedStatus === 'plain' ? <Check size={12} weight="bold" className="text-emerald-500" /> : <FileText size={12} weight="duotone" className="text-blue-500" />}
                             </div>
-                            Copy Plain Text
+                            {copiedStatus === 'plain' ? 'Copied!' : 'Copy Plain Text'}
                           </button>
                           <button 
                             onClick={() => {
                               const html = (transcription.text || '')
                                 .replace(/\*\*(.*?)\*\*/g, '<b>$1</b>')
+                                .replace(/__(.*?)__/g, '<b>$1</b>')
                                 .replace(/\*(.*?)\*/g, '<i>$1</i>')
+                                .replace(/_(.*?)_/g, '<i>$1</i>')
                                 .replace(/\n/g, '<br>');
                               navigator.clipboard.writeText(html);
+                              handleCopyFeedback('html');
                             }}
                             className="w-full flex items-center gap-3 px-3 py-2 text-left text-[11px] font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-white/5 rounded-xl transition-all group"
                           >
                             <div className="w-7 h-7 rounded-lg bg-orange-100 dark:bg-orange-900/20 flex items-center justify-center group-hover:scale-110 transition-transform">
-                              <FileCode size={12} weight="duotone" className="text-orange-500"/>
+                              {copiedStatus === 'html' ? <Check size={12} weight="bold" className="text-emerald-500" /> : <FileCode size={12} weight="duotone" className="text-orange-500" />}
                             </div>
-                            Copy HTML
+                            {copiedStatus === 'html' ? 'Copied!' : 'Copy HTML'}
                           </button>
 
                           <div className="h-px bg-slate-100 dark:bg-dark-border my-2 mx-2"></div>
@@ -268,7 +282,7 @@ const EditorView: React.FC<EditorViewProps> = ({
                   </button>
                   
                   <div className="absolute top-full right-0 mt-2 opacity-0 group-hover/more:opacity-100 pointer-events-none group-hover/more:pointer-events-auto transition-all duration-200 scale-95 group-hover/more:scale-100 origin-top-right z-50">
-                    <div className="bg-white dark:bg-dark-card rounded-2xl shadow-xl border border-slate-100 dark:border-dark-border p-2 min-w-[180px]">
+                    <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-xl border border-slate-100 dark:border-slate-700 p-2 min-w-[180px]">
                       <button 
                         onClick={() => setShowArchiveSidebar(true)}
                         className="w-full flex items-center gap-3 px-3 py-2 text-left text-[11px] font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-white/5 rounded-xl transition-all group"
@@ -300,7 +314,7 @@ const EditorView: React.FC<EditorViewProps> = ({
                             <button 
                               onClick={handleGoogleLogin}
                               disabled={isLoggingIn}
-                              className="w-full flex items-center gap-3 px-3 py-2 text-left text-[11px] font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-white/5 rounded-xl transition-all group"
+                              className="w-full flex items-center gap-3 px-3 py-2 text-left text-[11px] font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-white/10 rounded-xl transition-all group"
                             >
                               <div className="w-7 h-7 rounded-lg bg-primary/10 dark:bg-accent/20 flex items-center justify-center group-hover:scale-110 transition-transform">
                                 {isLoggingIn ? <Spinner size={14} weight="bold" className="animate-spin text-primary" /> : <SignIn size={14} weight="duotone" className="text-primary" />}
@@ -315,7 +329,7 @@ const EditorView: React.FC<EditorViewProps> = ({
 
                       <button 
                         onClick={() => setDarkMode(!darkMode)}
-                        className="w-full flex items-center gap-3 px-3 py-2 text-left text-[11px] font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-white/5 rounded-xl transition-all group"
+                        className="w-full flex items-center gap-3 px-3 py-2 text-left text-[11px] font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-white/10 rounded-xl transition-all group"
                       >
                         <div className="w-7 h-7 rounded-lg bg-amber-50 dark:bg-amber-900/20 flex items-center justify-center group-hover:scale-110 transition-transform">
                           {darkMode ? <Sun size={14} weight="duotone" className="text-amber-500" /> : <Moon size={14} weight="duotone" className="text-slate-600" />}

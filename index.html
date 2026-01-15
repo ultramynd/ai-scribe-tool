@@ -12,20 +12,25 @@
         theme: {
           extend: {
             colors: {
-              primary: "#710096", // Primary Purple
-              accent: "#5EC5D4", // Accent Cyan
+              primary: "#710096", // Electric Purple
+              accent: "#5EC5D4",  // Electric Cyan
               dark: {
-                bg: "#0D0D0D", // Dark Background
-                card: "#1A1A1A", // Card/Glass
-                border: "#262626", // Border/Stroke
-                text: "#FFFFFF", // Text Primary
-                muted: "#A1A1A1", // Text Secondary
+                bg: "#0A0A0A",     // Deep Black
+                card: "#18181B",   // Zinc-900 equivalent for cards
+                border: "#27272A", // Zinc-800 equivalent for borders
+                text: "#FAFAFA",   // Zinc-50
+                muted: "#A1A1AA",  // Zinc-400
+                panel: "#121212",  // Alternate dark surface
               },
             },
             fontFamily: {
               sans: ["Inter", "sans-serif"],
               display: ["Plus Jakarta Sans", "sans-serif"],
             },
+            boxShadow: {
+              'premium': '0 25px 50px -12px rgba(113, 0, 150, 0.15)',
+              'glow': '0 0 20px rgba(113, 0, 150, 0.3)',
+            }
           },
         },
       };

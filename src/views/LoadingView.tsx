@@ -73,15 +73,8 @@ const LoadingView: React.FC<LoadingViewProps> = ({
              </div>
           </div>
 
-          <div className="text-center mb-8 relative">
+          <div className="text-center mb-12 relative">
              <h2 className="text-4xl font-bold bg-clip-text text-transparent bg-gradient-to-b from-white to-gray-400 mb-4 tracking-tight animate-in fade-in slide-in-from-bottom-4 duration-700">Processing Media</h2>
-             <div className="flex flex-wrap justify-center gap-x-4 gap-y-2 text-[10px] text-dark-muted font-bold uppercase tracking-widest opacity-60">
-                <span>• Speaker Detection</span>
-                <span>• Auto-Formatting</span>
-                <span>• Smart Summaries</span>
-                <span>• Video Analysis</span>
-                <span>• Secure Cloud Sync</span>
-             </div>
           </div>
 
           {/* Enhanced Terminal Log with distinct border and header */}

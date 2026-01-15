@@ -26,11 +26,13 @@ export const generateTxt = (text: string, filename: string) => {
  * Generates a Word-compatible HTML file (saved as .doc).
  */
 export const generateDoc = (text: string, filename: string) => {
-  // Simple conversion of Markdown-like bold to HTML bold and newlines to breaks
+  // Simple conversion of Markdown bold/italic to HTML
   const htmlBody = text
     .replace(/\n/g, '<br/>')
     .replace(/\*\*(.*?)\*\*/g, '<b>$1</b>')
-    .replace(/\*(.*?)\*/g, '<i>$1</i>');
+    .replace(/__(.*?)__/g, '<b>$1</b>')
+    .replace(/\*(.*?)\*/g, '<i>$1</i>')
+    .replace(/_(.*?)_/g, '<i>$1</i>');
 
   const content = `
     <html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>
@@ -38,14 +40,13 @@ export const generateDoc = (text: string, filename: string) => {
         <meta charset='utf-8'>
         <title>${filename}</title>
         <style>
-          body { font-family: 'Calibri', sans-serif; font-size: 11pt; }
+          body { font-family: 'Calibri', sans-serif; font-size: 11pt; line-height: 1.5; }
         </style>
       </head>
       <body>${htmlBody}</body>
     </html>
   `;
   
-  // application/msword is widely supported for this HTML-hack approach
   const blob = new Blob([content], { type: 'application/msword' });
   downloadBlob(blob, `${filename}.doc`);
 };
@@ -60,29 +61,40 @@ export const generateDocx = async (text: string, filename: string) => {
 
     for (const line of lines) {
       if (!line.trim()) {
-        children.push(new Paragraph({ 
-          children: [new TextRun("")] 
-        })); 
+        children.push(new Paragraph({ children: [new TextRun("")] })); 
         continue;
       }
 
-      // Split by ** for bold detection
-      const parts = line.split(/(\*\*.*?\*\*)/g);
+      // Robust regex to capture bold (** or __) and italic (* or _)
+      // 1. **bold** or __bold__
+      // 2. *italic* or _italic_
+      const parts = line.split(/(\*\*.*?\*\*|__.*?__|(?<!\*)\*.*?\*(?!\*)|(?<!_)_.*?_(?!_))/g);
+      
       const textRuns = parts.map(part => {
-          if (part.startsWith('**') && part.endsWith('**')) {
+          if (!part) return null;
+          
+          // Bold matches
+          if ((part.startsWith('**') && part.endsWith('**')) || (part.startsWith('__') && part.endsWith('__'))) {
               return new TextRun({
                   text: part.slice(2, -2),
                   bold: true,
               });
           }
+          
+          // Italic matches
+          if ((part.startsWith('*') && part.endsWith('*')) || (part.startsWith('_') && part.endsWith('_'))) {
+              return new TextRun({
+                  text: part.slice(1, -1),
+                  italics: true,
+              });
+          }
+          
           return new TextRun({ text: part });
-      });
+      }).filter(Boolean) as TextRun[];
 
       children.push(new Paragraph({
         children: textRuns,
-        spacing: {
-          after: 120, // spacing between paragraphs (twips)
-        },
+        spacing: { after: 120 },
       }));
     }
 
