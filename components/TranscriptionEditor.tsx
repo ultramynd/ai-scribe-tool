@@ -358,6 +358,20 @@ const TranscriptionEditor: React.FC<TranscriptionEditorProps> = ({
           // Only update if actually different to preserve cursor if possible
           if (contentEditableRef.current.innerHTML !== html) {
               contentEditableRef.current.innerHTML = html;
+              
+              // Auto-scroll to current match if active
+              if (searchTerm && currentMatchIndex !== -1) {
+                  const activeMark = contentEditableRef.current.querySelector('.bg-amber-400');
+                  if (activeMark) {
+                      activeMark.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                  }
+              }
+          } else if (searchTerm && currentMatchIndex !== -1) {
+              // Even if content is same, index might have changed
+              const activeMark = contentEditableRef.current.querySelector('.bg-amber-400');
+              if (activeMark) {
+                  activeMark.scrollIntoView({ behavior: 'smooth', block: 'center' });
+              }
           }
       }
   }, [isEditing, searchTerm, currentMatchIndex]);
@@ -653,11 +667,14 @@ const TranscriptionEditor: React.FC<TranscriptionEditorProps> = ({
   };
 
   const scrollToMatch = (index: number) => {
-     // This is tricky with simple contentEditable markdown rendering
-     // We will try to rely on native window.find for visual scrolling/highlighting if possible,
-     // or just simple focus. For now, visual count is the MVP.
-     // Implementing robust scrolling to a specific text node index in this complex editor is high-risk.
-     // We will fallback to a Toast for index.
+     if (contentEditableRef.current) {
+         // The useEffect on currentMatchIndex will handle the actual scroll 
+         // after the DOM is updated. This remains as a fallback.
+         const marks = contentEditableRef.current.querySelectorAll('mark');
+         if (marks[index]) {
+             marks[index].scrollIntoView({ behavior: 'smooth', block: 'center' });
+         }
+     }
   };
 
   const handleReplaceOne = () => {
