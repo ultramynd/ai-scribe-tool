@@ -149,7 +149,7 @@ const PlaybackControl: React.FC<PlaybackControlProps> = ({
     <div className={`
         ${minimal 
             ? 'flex items-center gap-3 py-1' 
-            : 'bg-white/80 dark:bg-slate-900/50 backdrop-blur-md border border-slate-200/50 dark:border-white/10 rounded-full p-2 pr-6 shadow-xl shadow-slate-200/50 dark:shadow-black/20 flex items-center gap-4 w-full max-w-2xl mx-auto transition-all duration-300 hover:scale-[1.005] hover:shadow-2xl hover:shadow-slate-300/50 dark:hover:shadow-black/30'
+            : 'bg-white/90 dark:bg-slate-900/90 backdrop-blur-xl border border-slate-200/50 dark:border-white/[0.05] rounded-full p-2 pr-6 shadow-xl shadow-slate-200/50 dark:shadow-black/40 flex items-center gap-4 w-full max-w-2xl mx-auto transition-all duration-300 hover:scale-[1.005] hover:shadow-2xl hover:shadow-slate-300/50 dark:hover:shadow-black/50'
         }
     `}>
       <audio ref={audioRef} src={audioUrl} className="hidden" />
@@ -209,14 +209,14 @@ const PlaybackControl: React.FC<PlaybackControlProps> = ({
       <div className="flex items-center gap-3 border-l border-slate-200 dark:border-white/10 pl-4 h-6">
           <button 
               onClick={toggleMute}
-              className="text-slate-400 dark:text-slate-500 hover:text-primary dark:hover:text-white transition-colors"
+              className="text-slate-400 dark:text-slate-400 hover:text-primary dark:hover:text-white transition-colors"
           >
               {isMuted || volume === 0 ? <SpeakerSlash size={16} /> : <SpeakerHigh size={16} />}
           </button>
           
           <button 
               onClick={toggleSpeed}
-              className="px-1.5 py-0.5 rounded-md bg-slate-100 dark:bg-white/5 text-[10px] font-black text-slate-500 dark:text-slate-400 hover:bg-primary/10 hover:text-primary dark:hover:text-white transition-all"
+              className="px-1.5 py-0.5 rounded-md bg-slate-100 dark:bg-white/10 text-[10px] font-black text-slate-500 dark:text-slate-300 hover:bg-primary/10 hover:text-primary dark:hover:text-white transition-all"
           >
               {playbackRate}x
           </button>

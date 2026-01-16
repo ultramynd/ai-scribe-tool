@@ -710,6 +710,17 @@ const TranscriptionEditor: React.FC<TranscriptionEditorProps> = ({
 
   // --- AI Features ---
 
+  const handleAiError = (e: any, actionName: string) => {
+    const errorMsg = e?.message || "Check your internet connection or API key.";
+    const isQuotaError = errorMsg.includes('429') || errorMsg.toLowerCase().includes('quota');
+    
+    if (isQuotaError) {
+      alert(`⚠️ AI Quota Exceeded\n\nYou have reached the limit for free requests. Please wait a moment or upgrade your plan to continue using ${actionName}.\n\nError details: ${errorMsg}`);
+    }
+    
+    return `Failed to ${actionName.toLowerCase()}.\n\nReason: ${errorMsg}`;
+  };
+
   const handleSummarize = async () => {
     setSummaryTitle("Summary");
     setShowSummarySidebar(true);
@@ -721,8 +732,7 @@ const TranscriptionEditor: React.FC<TranscriptionEditorProps> = ({
       setSummary(result);
       setEditedSummary(result);
     } catch (e: any) {
-      const errorMsg = e?.message || "Check your internet connection or API key.";
-      setSummary(`Failed to generate summary.\n\nReason: ${errorMsg}`);
+      setSummary(handleAiError(e, "Generate Summary"));
     } finally {
       setIsSummarizing(false);
     }
@@ -740,7 +750,7 @@ const TranscriptionEditor: React.FC<TranscriptionEditorProps> = ({
         setSummary(result);
         setEditedSummary(result);
     } catch (err: any) {
-        setSummary(`Failed to analyze visual content.\n\nReason: ${err.message || 'The AI model could not process this file.'}`);
+        setSummary(handleAiError(err, "Analyze Visual Content"));
     } finally {
         setIsSummarizing(false);
     }
@@ -758,8 +768,7 @@ const TranscriptionEditor: React.FC<TranscriptionEditorProps> = ({
           setSummary(result);
           setEditedSummary(result);
       } catch (e: any) {
-          const errorMsg = e?.message || "AI was unable to process this request.";
-          setSummary(`Failed to enhance text.\n\nReason: ${errorMsg}`);
+          setSummary(handleAiError(e, "Enhance Text"));
       } finally {
           setIsSummarizing(false);
           setIsEnhancing(false);
@@ -777,7 +786,7 @@ const TranscriptionEditor: React.FC<TranscriptionEditorProps> = ({
       setSummary(result);
       setEditedSummary(result);
     } catch (e: any) {
-      setSummary(`Failed to extract key moments.\n\nReason: ${e.message || 'Transcript is too short or unclear.'}`);
+      setSummary(handleAiError(e, "Extract Key Moments"));
     } finally {
       setIsSummarizing(false);
     }
@@ -794,7 +803,7 @@ const TranscriptionEditor: React.FC<TranscriptionEditorProps> = ({
       setSummary(result);
       setEditedSummary(result);
     } catch (e: any) {
-      setSummary(`Failed to identify discussion bounds.\n\nReason: ${e.message || 'Core discussion could not be differentiated.'}`);
+      setSummary(handleAiError(e, "Identify Discussion Bounds"));
     } finally {
       setIsSummarizing(false);
     }
@@ -811,7 +820,7 @@ const TranscriptionEditor: React.FC<TranscriptionEditorProps> = ({
       setSummary(result);
       setEditedSummary(result);
     } catch (e: any) {
-      setSummary(`Failed to filter pleasantries.\n\nReason: ${e.message || 'AI could not find distinguishable intro/outro filler.'}`);
+      setSummary(handleAiError(e, "Filter Pleasantries"));
     } finally {
       setIsSummarizing(false);
     }
@@ -828,7 +837,7 @@ const TranscriptionEditor: React.FC<TranscriptionEditorProps> = ({
       setSummary(result);
       setEditedSummary(result);
     } catch (e: any) {
-      setSummary(`Failed to refine speaker labels.\n\nReason: ${e.message}`);
+      setSummary(handleAiError(e, "Refine Speaker Labels"));
     } finally {
       setIsSummarizing(false);
     }
@@ -1308,7 +1317,7 @@ const TranscriptionEditor: React.FC<TranscriptionEditorProps> = ({
                       className={`flex items-center gap-2 p-2.5 rounded-xl border transition-all ${
                         summaryTitle === "Summary" 
                           ? "bg-emerald-500 text-white border-emerald-500 shadow-lg shadow-emerald-500/20" 
-                          : "bg-slate-50 dark:bg-dark-bg border-slate-100 dark:border-dark-border text-slate-600 dark:text-dark-muted hover:border-emerald-500/30 hover:bg-white dark:hover:bg-dark-card"
+                          : "bg-slate-50 dark:bg-dark-bg border-slate-100 dark:border-white/10 text-slate-600 dark:text-slate-400 hover:border-emerald-500/30 hover:bg-white dark:hover:bg-dark-card"
                       }`}
                     >
                       <BookOpen size={16} weight="duotone" />
@@ -1323,7 +1332,7 @@ const TranscriptionEditor: React.FC<TranscriptionEditorProps> = ({
                       className={`flex items-center gap-2 p-2.5 rounded-xl border transition-all ${
                         summaryTitle === "Key Moments" 
                           ? "bg-amber-500 text-white border-amber-500 shadow-lg shadow-amber-500/20" 
-                          : "bg-slate-50 dark:bg-dark-bg border-slate-100 dark:border-dark-border text-slate-600 dark:text-dark-muted hover:border-amber-500/30 hover:bg-white dark:hover:bg-dark-card"
+                          : "bg-slate-50 dark:bg-dark-bg border-slate-100 dark:border-white/10 text-slate-600 dark:text-slate-400 hover:border-amber-500/30 hover:bg-white dark:hover:bg-dark-card"
                       }`}
                     >
                       <Timer size={16} weight="duotone" />
@@ -1348,7 +1357,7 @@ const TranscriptionEditor: React.FC<TranscriptionEditorProps> = ({
                       className={`flex items-center gap-2 p-2.5 rounded-xl border transition-all ${
                         summaryTitle === "Smart Fix" 
                           ? "bg-primary text-white border-primary shadow-lg shadow-primary/20" 
-                          : "bg-slate-50 dark:bg-dark-bg border-slate-100 dark:border-dark-border text-slate-600 dark:text-dark-muted hover:border-primary/30 dark:hover:border-accent/40 hover:bg-white dark:hover:bg-dark-card"
+                          : "bg-slate-50 dark:bg-dark-bg border-slate-100 dark:border-white/10 text-slate-600 dark:text-slate-400 hover:border-primary/30 dark:hover:border-accent/40 hover:bg-white dark:hover:bg-dark-card"
                       }`}
                     >
                       <MagicWand size={16} weight="duotone" />
@@ -1363,9 +1372,9 @@ const TranscriptionEditor: React.FC<TranscriptionEditorProps> = ({
                         onClick={handleStripPleasantries} 
                         disabled={isSummarizing} 
                         className={`flex items-center gap-2 p-2.5 rounded-xl border transition-all ${
-                          summaryTitle === "Strip Pleasantries" 
+                        summaryTitle === "Strip Pleasantries" 
                           ? "bg-blue-500 text-white border-blue-500 shadow-lg shadow-blue-500/20" 
-                          : "bg-slate-50 dark:bg-dark-bg border-slate-100 dark:border-dark-border text-slate-600 dark:text-dark-muted hover:border-blue-500/30 hover:bg-white dark:hover:bg-dark-card"
+                          : "bg-slate-50 dark:bg-dark-bg border-slate-100 dark:border-white/10 text-slate-600 dark:text-slate-400 hover:border-blue-500/30 hover:bg-white dark:hover:bg-dark-card"
                       }`}
                     >
                       <Funnel size={16} weight="duotone" />
@@ -1381,7 +1390,7 @@ const TranscriptionEditor: React.FC<TranscriptionEditorProps> = ({
                       className={`flex items-center gap-2 p-2.5 rounded-xl border transition-all ${
                         summaryTitle === "Identify Core" 
                           ? "bg-purple-500 text-white border-purple-500 shadow-lg shadow-purple-500/20" 
-                          : "bg-slate-50 dark:bg-dark-bg border-slate-100 dark:border-dark-border text-slate-600 dark:text-dark-muted hover:border-purple-500/30 hover:bg-white dark:hover:bg-dark-card"
+                          : "bg-slate-50 dark:bg-dark-bg border-slate-100 dark:border-white/10 text-slate-600 dark:text-slate-400 hover:border-purple-500/30 hover:bg-white dark:hover:bg-dark-card"
                       }`}
                     >
                       <ChatCenteredText size={16} weight="duotone" />
@@ -1394,7 +1403,7 @@ const TranscriptionEditor: React.FC<TranscriptionEditorProps> = ({
                       <button 
                         onClick={handleAnalyzeVideo} 
                         disabled={isSummarizing} 
-                        className="flex items-center gap-2 p-2.5 rounded-xl bg-slate-50 dark:bg-dark-bg border border-slate-100 dark:border-dark-border text-slate-600 dark:text-dark-muted hover:border-accent/30 hover:bg-white dark:hover:bg-dark-card transition-all"
+                        className="flex items-center gap-2 p-2.5 rounded-xl bg-slate-50 dark:bg-dark-bg border border-slate-100 dark:border-white/10 text-slate-600 dark:text-slate-400 hover:border-accent/30 hover:bg-white dark:hover:bg-dark-card transition-all"
                       >
                         <VideoCamera size={16} weight="duotone" />
                         <div className="flex flex-col items-start gap-0.5">
@@ -1609,7 +1618,7 @@ const TranscriptionEditor: React.FC<TranscriptionEditorProps> = ({
                               <Sparkle size={32} weight="duotone" className="text-primary/30 dark:text-accent/30 group-hover:scale-110 transition-transform duration-500" />
                           </div>
                           <h4 className="text-sm font-bold text-slate-800 dark:text-white mb-2">Ready to Assist</h4>
-                          <p className="text-xs text-slate-400 dark:text-dark-muted leading-relaxed max-w-[180px]">
+                          <p className="text-xs text-slate-400 dark:text-slate-300 leading-relaxed max-w-[180px]">
                               Select an AI action above to summarize or enhance your transcription.
                           </p>
                       </div>

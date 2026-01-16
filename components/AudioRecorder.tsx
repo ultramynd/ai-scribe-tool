@@ -201,7 +201,7 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({ onRecordingComplete, isTr
               </div>
 
               {/* High-end Timer */}
-              <div className={`text-6xl font-black tabular-nums tracking-[-0.05em] transition-all duration-500 ${isRecording ? 'text-slate-900 dark:text-white drop-shadow-[0_0_20px_rgba(113,0,150,0.2)]' : 'text-slate-300 dark:text-dark-muted'}`}>
+              <div className={`text-6xl font-black tabular-nums tracking-[-0.05em] transition-all duration-500 ${isRecording ? 'text-slate-900 dark:text-white drop-shadow-[0_0_20px_rgba(113,0,150,0.2)]' : 'text-slate-300 dark:text-slate-600'}`}>
                 {formatTime(duration)}
               </div>
               <div className="text-[9px] font-black uppercase tracking-[0.25em] text-primary dark:text-accent mt-3 opacity-50">
@@ -214,7 +214,7 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({ onRecordingComplete, isTr
                   <div className="bg-white/50 dark:bg-dark-card/30 backdrop-blur-md rounded-2xl p-4 border border-white/40 dark:border-white/5 min-h-[60px] max-h-[100px] overflow-y-auto">
                     <p className="text-[10px] font-sans leading-relaxed text-slate-800 dark:text-slate-200">
                       {liveTranscript}
-                      <span className="text-slate-400 dark:text-dark-muted">{interimTranscript}</span>
+                      <span className="text-slate-400 dark:text-slate-400">{interimTranscript}</span>
                       <span className="inline-block w-0.5 h-3 bg-primary dark:bg-accent ml-1 animate-pulse align-middle"></span>
                     </p>
                   </div>

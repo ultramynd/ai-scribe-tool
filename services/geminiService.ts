@@ -138,12 +138,18 @@ export const transcribeAudio = async (
   onStatus?.("Preparing Media for AI Engine...", 2);
   const executeWithRetry = async (attempt: number = 0): Promise<string> => {
     try {
-      if (!import.meta.env.VITE_GEMINI_API_KEY) {
+      const useFallback = attempt === 10;
+      const primaryKey = import.meta.env.VITE_GEMINI_API_KEY;
+      const fallbackKey = import.meta.env.VITE_GEMINI_API_KEY_FALLBACK;
+      
+      const activeApiKey = useFallback && fallbackKey ? fallbackKey : primaryKey;
+
+      if (!activeApiKey) {
         throw new Error("API Key is missing. Please check your environment configuration.");
       }
       
-      const ai = new GoogleGenAI({ apiKey: import.meta.env.VITE_GEMINI_API_KEY });
-      onStatus?.(`Engine initialized: ${useSmartModel ? '2.5 Pro' : '2.5 Flash'}`, 8);
+      const ai = new GoogleGenAI({ apiKey: activeApiKey });
+      onStatus?.(`Engine initialized: ${useSmartModel ? '2.5 Pro' : '2.5 Flash'} ${useFallback ? '(Backup Channel)' : ''}`, 8);
   
       let finalMimeType = mimeType;
       if (mediaFile instanceof File && mediaFile.name) {
@@ -277,14 +283,88 @@ export const transcribeAudio = async (
         clearInterval(fakeProgressTimer);
         throw e;
       }
+      const isRateLimited = errorMsg.includes('429') || errorMsg.includes('quota') || errorMsg.includes('resource_exhausted');
+
+      // Model Fallback Logic: Switch from Pro to Flash if capacity hit
+      if (useSmartModel && isRateLimited && !errorMsg.includes('fallback')) {
+        onStatus?.("Switching to High-Capacity engine (Flash) due to rate limit...");
+        return transcribeAudio(mediaFile, mimeType, autoEdit, detectSpeakers, false, onStatus);
+      }
+
+      // API Key Fallback Logic
+      const fallbackKey = import.meta.env.VITE_GEMINI_API_KEY_FALLBACK;
+      // Identify if we are already using the fallback to prevent infinite loops
+      // We can check if the current ai instance was init with primary but we are in a closure.
+      // Better: pass a flag `usingFallback` to `executeWithRetry`?
+      // Since we can't easily change the Function Signature of the export without breaking calls,
+      // we'll handle it via state or just try once if the Primary fails.
+      
+      // Let's modify the executeWithRetry signature slightly to accept a key override.
+      
+      if (isRateLimited && fallbackKey && attempt < 1) { // Only try fallback once
+         onStatus?.("⚠️ Primary Quota Exceeded. Switching to Backup API Key...", 60);
+         // Recursively call with a mechanism to use the secondary key.
+         // Since we can't change the outer function args, we will implement a mini-retry here
+         // BUT we need to re-init `ai`. 
+         // Strategy: Let's actually change `executeWithRetry` to accept an optional apiKey override.
+      }
+      
+      throw error;
+    }
+  };
+  
+  // Revised Internal Execution Function
+  const executeWithRetry = async (attempt: number = 0, apiKeyOverride?: string): Promise<string> => {
+    try {
+      const activeKey = apiKeyOverride || import.meta.env.VITE_GEMINI_API_KEY;
+      if (!activeKey) {
+        throw new Error("API Key is missing. Please check your environment configuration.");
+      }
+      
+      const ai = new GoogleGenAI({ apiKey: activeKey });
+      // ... (rest of logic)
+      
+      // We need to essentially copy the massive block above or refactor. 
+      // To minimize risk, I will implement the fallback check inside the CATCH block 
+      // by recursively calling `executeWithRetry` with the new key.
+    } catch (error: any) {
+        // ...
+    }
+  }
+  
+  // Okay, the tool requires me to replace the EXACT content. 
+  // I will replace the Catch Block to implement the logic.
+  
     } catch (error: any) {
       const errorMsg = error.message.toLowerCase();
       const isRateLimited = errorMsg.includes('429') || errorMsg.includes('quota') || errorMsg.includes('resource_exhausted');
 
-      // Model Fallback Logic: Switch from Pro to Flash if capacity hit
+      // 1. Model Fallback: Pro -> Flash
       if (useSmartModel && isRateLimited) {
         onStatus?.("Switching to High-Capacity engine (Flash) due to rate limit...");
         return transcribeAudio(mediaFile, mimeType, autoEdit, detectSpeakers, false, onStatus);
+      }
+
+      // 2. API Key Fallback check
+      const fallbackKey = import.meta.env.VITE_GEMINI_API_KEY_FALLBACK;
+      // We assume if we are retrying with attempt > 5 (arbitrary) we might be done, 
+      // but simpler: if we strictly hit 429 and haven't tried fallback (we can track via attempt count or a param).
+      // actually, `executeWithRetry` doesn't support the key arg yet.
+      // I will rewrite the entire `executeWithRetry` logic slightly to support this.
+      
+      // WAIT. I can just re-instantiate `ai` inside the retry??? 
+      // No, `ai` is const at the top.
+      
+      // Let's return a specific error or handle it. 
+      // Actually, I can recursively call `transcribeAudio` but I can't pass the API key.
+      
+      // BEST APPROACH: Refactor `transcribeAudio` to read the key dynamically? 
+      // No, let's just use the `attempt` logic. 
+      // If attempt === 10 (magic number for fallback), use fallback key.
+      
+      if (isRateLimited && fallbackKey && attempt !== 10) {
+          onStatus?.("⚠️ Primary Key Quota Hit. Switching to Fallback Key...", 60);
+          return executeWithRetry(10); // 10 signals "Use Fallback"
       }
 
       if (attempt < 2 && (isRateLimited || errorMsg.includes('503'))) {
@@ -295,6 +375,9 @@ export const transcribeAudio = async (
       throw error;
     }
   };
+
+  // I need to update the AI init at the top of executeWithRetry too.
+
 
   try {
     return await executeWithRetry();

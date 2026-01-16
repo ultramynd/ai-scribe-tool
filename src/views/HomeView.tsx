@@ -86,7 +86,7 @@ const HomeView: React.FC<HomeViewProps> = ({
             <div className="flex flex-col">
               <div className="flex items-center gap-2">
                 <span className="text-xl font-black tracking-tight text-slate-900 dark:text-white leading-none">ScribeAI</span>
-                <span className="px-1.5 py-0.5 rounded-md bg-primary/10 text-[8px] font-black tracking-tighter text-primary border border-primary/20 leading-none">BETA</span>
+                <span className="px-1.5 py-0.5 rounded-md bg-primary/10 dark:bg-accent/20 text-[8px] font-black tracking-tighter text-primary dark:text-accent border border-primary/20 dark:border-accent/20 leading-none">BETA</span>
               </div>
             </div>
           </div>
@@ -98,7 +98,7 @@ const HomeView: React.FC<HomeViewProps> = ({
                className="flex items-center gap-2.5 px-5 py-2.5 rounded-2xl bg-white dark:bg-dark-card border border-slate-100 dark:border-white/5 text-xs font-bold text-slate-600 dark:text-slate-300 hover:shadow-md transition-all group"
              >
                <Clock size={18} weight="duotone" className="text-slate-400 group-hover:text-primary transition-colors" />
-               <span className="hidden sm:inline">Archive</span>
+               <span className="hidden sm:inline">Tabs</span>
                {archiveItems.length > 0 && (
                  <div className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse ml-0.5"></div>
                )}
@@ -109,20 +109,20 @@ const HomeView: React.FC<HomeViewProps> = ({
                googleAccessToken ? (
                  <button 
                     onClick={handleGoogleLogout}
-                    className="flex items-center gap-2.5 px-5 py-2.5 rounded-2xl bg-slate-50 dark:bg-dark-bg border border-slate-200/50 dark:border-white/5 text-[10px] font-black text-slate-500 dark:text-slate-400 tracking-widest uppercase hover:bg-slate-100 dark:hover:bg-white/5 transition-all group"
+                    className="w-10 h-10 rounded-2xl bg-white dark:bg-dark-card border border-slate-100 dark:border-white/5 flex items-center justify-center hover:shadow-md transition-all group"
+                    title="Sign Out"
                   >
-                    <span>Connected</span>
-                    <SignOut size={16} weight="bold" className="text-slate-400 group-hover:text-primary transition-transform" />
+                    <SignOut size={18} weight="bold" className="text-slate-400 group-hover:text-primary transition-transform" />
                   </button>
                ) : (
                  googleClientId && (
                     <button 
                       onClick={handleGoogleLogin}
                       disabled={isLoggingIn}
-                      className="flex items-center gap-2.5 px-5 py-2.5 rounded-2xl bg-white dark:bg-dark-card border border-slate-100 dark:border-white/5 text-[10px] font-black text-slate-500 dark:text-slate-400 tracking-widest uppercase hover:shadow-md transition-all group"
+                      className="w-10 h-10 rounded-2xl bg-white dark:bg-dark-card border border-slate-100 dark:border-white/5 flex items-center justify-center hover:shadow-md transition-all group"
+                      title="Sign In"
                     >
-                      {isLoggingIn ? <Spinner size={16} weight="bold" className="animate-spin text-primary" /> : <SignIn size={16} weight="bold" className="text-slate-400 group-hover:text-primary transition-colors" />}
-                      <span>Login</span>
+                      {isLoggingIn ? <Spinner size={18} weight="bold" className="animate-spin text-primary" /> : <SignIn size={18} weight="bold" className="text-slate-400 group-hover:text-primary transition-colors" />}
                     </button>
                  )
                )
@@ -332,10 +332,10 @@ const HomeView: React.FC<HomeViewProps> = ({
                      <div className="flex flex-col gap-4 max-w-sm mx-auto">
                         <div className="flex flex-col gap-4 max-w-sm mx-auto p-4 rounded-3xl bg-white/40 dark:bg-black/20 border border-white/20 shadow-sm backdrop-blur-md transition-all">
                            {/* Mode Selection Cards */}
-                           <div className="grid grid-cols-2 gap-2 p-1 bg-slate-200/50 dark:bg-white/5 rounded-2xl">
+                           <div className="grid grid-cols-2 gap-2 p-1 bg-slate-200/50 dark:bg-white/5 rounded-2xl border border-transparent dark:border-white/5">
                               <button
                                  onClick={() => setTranscriptionMode('verbatim')}
-                                 className={`flex flex-col items-center justify-center py-4 px-2 rounded-xl transition-all duration-300 ${transcriptionMode === 'verbatim' ? 'bg-white dark:bg-dark-card text-primary shadow-sm scale-[1.02]' : 'text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200'}`}
+                                 className={`flex flex-col items-center justify-center py-4 px-2 rounded-xl transition-all duration-300 ${transcriptionMode === 'verbatim' ? 'bg-white dark:bg-dark-card text-primary dark:text-accent shadow-sm border border-slate-100 dark:border-white/10 scale-[1.02]' : 'text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200'}`}
                               >
                                  <Lightning size={24} weight={transcriptionMode === 'verbatim' ? "duotone" : "regular"} className="mb-2" />
                                  <span className="font-bold text-sm">Verbatim</span>
@@ -343,7 +343,7 @@ const HomeView: React.FC<HomeViewProps> = ({
                               </button>
                               <button
                                  onClick={() => setTranscriptionMode('polish')}
-                                 className={`flex flex-col items-center justify-center py-4 px-2 rounded-xl transition-all duration-300 ${transcriptionMode === 'polish' ? 'bg-white dark:bg-dark-card text-primary shadow-sm scale-[1.02]' : 'text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200'}`}
+                                 className={`flex flex-col items-center justify-center py-4 px-2 rounded-xl transition-all duration-300 ${transcriptionMode === 'polish' ? 'bg-white dark:bg-dark-card text-primary dark:text-accent shadow-sm border border-slate-100 dark:border-white/10 scale-[1.02]' : 'text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200'}`}
                               >
                                  <Sparkle size={24} weight={transcriptionMode === 'polish' ? "duotone" : "regular"} className="mb-2" />
                                  <span className="font-bold text-sm">Polish</span>
@@ -413,7 +413,7 @@ const HomeView: React.FC<HomeViewProps> = ({
                           onClick={handleTranscribe}
                           disabled={!isReadyToTranscribe()}
                           className={`group relative overflow-hidden rounded-[2rem] py-4 transition-all duration-500 active:scale-95 disabled:opacity-20 ${
-                            transcriptionMode === 'verbatim' ? 'bg-orange-500' : 'bg-slate-900 dark:bg-white'
+                            transcriptionMode === 'verbatim' ? 'bg-orange-500' : 'bg-slate-900 dark:bg-slate-800'
                           }`}
                         >
                           <div className={`absolute inset-0 bg-gradient-to-r ${
@@ -421,10 +421,10 @@ const HomeView: React.FC<HomeViewProps> = ({
                           } opacity-0 group-hover:opacity-100 transition-opacity duration-500`}></div>
                           
                           <div className="relative z-10 flex items-center justify-center gap-3">
-                              <span className="text-xs font-black uppercase tracking-[0.2em] text-white dark:text-slate-900 group-hover:text-white">
+                              <span className="text-xs font-black uppercase tracking-[0.2em] text-white group-hover:text-white">
                                  {transcriptionMode === 'verbatim' ? 'Start Transcription' : (isDeepThinking ? 'Start Deep Analysis' : 'Start Intelligent Mode')}
                               </span>
-                              <ArrowRight size={14} weight="bold" className="text-white dark:text-slate-900 group-hover:text-white transition-transform group-hover:translate-x-1" />
+                              <ArrowRight size={14} weight="bold" className="text-white group-hover:text-white transition-transform group-hover:translate-x-1" />
                           </div>
                         </button>
                      </div>

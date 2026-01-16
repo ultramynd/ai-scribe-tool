@@ -52,7 +52,7 @@ const FileUploader: React.FC<FileUploaderProps> = ({ onFileSelected, selectedFil
             </div>
             <h3 className="text-base sm:text-lg font-semibold text-gray-700 dark:text-dark-text mb-1">Click to upload</h3>
             <p className="text-xs sm:text-sm text-gray-500 dark:text-dark-muted">Audio (MP3, WAV) or Video (MP4, WebM)</p>
-            <p className="text-[10px] sm:text-xs text-gray-400 dark:text-dark-border mt-3 sm:mt-4">Max file size: 2GB (Files API)</p>
+            <p className="text-[10px] sm:text-xs text-gray-400 dark:text-dark-muted mt-3 sm:mt-4">Max file size: 2GB (Files API)</p>
           </div>
         </div>
       ) : (

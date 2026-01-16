@@ -636,22 +636,27 @@ const App: React.FC = () => {
     setActiveTabId(newTabId);
   };
 
+  // Zen Mode State (Tabs Visibility)
+  const [isTabsVisible, setIsTabsVisible] = useState(true);
+
   // --- Main Layout Rendering ---
 
   return (
     <div className={`flex flex-col h-screen overflow-hidden ${darkMode ? 'dark' : ''}`}>
-      {/* Top Level Tab System */}
-      <TabBar 
-        tabs={tabs} 
-        activeTabId={activeTabId} 
-        onTabSelect={setActiveTabId} 
-        onTabClose={closeTab}
-        onNewTab={() => {
-           setActiveTabId(null);
-           setIsEditorMode(false);
-           setActiveTab(null);
-        }}
-      />
+      {/* Top Level Tab System - Collapsible */}
+      <div className={`transition-all duration-300 ease-in-out overflow-hidden ${isTabsVisible ? 'max-h-20 opacity-100' : 'max-h-0 opacity-0'}`}>
+        <TabBar 
+          tabs={tabs} 
+          activeTabId={activeTabId} 
+          onTabSelect={setActiveTabId} 
+          onTabClose={closeTab}
+          onNewTab={() => {
+             setActiveTabId(null);
+             setIsEditorMode(false);
+             setActiveTab(null);
+          }}
+        />
+      </div>
 
       <div className="flex-1 overflow-y-auto relative">
         {/* Case 1: Active Loading Tab */}
@@ -667,6 +672,8 @@ const App: React.FC = () => {
         {/* Case 2: Active Completed Tab (Editor) */}
         {activeTabId && !activeTabObj?.transcription.isLoading && activeTabObj?.transcription.text !== null && (
           <EditorView 
+            isTabsVisible={isTabsVisible}
+            setIsTabsVisible={setIsTabsVisible}
             showExitConfirm={showExitConfirm}
             setShowExitConfirm={setShowExitConfirm}
             confirmExit={confirmExit}
@@ -796,5 +803,7 @@ const App: React.FC = () => {
     </div>
   );
 };
+
+// ThemeContext is now in src/contexts/ThemeContext.tsx
 
 export default App;

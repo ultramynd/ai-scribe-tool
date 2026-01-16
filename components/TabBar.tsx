@@ -1,7 +1,8 @@
 import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Plus, FileText } from '@phosphor-icons/react';
+import { X, Plus, FileText, CaretUp, CaretDown } from '@phosphor-icons/react';
 import { EditorTab } from '../types';
+
 
 interface TabBarProps {
   tabs: EditorTab[];
@@ -15,7 +16,7 @@ const TabBar: React.FC<TabBarProps> = ({ tabs, activeTabId, onTabSelect, onTabCl
   if (tabs.length === 0) return null;
 
   return (
-    <div className="w-full bg-white/40 dark:bg-dark-card/40 backdrop-blur-3xl border-b border-slate-200 dark:border-dark-border px-4 py-2 flex items-center gap-2 overflow-x-auto no-scrollbar relative z-[60]">
+    <div className="w-full bg-white/40 dark:bg-dark-bg/40 backdrop-blur-3xl border-b border-slate-200 dark:border-white/[0.05] px-4 py-2 flex items-center gap-2 overflow-x-auto no-scrollbar relative z-[60]">
       <AnimatePresence mode="popLayout">
         {tabs.map((tab) => (
           <motion.div
@@ -28,7 +29,7 @@ const TabBar: React.FC<TabBarProps> = ({ tabs, activeTabId, onTabSelect, onTabCl
             className={`
               group relative flex items-center gap-2 px-4 py-2.5 rounded-2xl text-[11px] font-black uppercase tracking-wider transition-all cursor-pointer min-w-[140px] max-w-[220px] border
               ${activeTabId === tab.id 
-                ? 'bg-white dark:bg-slate-800 border-slate-200 dark:border-primary/40 shadow-lg shadow-slate-900/[0.04] text-primary dark:text-white ring-1 ring-black/5 dark:ring-white/5' 
+                ? 'bg-white dark:bg-dark-card border-slate-200 dark:border-white/[0.04] shadow-lg shadow-slate-900/[0.04] text-primary dark:text-white ring-1 ring-black/5 dark:ring-white/[0.02]' 
                 : 'bg-transparent border-transparent text-slate-500 dark:text-slate-400 hover:bg-slate-100/50 dark:hover:bg-white/5 hover:text-slate-700 dark:hover:text-slate-200'}
             `}
           >
@@ -53,15 +54,19 @@ const TabBar: React.FC<TabBarProps> = ({ tabs, activeTabId, onTabSelect, onTabCl
           </motion.div>
         ))}
       </AnimatePresence>
+      
+      {/* New Tab Button */}
       <button 
         onClick={onNewTab}
-        className="w-10 h-10 flex items-center justify-center rounded-2xl text-slate-400 hover:bg-white dark:hover:bg-dark-card hover:text-primary dark:hover:text-accent hover:shadow-xl hover:shadow-slate-900/[0.05] transition-all shrink-0 border border-transparent hover:border-slate-100 dark:hover:border-white/5"
+        className="w-10 h-10 flex items-center justify-center rounded-2xl text-slate-400 dark:text-slate-200 hover:bg-white dark:hover:bg-dark-card hover:text-primary dark:hover:text-accent hover:shadow-xl hover:shadow-slate-900/[0.05] transition-all shrink-0 border border-transparent hover:border-slate-100 dark:hover:border-white/5"
         title="New Document"
       >
         <Plus size={18} weight="bold" />
       </button>
+
+      {/* Separator - Removed */}
+      {/* Zen Mode Toggle - Removed (Moved to Editor Header) */}
     </div>
   );
 };
-
 export default TabBar;
