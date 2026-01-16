@@ -170,8 +170,20 @@ const uploadFileToGemini = async (
     let retries = 0;
     while (retries < 60) {
       const pollUrl = `https://generativelanguage.googleapis.com/v1beta/files/${fileName}?key=${getActiveApiKey(attempt)}`;
-      const pollResp = await fetch(pollUrl);
-      const pollData = await pollResp.json();
+      const pollData = await new Promise<any>((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        xhr.open('GET', pollUrl);
+        xhr.onload = () => {
+          if (xhr.status >= 200 && xhr.status < 300) {
+            try { resolve(JSON.parse(xhr.responseText)); }
+            catch (e) { reject(new Error("Failed to parse server status.")); }
+          } else {
+            reject(new Error(`Polling failed with status: ${xhr.status}`));
+          }
+        };
+        xhr.onerror = () => reject(new Error("Network link lost during server processing..."));
+        xhr.send();
+      });
       
       if (pollData.state === 'ACTIVE') return fileUri;
       if (pollData.state === 'FAILED') throw new Error("File processing failed on server.");
