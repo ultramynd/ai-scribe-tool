@@ -187,16 +187,26 @@ const uploadFileToGemini = async (
       xhr.send(mediaFile);
     });
 
-    const fileUri = fileInfo.file.uri;
-    const fileName = fileInfo.file.name;
+    // Extract metadata robustly (API returns File object, but SDK wraps it)
+    const fileName = fileInfo.file?.name || fileInfo.name;
+    const fileUri = fileInfo.file?.uri || fileInfo.uri;
+    
+    if (!fileName) {
+      console.error("Upload response missing name:", fileInfo);
+      throw new Error("Server did not return a valid resource name.");
+    }
 
     // 3. Polling for file readiness
     onStatus?.("Server-side processing...", 50);
     let retries = 0;
-    const MAX_POLL_RETRIES = 300; // Increased to 300 attempts (~15 minutes)
+    const MAX_POLL_RETRIES = 300; // ~15 minutes
+    
+    // Ensure we don't duplicate 'files/' prefix in the path
+    const pollPath = fileName.startsWith('files/') ? fileName : `files/${fileName}`;
+    
     while (retries < MAX_POLL_RETRIES) {
       try {
-        const pollUrl = `https://generativelanguage.googleapis.com/v1beta/files/${fileName}?key=${getActiveApiKey(attempt)}`;
+        const pollUrl = `https://generativelanguage.googleapis.com/v1beta/${pollPath}?key=${getActiveApiKey(attempt)}`;
         const pollData = await new Promise<any>((resolve, reject) => {
           const xhr = new XMLHttpRequest();
           xhr.open('GET', pollUrl);
