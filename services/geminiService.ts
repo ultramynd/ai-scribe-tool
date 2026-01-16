@@ -238,7 +238,8 @@ export const transcribeAudio = async (
   const PRIMARY_MODEL = AI_MODELS.PRIMARY;
   const FALLBACK_MODEL = AI_MODELS.FAST;
 
-  const executeWithRetry = async (attempt: number = 0, currentModel: string = useSmartModel ? PRIMARY_MODEL : FALLBACK_MODEL): Promise<string> => {
+  // We define the generation logic as a separate function that DOES NOT include the upload
+  const executeGeneration = async (attempt: number = 0, currentModel: string = useSmartModel ? PRIMARY_MODEL : FALLBACK_MODEL): Promise<string> => {
     try {
       // Use fallback config thresholds
       const useFallbackKey = attempt >= FALLBACK_CONFIG.SWITCH_TO_BACKUP_KEY_ATTEMPT; 
@@ -340,7 +341,7 @@ export const transcribeAudio = async (
       if (isRateLimited) {
          onStatus?.("High demand detected. Rerouting to high-availability engine...", 70);
          await new Promise(r => setTimeout(r, 2000));
-         return executeWithRetry(attempt + 1, FALLBACK_MODEL);
+         return executeGeneration(attempt + 1, FALLBACK_MODEL);
       }
 
       // 2. Network/Server error -> Retry same model (backoff)
@@ -351,26 +352,26 @@ export const transcribeAudio = async (
          
          // If we've retried the same model too many times, switch to fast model
          if (attempt > FALLBACK_CONFIG.SWITCH_TO_FAST_MODEL_ATTEMPT) {
-             return executeWithRetry(attempt + 1, FALLBACK_MODEL);
+             return executeGeneration(attempt + 1, FALLBACK_MODEL);
          }
-         return executeWithRetry(attempt + 1, currentModel);
+         return executeGeneration(attempt + 1, currentModel);
       }
 
       // 3. Last Resort -> Switch Key + Flash (Explicit Strategy)
       if (attempt >= FALLBACK_CONFIG.SWITCH_TO_BACKUP_KEY_ATTEMPT) {
          onStatus?.("Optimizing connection path for stability...", 60);
          await new Promise(r => setTimeout(r, 2000));
-         return executeWithRetry(attempt + 1, FALLBACK_MODEL);
+         return executeGeneration(attempt + 1, FALLBACK_MODEL);
       }
       
       // Default retry
       await new Promise(r => setTimeout(r, 2000));
-      return executeWithRetry(attempt + 1, FALLBACK_MODEL);
+      return executeGeneration(attempt + 1, FALLBACK_MODEL);
     }
   };
 
   try {
-    return await executeWithRetry();
+    return await executeGeneration();
   } catch (error: any) {
     logger.error("Final Transcription Failure", error);
     

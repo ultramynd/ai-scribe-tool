@@ -194,35 +194,43 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({ onRecordingComplete, isTr
   }, []);
 
   return (
-    <div className="flex flex-col items-center w-full max-w-sm mx-auto p-1 py-10 rounded-[3rem] bg-white/40 dark:bg-dark-card/20 backdrop-blur-3xl border border-white/60 dark:border-white/5 shadow-2xl relative overflow-hidden">
+    <div className="flex flex-col items-center w-full h-full relative">
+      
+      {/* Background Ambient Glows */}
+      <div className="absolute inset-0 -z-10 overflow-hidden pointer-events-none">
+        <div className={`absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[120%] h-[120%] bg-white dark:bg-slate-900/50 transition-opacity duration-1000 ${isRecording ? 'opacity-0' : 'opacity-100'}`}></div>
+        <div className={`absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[300px] h-[300px] bg-primary/20 blur-[100px] rounded-full transition-all duration-1000 ${isRecording ? 'scale-150 opacity-60' : 'scale-100 opacity-20'}`}></div>
+        <div className={`absolute top-1/3 right-0 w-[200px] h-[200px] bg-accent/20 blur-[80px] rounded-full transition-all duration-1000 delay-300 ${isRecording ? 'scale-125 opacity-40' : 'scale-100 opacity-0'}`}></div>
+      </div>
       
       {/* Visualizer & Timer Group */}
-      <div className="relative w-full flex flex-col items-center justify-center mb-8">
+      <div className="relative w-full flex flex-col items-center justify-center mb-12 flex-1">
           <div className="relative z-10 flex flex-col items-center">
               {/* Elegant Wave Visualizer */}
-              <div className="w-48 h-20 mb-4 relative">
-                <canvas ref={canvasRef} width={200} height={100} className="w-full h-full relative z-10" />
+              <div className="w-64 h-24 mb-6 relative">
+                <canvas ref={canvasRef} width={256} height={128} className="w-full h-full relative z-10" />
                 
                 {/* Visualizer Glow Background */}
-                <div className={`absolute inset-0 bg-gradient-to-r from-primary/10 to-accent/10 blur-2xl rounded-full transition-opacity duration-1000 ${isRecording ? 'opacity-100' : 'opacity-20'}`}></div>
+                <div className={`absolute inset-0 bg-gradient-to-r from-primary/10 to-accent/10 blur-3xl rounded-full transition-opacity duration-1000 ${isRecording ? 'opacity-100' : 'opacity-40'}`}></div>
               </div>
 
               {/* High-end Timer */}
-              <div className={`text-6xl font-black tabular-nums tracking-[-0.05em] transition-all duration-500 ${isRecording ? 'text-slate-900 dark:text-white drop-shadow-[0_0_20px_rgba(113,0,150,0.2)]' : 'text-slate-300 dark:text-slate-600'}`}>
+              <div className={`text-7xl font-black tabular-nums tracking-[-0.05em] transition-all duration-500 ${isRecording ? 'text-slate-900 dark:text-white drop-shadow-[0_0_30px_rgba(113,0,150,0.15)]' : 'text-slate-300 dark:text-slate-700/50'}`}>
                 {formatTime(duration)}
               </div>
-              <div className="text-[9px] font-black uppercase tracking-[0.25em] text-primary dark:text-accent mt-3 opacity-50">
-                {isRecording ? 'Capturing Audio...' : 'Voice Interface'}
+              <div className="text-[10px] font-black uppercase tracking-[0.3em] text-primary dark:text-accent mt-4 opacity-60 flex items-center gap-2">
+                {isRecording && <span className="flex h-1.5 w-1.5 rounded-full bg-red-500 animate-pulse"></span>}
+                {isRecording ? 'Live Capturing' : 'Voice Node Ready'}
               </div>
 
               {/* Live Transcript Preview */}
               {isRecording && isLiveEnabled && (
-                <div className="mt-6 w-full px-4 animate-in fade-in slide-in-from-top-2 duration-700">
-                  <div className="bg-white/50 dark:bg-dark-card/30 backdrop-blur-md rounded-2xl p-4 border border-white/40 dark:border-white/5 min-h-[60px] max-h-[100px] overflow-y-auto">
-                    <p className="text-[10px] font-sans leading-relaxed text-slate-800 dark:text-slate-200">
+                <div className="mt-8 w-full max-w-sm px-4 animate-in fade-in slide-in-from-bottom-2 duration-700 text-center">
+                  <div className="bg-white/40 dark:bg-black/20 backdrop-blur-xl rounded-[2rem] p-5 border border-white/40 dark:border-white/5 min-h-[80px] max-h-[140px] overflow-y-auto shadow-sm">
+                    <p className="text-xs font-medium leading-relaxed text-slate-700 dark:text-slate-300/90 italic">
                       {liveTranscript}
-                      <span className="text-slate-400 dark:text-slate-400">{interimTranscript}</span>
-                      <span className="inline-block w-0.5 h-3 bg-primary dark:bg-accent ml-1 animate-pulse align-middle"></span>
+                      <span className="text-slate-400 dark:text-slate-500">{interimTranscript}</span>
+                      <span className="inline-block w-1 h-3.5 bg-primary dark:bg-accent ml-1 animate-pulse align-middle rounded-full"></span>
                     </p>
                   </div>
                 </div>
@@ -231,31 +239,31 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({ onRecordingComplete, isTr
       </div>
 
       {error && (
-        <div className="mb-6 px-4 py-2 bg-red-500/10 border border-red-500/20 text-red-500 text-[10px] font-black uppercase tracking-widest rounded-full flex items-center gap-2 animate-bounce">
-          <WarningCircle size={14} weight="duotone" /> {error}
+        <div className="mb-6 px-5 py-2.5 bg-red-500/10 border border-red-500/20 text-red-600 dark:text-red-400 text-[10px] font-black uppercase tracking-widest rounded-full flex items-center gap-2 animate-in slide-in-from-top-2 duration-300">
+          <WarningCircle size={16} weight="duotone" /> {error}
         </div>
       )}
 
       {/* Controls Container */}
-      <div className="flex items-center gap-8 relative z-10">
+      <div className="flex items-center gap-10 relative z-10 pb-6">
         {!isRecording ? (
           <button
             onClick={startRecording}
             disabled={isTranscribing}
-            className="group relative flex items-center justify-center w-20 h-20 rounded-full bg-slate-900 dark:bg-white text-white dark:text-slate-900 shadow-2xl transition-all hover:scale-105 active:scale-90 disabled:opacity-30 disabled:scale-100"
+            className="group relative flex items-center justify-center w-24 h-24 rounded-full bg-slate-900 dark:bg-white text-white dark:text-slate-900 shadow-[0_20px_50px_rgba(0,0,0,0.15)] transition-all hover:scale-105 active:scale-95 disabled:opacity-30 disabled:scale-100"
           >
-            <div className="absolute inset-0 rounded-full bg-gradient-to-tr from-primary to-accent opacity-0 group-hover:opacity-40 transition-opacity blur-xl"></div>
+            <div className="absolute inset-0 rounded-full bg-gradient-to-tr from-primary to-accent opacity-0 group-hover:opacity-40 transition-opacity blur-2xl"></div>
             <div className="relative z-10">
-                <Microphone size={28} weight="duotone" />
+                <Microphone size={32} weight="duotone" />
             </div>
           </button>
         ) : (
           <button
             onClick={stopRecording}
-            className="flex items-center justify-center w-20 h-20 rounded-full bg-red-500 text-white shadow-2xl shadow-red-500/40 transition-all hover:scale-105 active:scale-95 group"
+            className="flex items-center justify-center w-24 h-24 rounded-full bg-red-500 text-white shadow-[0_20px_50px_rgba(239,68,68,0.3)] transition-all hover:scale-105 active:scale-95 group"
           >
-            <div className="w-7 h-7 rounded-lg bg-white/20 group-hover:scale-90 transition-transform flex items-center justify-center">
-                <Stop size={20} weight="fill" />
+            <div className="w-8 h-8 rounded-xl bg-white/20 group-hover:scale-90 transition-transform flex items-center justify-center">
+                <Stop size={24} weight="fill" />
             </div>
           </button>
         )}
@@ -264,10 +272,10 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({ onRecordingComplete, isTr
           <button
             onClick={resetRecording}
             disabled={isTranscribing}
-            className="flex items-center justify-center w-12 h-12 rounded-2xl bg-white/50 dark:bg-dark-bg/50 border border-slate-200 dark:border-white/5 text-slate-400 hover:text-primary transition-all shadow-sm active:scale-95"
+            className="flex items-center justify-center w-14 h-14 rounded-2xl bg-white/60 dark:bg-white/5 border border-slate-200 dark:border-white/10 text-slate-400 hover:text-primary dark:hover:text-accent transition-all shadow-sm active:scale-95"
             title="Reset"
           >
-            <ArrowsClockwise size={18} weight="duotone" />
+            <ArrowsClockwise size={22} weight="duotone" />
           </button>
         )}
 
@@ -275,12 +283,12 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({ onRecordingComplete, isTr
         {!isRecording && duration === 0 && (
           <button
             onClick={() => setIsLiveEnabled(!isLiveEnabled)}
-            className={`flex flex-col items-center gap-2 group transition-all ${isLiveEnabled ? 'text-primary dark:text-accent' : 'text-slate-400'}`}
+            className={`flex flex-col items-center gap-2.5 group transition-all ${isLiveEnabled ? 'text-primary dark:text-accent' : 'text-slate-400'}`}
           >
-            <div className={`w-12 h-12 rounded-2xl flex items-center justify-center border transition-all ${isLiveEnabled ? 'bg-primary/10 border-primary/20 shadow-lg shadow-primary/10' : 'bg-slate-100/50 dark:bg-white/5 border-transparent opacity-60'}`}>
-              <Brain size={22} weight={isLiveEnabled ? "fill" : "duotone"} className={isLiveEnabled ? "animate-pulse" : ""} />
+            <div className={`w-14 h-14 rounded-2xl flex items-center justify-center border transition-all ${isLiveEnabled ? 'bg-primary/10 border-primary/25 shadow-lg shadow-primary/10 scale-105' : 'bg-slate-100/50 dark:bg-white/5 border-transparent opacity-60'}`}>
+              <Brain size={26} weight={isLiveEnabled ? "fill" : "duotone"} className={isLiveEnabled ? "animate-pulse" : ""} />
             </div>
-            <span className="text-[8px] font-black uppercase tracking-widest leading-none">Live AI</span>
+            <span className="text-[9px] font-black uppercase tracking-widest leading-none">Live AI</span>
           </button>
         )}
       </div>
