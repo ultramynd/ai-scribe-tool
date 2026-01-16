@@ -796,6 +796,8 @@ const App: React.FC = () => {
             isSavingToDrive={isSavingToDrive}
             driveSaved={driveSaved}
             contentType={activeTabObj?.contentType || null}
+            setShowArchiveSidebar={setShowArchiveSidebar}
+            showArchiveSidebar={showArchiveSidebar}
             getAudioUrl={() => {
                if (activeTabObj?.micUrl) return activeTabObj.micUrl;
                if (activeTabObj?.uploadedFile?.previewUrl) return activeTabObj.uploadedFile.previewUrl;
@@ -812,7 +814,6 @@ const App: React.FC = () => {
             handleGoogleLogout={handleGoogleLogout}
             isLoggingIn={isLoggingIn}
             archiveItems={archiveItems}
-            setShowArchiveSidebar={setShowArchiveSidebar}
             darkMode={darkMode}
             setDarkMode={setDarkMode}
             setActiveTab={setActiveTab}

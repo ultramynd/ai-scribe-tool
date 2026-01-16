@@ -32,16 +32,19 @@ const GoogleFilePicker: React.FC<GoogleFilePickerProps> = ({ accessToken, onSele
   const fetchFiles = useCallback(async (folderId: string = 'root', query: string = '') => {
     setLoading(true);
     try {
-      let q = `trashed = false and (mimeType contains 'audio/' or mimeType contains 'video/' or mimeType = 'application/vnd.google-apps.folder')`;
+      let q = `trashed = false and (mimeType contains 'audio/' or mimeType contains 'video/' or mimeType contains 'mpeg' or mimeType = 'application/vnd.google-apps.folder' or mimeType = 'application/octet-stream')`;
       if (folderId !== 'root' || folderStack.length > 0) {
         q = `'${folderId}' in parents and ${q}`;
+      } else {
+        q = `'root' in parents and ${q}`;
       }
+      
       if (query) {
-        q = `name contains '${query}' and ${q}`;
+        q = `name contains '${query}' and trashed = false and (mimeType contains 'audio/' or mimeType contains 'video/' or mimeType = 'application/vnd.google-apps.folder')`;
       }
 
       const response = await fetch(
-        `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(q)}&fields=files(id,name,mimeType,modifiedTime,size,iconLink,thumbnailLink)&pageSize=50&orderBy=folder,name`,
+        `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(q)}&fields=files(id,name,mimeType,modifiedTime,size,iconLink,thumbnailLink)&pageSize=100&orderBy=folder,name`,
         {
           headers: { Authorization: `Bearer ${accessToken}` }
         }

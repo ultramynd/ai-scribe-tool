@@ -42,6 +42,7 @@ interface EditorViewProps {
   isLoggingIn: boolean;
   archiveItems: ArchiveItem[];
   setShowArchiveSidebar: (val: boolean) => void;
+  showArchiveSidebar: boolean;
   darkMode: boolean;
   setDarkMode: (val: boolean) => void;
   setActiveTab: (tab: AudioSource | null) => void;
@@ -68,7 +69,7 @@ const EditorView: React.FC<EditorViewProps> = ({
   handleExportDocx, handleExportTxt, handleExportSrt,
   googleAccessToken, googleClientId, driveScriptsLoaded,
   handleGoogleLogin, handleGoogleLogout, isLoggingIn,
-  archiveItems, setShowArchiveSidebar,
+  archiveItems, setShowArchiveSidebar, showArchiveSidebar,
   darkMode, setDarkMode, setActiveTab,
   handleBackgroundTranscribe, setPickerCallback,
   setIsPickerOpen, isPickerOpen, handlePickDriveFile,
@@ -174,7 +175,7 @@ const EditorView: React.FC<EditorViewProps> = ({
                     <CaretDown size={10} weight="bold" className="ml-0.5 opacity-50 group-hover/new:rotate-180 transition-transform" />
                   </button>
                   {/* Dropdown Content for New (Start Over) */}
-                  <div className="absolute top-full left-0 mt-2 opacity-0 group-hover/new:opacity-100 pointer-events-none group-hover/new:pointer-events-auto transition-all duration-200 scale-95 group-hover/new:scale-100 origin-top-left z-50">
+                  <div className="absolute top-full left-0 pt-2 opacity-0 group-hover/new:opacity-100 pointer-events-none group-hover/new:pointer-events-auto transition-all duration-200 scale-95 group-hover/new:scale-100 origin-top-left z-50">
                       <div className="bg-white dark:bg-[#0a0a0a] rounded-2xl shadow-xl border border-slate-100 dark:border-white/10 p-2 min-w-[240px] flex flex-col gap-1">
                           <div className="px-2.5 py-1.5 text-[9px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest border-b border-slate-100 dark:border-white/5 mb-1">Start New Session</div>
                           
@@ -250,7 +251,7 @@ const EditorView: React.FC<EditorViewProps> = ({
                   </button>
                   
                   {/* Dropdown Content */}
-                  <div className="absolute top-full left-0 mt-2 opacity-0 group-hover/add:opacity-100 pointer-events-none group-hover/add:pointer-events-auto transition-all duration-200 scale-95 group-hover/add:scale-100 origin-top-left z-50">
+                  <div className="absolute top-full left-0 pt-2 opacity-0 group-hover/add:opacity-100 pointer-events-none group-hover/add:pointer-events-auto transition-all duration-200 scale-95 group-hover/add:scale-100 origin-top-left z-50">
                       <div className="bg-white dark:bg-[#0a0a0a] rounded-2xl shadow-xl border border-slate-100 dark:border-white/10 p-2 min-w-[220px] flex flex-col gap-1">
                           <div className="px-2.5 py-1.5 text-[9px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest border-b border-slate-100 dark:border-white/5 mb-1">Add to Document</div>
                           
@@ -309,7 +310,7 @@ const EditorView: React.FC<EditorViewProps> = ({
                      <span className="text-[10px] font-bold uppercase tracking-widest">Save & Export</span>
                      <CaretDown size={10} weight="bold" className="ml-0.5 opacity-50 group-hover/export:rotate-180 transition-transform" />
                    </button>
-                   <div className="absolute top-full right-0 text-left mt-2 opacity-0 group-hover/export:opacity-100 pointer-events-none group-hover/export:pointer-events-auto transition-all duration-200 scale-95 group-hover/export:scale-100 origin-top-right z-50">
+                   <div className="absolute top-full right-0 text-left pt-2 opacity-0 group-hover/export:opacity-100 pointer-events-none group-hover/export:pointer-events-auto transition-all duration-200 scale-95 group-hover/export:scale-100 origin-top-right z-50">
                        <div className="bg-white dark:bg-dark-card rounded-2xl shadow-xl border border-slate-100 dark:border-dark-border p-3 min-w-[240px] flex flex-col gap-3">
                            
                            {/* 1. Save to Google Drive */}
@@ -428,9 +429,25 @@ const EditorView: React.FC<EditorViewProps> = ({
                       : 'bg-slate-100 dark:bg-dark-card border-slate-200 dark:border-white/5 text-slate-600 dark:text-slate-300 hover:bg-white dark:hover:bg-white/5 hover:shadow-md'}`}
                   >
                     <Sparkle size={16} weight="duotone" className={showAiSidebar ? "text-primary dark:text-accent" : "text-slate-500 dark:text-slate-400"}/>
-                    <span className="text-[11px] font-bold uppercase tracking-wider">Smart Editor</span>
-                  </button>
-            </div>
+                     <span className="text-[11px] font-bold uppercase tracking-wider">Smart Editor</span>
+                   </button>
+ 
+                   {/* Sessions Button */}
+                   <button 
+                     onClick={() => setShowArchiveSidebar(!showArchiveSidebar)}
+                     className={`flex items-center gap-2 px-3.5 py-2 rounded-xl border transition-all ${showArchiveSidebar 
+                       ? 'bg-primary/5 border-primary/20 text-primary dark:text-accent' 
+                       : 'bg-slate-100 dark:bg-dark-card border-slate-200 dark:border-white/5 text-slate-600 dark:text-slate-300 hover:bg-white dark:hover:bg-white/5 hover:shadow-md'}`}
+                   >
+                     <Clock size={16} weight="duotone" className={showArchiveSidebar ? "text-primary dark:text-accent" : "text-slate-500 dark:text-slate-400"}/>
+                     <div className="flex items-center gap-1.5">
+                        <span className="text-[11px] font-bold uppercase tracking-wider">Sessions</span>
+                        {archiveItems.length > 0 && (
+                            <div className={`w-1.5 h-1.5 rounded-full ${showArchiveSidebar ? 'bg-primary dark:bg-accent' : 'bg-primary'} animate-pulse`}></div>
+                        )}
+                     </div>
+                   </button>
+             </div>
 
             {/* Right Group: Mode Switcher & User Menu */}
             <div className="hidden sm:flex items-center gap-4">
@@ -463,27 +480,9 @@ const EditorView: React.FC<EditorViewProps> = ({
                   </button>
                   
                   {/* User Menu Dropdown */}
-                  <div className="absolute top-full right-0 mt-2 opacity-0 group-hover/user:opacity-100 pointer-events-none group-hover/user:pointer-events-auto transition-all duration-200 scale-95 group-hover/user:scale-100 origin-top-right z-50">
+                  <div className="absolute top-full right-0 pt-2 opacity-0 group-hover/user:opacity-100 pointer-events-none group-hover/user:pointer-events-auto transition-all duration-200 scale-95 group-hover/user:scale-100 origin-top-right z-50">
                     <div className="bg-white dark:bg-dark-card rounded-2xl shadow-xl border border-slate-100 dark:border-dark-border p-2 min-w-[220px]">
                       
-                      <div className="px-2.5 py-1.5 text-[9px] font-black text-slate-400 dark:text-dark-muted uppercase tracking-widest">History & Tools</div>
-                      
-                      <button 
-                        onClick={() => setShowArchiveSidebar(true)}
-                        className="w-full flex items-center gap-3 px-3 py-2 text-left text-[11px] font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-white/5 rounded-xl transition-all group"
-                      >
-                        <div className="w-7 h-7 rounded-lg bg-slate-100 dark:bg-dark-border flex items-center justify-center group-hover:scale-110 transition-transform">
-                          <Clock size={14} weight="duotone" className="text-slate-500" />
-                        </div>
-                        <div className="flex items-center gap-2 flex-1">
-                          <span>Sessions</span>
-                          {archiveItems.length > 0 && (
-                            <div className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse"></div>
-                          )}
-                        </div>
-                      </button>
-
-                      <div className="h-px bg-slate-100 dark:bg-dark-border my-2 mx-2"></div>
                       <div className="px-2.5 py-1.5 text-[9px] font-black text-slate-400 dark:text-dark-muted uppercase tracking-widest">Account & Settings</div>
 
                       {driveScriptsLoaded && (
@@ -532,7 +531,7 @@ const EditorView: React.FC<EditorViewProps> = ({
                 <button className="w-9 h-9 rounded-xl flex items-center justify-center text-slate-500 hover:bg-slate-100 dark:hover:bg-dark-card transition-all">
                   <List size={18} weight="bold" />
                 </button>
-                <div className="absolute top-full right-0 mt-2 opacity-0 group-hover:opacity-100 pointer-events-none group-hover:pointer-events-auto transition-all duration-200 scale-95 group-hover:scale-100 origin-top-right z-50">
+                <div className="absolute top-full right-0 pt-2 opacity-0 group-hover:opacity-100 pointer-events-none group-hover:pointer-events-auto transition-all duration-200 scale-95 group-hover:scale-100 origin-top-right z-50">
                   <div className="bg-white dark:bg-dark-card rounded-2xl shadow-xl border border-slate-100 dark:border-dark-border p-1.5 min-w-[160px]">
                     <button 
                       onClick={() => onNewSession(null as any)} // Will effectively reset

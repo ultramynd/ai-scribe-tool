@@ -29,107 +29,153 @@ const getMimeTypeFromExtension = (filename: string): string | null => {
   return ext ? MIME_TYPE_MAP[ext] || null : null;
 };
 
+/**
+ * Returns the appropriate API key based on the attempt count.
+ */
+const getActiveApiKey = (attempt: number): string => {
+  const primaryKey = import.meta.env.VITE_GEMINI_API_KEY;
+  const fallbackKey = import.meta.env.VITE_GEMINI_API_KEY_FALLBACK;
+  
+  // Switch to backup key if we've reached the threshold defined in config
+  if (attempt >= FALLBACK_CONFIG.SWITCH_TO_BACKUP_KEY_ATTEMPT && fallbackKey) {
+    return fallbackKey;
+  }
+  return primaryKey;
+};
+
+/**
+ * Generic wrapper for Gemini AI Generation requests with retry and fallback support.
+ */
+async function executeGaiRequest<T>(
+  action: (ai: GoogleGenAI, model: string) => Promise<T>,
+  model: string,
+  onStatus?: StatusCallback,
+  attempt: number = 0
+): Promise<T> {
+  const apiKey = getActiveApiKey(attempt);
+  const ai = new GoogleGenAI({ apiKey });
+  
+  try {
+    return await action(ai, model);
+  } catch (error: any) {
+    logger.error(`AI Request Attempt ${attempt + 1} Failed`, { model, error: error.message });
+    
+    const msg = error.message?.toLowerCase() || "";
+    const isRateLimited = msg.includes('429') || msg.includes('quota');
+    const isServerErr = msg.includes('500') || msg.includes('503');
+    
+    if (attempt < FALLBACK_CONFIG.MAX_RETRIES && (isRateLimited || isServerErr)) {
+      const isLastDitch = attempt + 1 >= FALLBACK_CONFIG.SWITCH_TO_BACKUP_KEY_ATTEMPT;
+      if (onStatus) {
+        if (isRateLimited) onStatus(isLastDitch ? "Switching to backup engine..." : "Rate limit reached, retrying...");
+        else onStatus("Connection lost, reconnecting...");
+      }
+      
+      const delay = Math.pow(2, attempt) * 1000; // Exponential backoff
+      await new Promise(r => setTimeout(r, delay));
+      return executeGaiRequest(action, model, onStatus, attempt + 1);
+    }
+    throw error;
+  }
+}
+
 export type StatusCallback = (message: string, progress?: number) => void;
 
 /**
- * Helper to upload large files to Gemini API
+ * Helper to upload large files to Gemini API with XHR for better stability and progress tracking.
  */
 const uploadFileToGemini = async (
   mediaFile: File | Blob, 
   mimeType: string, 
-  onStatus?: StatusCallback
+  onStatus?: StatusCallback,
+  attempt: number = 0
 ): Promise<string> => {
-  onStatus?.(`Initializing resumable upload for ${Math.round(mediaFile.size / 1024 / 1024)}MB file...`, 5);
-  const uploadUrl = `https://generativelanguage.googleapis.com/upload/v1beta/files?key=${import.meta.env.VITE_GEMINI_API_KEY}`;
+  const apiKey = getActiveApiKey(attempt);
+  const uploadUrl = `https://generativelanguage.googleapis.com/upload/v1beta/files?key=${apiKey}`;
   const displayName = mediaFile instanceof File ? mediaFile.name : 'uploaded_media';
   
+  onStatus?.(`${attempt > 0 ? 'Retrying' : 'Initializing'} resumable upload (${Math.round(mediaFile.size / 1024 / 1024)}MB)...`, 5);
+
   try {
+    // 1. Initial request to get the resumable session URL
     const initialResponse = await fetch(uploadUrl, {
-        method: 'POST',
-        headers: {
+      method: 'POST',
+      headers: {
         'X-Goog-Upload-Protocol': 'resumable',
         'X-Goog-Upload-Command': 'start',
         'X-Goog-Upload-Header-Content-Length': mediaFile.size.toString(),
         'X-Goog-Upload-Header-Content-Type': mimeType,
         'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ 
-            file: { 
-                display_name: displayName,
-                mime_type: mimeType 
-            } 
-        })
+      },
+      body: JSON.stringify({ file: { display_name: displayName, mime_type: mimeType } })
     });
 
     if (!initialResponse.ok) {
-        const errText = await initialResponse.text();
-        throw new Error(`Failed to initiate upload: ${initialResponse.status} ${errText}`);
+      if (initialResponse.status === 429 && attempt < 1 && import.meta.env.VITE_GEMINI_API_KEY_FALLBACK) {
+        return uploadFileToGemini(mediaFile, mimeType, onStatus, attempt + 1);
+      }
+      const errText = await initialResponse.text();
+      throw new Error(`Upload Init Failed: ${initialResponse.status} ${errText}`);
     }
 
-    const uploadUrlHeader = initialResponse.headers.get('x-goog-upload-url');
-    if (!uploadUrlHeader) throw new Error("Failed to get upload URL");
+    const sessionUrl = initialResponse.headers.get('x-goog-upload-url');
+    if (!sessionUrl) throw new Error("Failed to get upload session URL");
 
-    onStatus?.("Capturing upload slot (Protocol: Resumable)...", 10);
-    const uploadBlob = new Blob([mediaFile], { type: mimeType });
-
-    // Use XHR for upload progress tracking
+    // 2. Perform the actual upload using XHR for better progress and reliability
     const fileInfo = await new Promise<any>((resolve, reject) => {
-        const xhr = new XMLHttpRequest();
-        xhr.open('POST', uploadUrlHeader);
-        xhr.setRequestHeader('Content-Length', mediaFile.size.toString());
-        xhr.setRequestHeader('X-Goog-Upload-Offset', '0');
-        xhr.setRequestHeader('X-Goog-Upload-Command', 'upload, finalize');
+      const xhr = new XMLHttpRequest();
+      xhr.open('POST', sessionUrl);
+      xhr.setRequestHeader('X-Goog-Upload-Offset', '0');
+      xhr.setRequestHeader('X-Goog-Upload-Command', 'upload, finalize');
+      
+      xhr.upload.onprogress = (event) => {
+        if (event.lengthComputable) {
+          const percent = Math.round((event.loaded / event.total) * 100);
+          const progress = 10 + Math.round((event.loaded / event.total) * 40);
+          onStatus?.(`Uploading media: ${percent}%`, progress);
+        }
+      };
 
-        xhr.upload.onprogress = (event) => {
-            if (event.lengthComputable) {
-                const percentComplete = (event.loaded / event.total);
-                // Map upload to 10-50% range
-                const mappedProgress = 10 + Math.round(percentComplete * 40);
-                onStatus?.(`Uploading media: ${Math.round(percentComplete * 100)}%`, mappedProgress);
-            }
-        };
+      xhr.onload = () => {
+        if (xhr.status >= 200 && xhr.status < 300) {
+          try {
+            resolve(JSON.parse(xhr.responseText));
+          } catch (e) {
+            reject(new Error("Failed to parse server response after upload."));
+          }
+        } else {
+          reject(new Error(`Upload failed with status: ${xhr.status} ${xhr.responseText}`));
+        }
+      };
 
-        xhr.onload = () => {
-            if (xhr.status >= 200 && xhr.status < 300) {
-                try {
-                    resolve(JSON.parse(xhr.responseText));
-                } catch (e) {
-                    reject(new Error("Failed to parse upload response"));
-                }
-            } else {
-                reject(new Error(`Upload failed with status: ${xhr.status}`));
-            }
-        };
-
-        xhr.onerror = () => {
-            onStatus?.("Upload failed: Network error", 0);
-            reject(new Error("Network error during upload"));
-        };
-        xhr.send(uploadBlob);
+      xhr.onerror = () => reject(new Error("Network error during upload (XHR)."));
+      xhr.send(mediaFile);
     });
 
     const fileUri = fileInfo.file.uri;
-    const fileState = fileInfo.file.state;
+    const fileName = fileInfo.file.name;
 
-    if (fileState === 'PROCESSING') {
-        onStatus?.("Server-side processing (AIAudioEngine)...", 20);
-        let currentState = fileState;
-        let retries = 0;
-        while (currentState === 'PROCESSING' && retries < 60) { // Increased timeout for larger files
-            await new Promise(r => setTimeout(r, 2000));
-            onStatus?.(`Analyzing deep features (${retries + 1}/60)...`, 20 + (retries * 1));
-            const pollUrl = `https://generativelanguage.googleapis.com/v1beta/files/${fileInfo.file.name}?key=${import.meta.env.VITE_GEMINI_API_KEY}`;
-            const pollResp = await fetch(pollUrl);
-            const pollData = await pollResp.json();
-            currentState = pollData.state;
-            retries++;
-        }
-        if (currentState === 'FAILED') throw new Error("File processing failed on server side.");
+    // 3. Polling for file readiness
+    onStatus?.("Server-side processing...", 50);
+    let retries = 0;
+    while (retries < 60) {
+      const pollUrl = `https://generativelanguage.googleapis.com/v1beta/files/${fileName}?key=${getActiveApiKey(attempt)}`;
+      const pollResp = await fetch(pollUrl);
+      const pollData = await pollResp.json();
+      
+      if (pollData.state === 'ACTIVE') return fileUri;
+      if (pollData.state === 'FAILED') throw new Error("File processing failed on server.");
+      
+      await new Promise(r => setTimeout(r, 2000));
+      retries++;
+      onStatus?.(`Analyzing deep features...`, 50 + retries);
     }
-    
-    return fileUri;
+    throw new Error("Polling timeout: File took too long to process on server.");
   } catch (error: any) {
-    logger.error("Upload Error", error);
+    logger.error("Upload process failed", error);
+    if ((error.message.includes('429') || error.message.includes('fetch')) && attempt < 1) {
+      return uploadFileToGemini(mediaFile, mimeType, onStatus, attempt + 1);
+    }
     throw error;
   }
 };
@@ -158,7 +204,7 @@ export const transcribeAudio = async (
   }
 
   let contentPart: any;
-  const MAX_INLINE_SIZE = 10 * 1024 * 1024; // 10MB Limit for Inline
+  const MAX_INLINE_SIZE = 20 * 1024 * 1024; // 20MB Limit for Inline (Boosted for speed)
 
   try {
     if (mediaFile.size < MAX_INLINE_SIZE) {
@@ -257,31 +303,25 @@ export const transcribeAudio = async (
          onStatus?.(msgs[Math.floor(Math.random() * msgs.length)]);
       }, 3000);
 
-      try {
-        const response = await ai.models.generateContent({
-            model: modelName,
-            contents: {
-              parts: [
-                  contentPart, // Re-use the already uploaded content
-                  { text: autoEdit ? autoEditPrompt : rawPrompt }
-              ]
-            }
+      const response = await executeGaiRequest(async (genAi, model) => {
+        return await genAi.models.generateContent({
+          model: model,
+          contents: {
+            parts: [
+              contentPart,
+              { text: autoEdit ? autoEditPrompt : rawPrompt }
+            ]
+          }
         });
-        
-        clearInterval(fakeProgressTimer);
+      }, modelName, onStatus, attempt);
+      
+      clearInterval(fakeProgressTimer);
 
-        if (response.text) {
-            onStatus?.("Validating output...", 98);
-            await new Promise(r => setTimeout(r, 500));
-            onStatus?.("Transcription complete.", 100);
-            return response.text;
-        } else {
-            throw new Error("No transcription generated (Empty response).");
-        }
-      } catch (e) {
-        clearInterval(fakeProgressTimer);
-        throw e;
+      if (response.text) {
+          onStatus?.("Transcription complete.", 100);
+          return response.text;
       }
+      throw new Error("No transcription generated (Empty response).");
     } catch (error: any) {
       logger.error(`Transcription Attempt ${attempt + 1} Failed`, { model: currentModel, error: error.message });
       
@@ -342,6 +382,7 @@ export const transcribeAudio = async (
     else if (msg.includes('network') || msg.includes('fetch')) userMessage = "Network Connection Error. Please check your internet.";
     else if (msg.includes('safety') || msg.includes('blocked')) userMessage = "Content Blocked by AI Safety Filters.";
     else if (msg.includes('media upload failed')) userMessage = error.message; // Pass through upload errors
+    else userMessage = `Transcription Failed: ${error.message}`; // Fallback: Show actual error
     
     throw new Error(userMessage);
   }
@@ -351,13 +392,14 @@ export const transcribeAudio = async (
  * Classifies the content type based on the text.
  */
 export const classifyContent = async (text: string): Promise<string> => {
-  const ai = new GoogleGenAI({ apiKey: import.meta.env.VITE_GEMINI_API_KEY });
   const model = AI_MODELS.FAST; 
   const sample = text.substring(0, 2000);
   const prompt = `Classify this text into one category: Song, Podcast, Interview, Meeting, Lecture, Video, Voice Note, News. Return ONLY the category name.\n\nText:\n${sample}`;
 
   try {
-    const response = await ai.models.generateContent({ model, contents: prompt });
+    const response = await executeGaiRequest(async (ai, m) => {
+      return await ai.models.generateContent({ model: m, contents: prompt });
+    }, model);
     return String(response.text || "").trim() || "Unknown";
   } catch (e) {
     logger.warn("Classification failed", e);
@@ -390,7 +432,9 @@ export const summarizeText = async (text: string, useSmartModel: boolean = false
     ${text}
   `;
   try {
-    const response = await ai.models.generateContent({ model, contents: prompt });
+    const response = await executeGaiRequest(async (ai, m) => {
+      return await ai.models.generateContent({ model: m, contents: prompt });
+    }, model);
     return String(response.text || "Could not generate summary.");
   } catch (e) {
     logger.error("Summarization error", e);
@@ -428,7 +472,9 @@ export const enhanceFormatting = async (text: string, contextType: string = "Gen
   `;
   
   try {
-    const response = await ai.models.generateContent({ model, contents: prompt });
+    const response = await executeGaiRequest(async (ai, m) => {
+      return await ai.models.generateContent({ model: m, contents: prompt });
+    }, model);
     return String(response.text || text);
   } catch (e) {
     logger.error("Enhance Formatting error", e);
@@ -454,7 +500,9 @@ export const extractKeyMoments = async (text: string, useSmartModel: boolean = f
   `;
   
   try {
-    const response = await ai.models.generateContent({ model, contents: prompt });
+    const response = await executeGaiRequest(async (ai, m) => {
+      return await ai.models.generateContent({ model: m, contents: prompt });
+    }, model);
     return String(response.text || "No key moments identified.");
   } catch (e) {
     logger.error("Key Moments error", e);
@@ -482,7 +530,9 @@ export const findDiscussionBounds = async (text: string, useSmartModel: boolean 
    `;
    
    try {
-     const response = await ai.models.generateContent({ model, contents: prompt });
+     const response = await executeGaiRequest(async (ai, m) => {
+       return await ai.models.generateContent({ model: m, contents: prompt });
+     }, model);
      return String(response.text || "Could not identify discussion bounds.");
    } catch (e) {
      logger.error("Discussion Bounds error", e);
@@ -508,7 +558,9 @@ export const findDiscussionBounds = async (text: string, useSmartModel: boolean 
    `;
    
    try {
-     const response = await ai.models.generateContent({ model, contents: prompt });
+     const response = await executeGaiRequest(async (ai, m) => {
+       return await ai.models.generateContent({ model: m, contents: prompt });
+     }, model);
      return String(response.text || text);
    } catch (e) {
      logger.error("Strip Pleasantries error", e);
@@ -538,20 +590,22 @@ export const findDiscussionBounds = async (text: string, useSmartModel: boolean 
    `;
    
    try {
-     const response = await ai.models.generateContent({
-       model: model,
-       contents: {
-         parts: [{ text: prompt }, { text: text }]
-       }
-     });
-     
-     const output = String(response.text || text).trim();
-     return output.replace(/^```markdown\n/, '').replace(/^```\n/, '').replace(/\n```$/, '');
-   } catch (e) {
-     logger.error("Refine Speakers error", e);
-     return text;
-   }
- };
+    const response = await executeGaiRequest(async (ai, m) => {
+      return await ai.models.generateContent({
+        model: m,
+        contents: {
+          parts: [{ text: prompt }, { text: text }]
+        }
+      });
+    }, model);
+    
+    const output = String(response.text || text).trim();
+    return output.replace(/^```markdown\n/, '').replace(/^```\n/, '').replace(/\n```$/, '');
+  } catch (e) {
+    logger.error("Refine Speakers error", e);
+    return text;
+  }
+};
 
  /**
   * Analyzes video visual content for key info
@@ -591,10 +645,12 @@ export const findDiscussionBounds = async (text: string, useSmartModel: boolean 
         4. **Context**: Infer context (e.g. formal meeting, vlog, tutorial).
       `;
   
-      const response = await ai.models.generateContent({
-        model,
-        contents: { parts: [contentPart, { text: prompt }] },
-      });
+      const response = await executeGaiRequest(async (ai, m) => {
+        return await ai.models.generateContent({
+          model: m,
+          contents: { parts: [contentPart, { text: prompt }] },
+        });
+      }, model);
   
       return String(response.text || "No analysis could be generated.");
     } catch (error: any) {
