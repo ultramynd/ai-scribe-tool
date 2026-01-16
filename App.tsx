@@ -10,6 +10,7 @@ import LoadingView from './src/views/LoadingView';
 import HomeView from './src/views/HomeView';
 import EditorView from './src/views/EditorView';
 import TabBar from './components/TabBar';
+import { generateDocx, generateTxt, generateSrt } from './utils/exportUtils';
 
 
 

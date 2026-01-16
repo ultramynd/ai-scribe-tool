@@ -1,6 +1,7 @@
 import { GoogleGenAI } from "@google/genai";
 import { blobToBase64 } from "../utils/audioUtils";
 import { logger } from "../utils/logger";
+import { AI_MODELS, FALLBACK_CONFIG } from "../src/config/aiModels";
 
 // Explicit MIME type mapping to ensure API compatibility
 const MIME_TYPE_MAP: Record<string, string> = {
@@ -146,14 +147,14 @@ export const transcribeAudio = async (
 ): Promise<string> => {
   onStatus?.("Preparing Media for AI Engine...", 2);
   
-  // Model Configuration - Adjusted to stable models
-  // Models: 'gemini-1.5-pro-latest' (High Quality) vs 'gemini-1.5-flash-latest' (Fast)
-  const PRIMARY_MODEL = "gemini-1.5-pro-latest";
-  const FALLBACK_MODEL = "gemini-1.5-flash-latest";
+  // Model Configuration from Central Config
+  const PRIMARY_MODEL = AI_MODELS.PRIMARY;
+  const FALLBACK_MODEL = AI_MODELS.FAST;
 
   const executeWithRetry = async (attempt: number = 0, currentModel: string = useSmartModel ? PRIMARY_MODEL : FALLBACK_MODEL): Promise<string> => {
     try {
-      const useFallbackKey = attempt >= 2; // Switch key after 2 failures
+      // Use fallback config thresholds
+      const useFallbackKey = attempt >= FALLBACK_CONFIG.SWITCH_TO_BACKUP_KEY_ATTEMPT; 
       const primaryKey = import.meta.env.VITE_GEMINI_API_KEY;
       const fallbackKey = import.meta.env.VITE_GEMINI_API_KEY_FALLBACK;
       
@@ -164,7 +165,9 @@ export const transcribeAudio = async (
       }
       
       const ai = new GoogleGenAI({ apiKey: activeApiKey });
-      onStatus?.(`Engine initialized: ${currentModel.includes('pro') ? 'Gemini 1.5 Pro' : 'Gemini 1.5 Flash'} ${useFallbackKey ? '(Backup Key)' : '(Primary)'}`, 8);
+      const modelName = currentModel;
+      
+      onStatus?.(`Engine initialized: ${modelName} ${useFallbackKey ? '(Backup Key)' : '(Primary)'}`, 8);
   
       let finalMimeType = mimeType;
       if (mediaFile instanceof File && mediaFile.name) {
@@ -237,7 +240,7 @@ export const transcribeAudio = async (
         };
       }
 
-      onStatus?.(`Generating transcription with ${currentModel}...`, 60);
+      onStatus?.(`Generating transcription with ${modelName}...`, 60);
 
       const fakeProgressTimer = setInterval(() => {
          const msgs = ["Decoding audio structure...", "Aligning timestamps...", "Transcribing speech segments...", "Verifying speaker identity..."];
@@ -246,7 +249,7 @@ export const transcribeAudio = async (
 
       try {
         const response = await ai.models.generateContent({
-            model: currentModel,
+            model: modelName,
             contents: {
               parts: [
                   contentPart,
@@ -277,31 +280,42 @@ export const transcribeAudio = async (
       const isNetwork = errorMsg.includes('network') || errorMsg.includes('fetch');
       const isServer = errorMsg.includes('503') || errorMsg.includes('500');
 
+      const maxRetries = FALLBACK_CONFIG.MAX_RETRIES + 2; // Allow a few extra steps for fallback strategies
+
+      if (attempt >= maxRetries) throw error;
+
       // FALLBACK STRATEGY
 
-      // 1. If Rate Limited on Pro -> Switch to Flash (High Cap)
-      if (isRateLimited && currentModel.includes('pro')) {
-         onStatus?.("⚠️ Pro Rate Limit Hit. Switching to High-Speed Flash Model...", 70);
+      // 1. High Demand / Rate Limit -> Switch to High-Availability Model (Fast)
+      if (isRateLimited) {
+         onStatus?.("High demand detected. Rerouting to high-availability engine...", 70);
          await new Promise(r => setTimeout(r, 2000));
          return executeWithRetry(attempt + 1, FALLBACK_MODEL);
       }
 
-      // 2. If Network/Server error -> Retry same model (backoff)
-      if ((isNetwork || isServer) && attempt < 4) {
-         const delay = (attempt + 1) * 3000;
-         onStatus?.(`⚠️ Network/Server Glitch. Retrying in ${delay/1000}s...`, 60);
+      // 2. Network/Server error -> Retry same model (backoff)
+      if ((isNetwork || isServer)) {
+         const delay = (attempt + 1) * FALLBACK_CONFIG.RETRY_DELAY_MS;
+         onStatus?.(`Re-establishing secure connection (Attempt ${attempt + 1})...`, 60);
          await new Promise(r => setTimeout(r, delay));
+         
+         // If we've retried the same model too many times, switch to fast model
+         if (attempt > FALLBACK_CONFIG.SWITCH_TO_FAST_MODEL_ATTEMPT) {
+             return executeWithRetry(attempt + 1, FALLBACK_MODEL);
+         }
          return executeWithRetry(attempt + 1, currentModel);
       }
 
-      // 3. Last Resort -> Switch Key + Flash
-      if (attempt < 5) {
-         onStatus?.("⚠️ Persistent Error. Trying alternative route...", 60);
+      // 3. Last Resort -> Switch Key + Flash (Explicit Strategy)
+      if (attempt >= FALLBACK_CONFIG.SWITCH_TO_BACKUP_KEY_ATTEMPT) {
+         onStatus?.("Optimizing connection path for stability...", 60);
          await new Promise(r => setTimeout(r, 2000));
          return executeWithRetry(attempt + 1, FALLBACK_MODEL);
       }
       
-      throw error;
+      // Default retry
+      await new Promise(r => setTimeout(r, 2000));
+      return executeWithRetry(attempt + 1, FALLBACK_MODEL);
     }
   };
 
@@ -327,7 +341,7 @@ export const transcribeAudio = async (
  */
 export const classifyContent = async (text: string): Promise<string> => {
   const ai = new GoogleGenAI({ apiKey: import.meta.env.VITE_GEMINI_API_KEY });
-  const model = "gemini-1.5-flash-latest"; // Safe stable model
+  const model = AI_MODELS.FAST; 
   const sample = text.substring(0, 2000);
   const prompt = `Classify this text into one category: Song, Podcast, Interview, Meeting, Lecture, Video, Voice Note, News. Return ONLY the category name.\n\nText:\n${sample}`;
 
@@ -342,7 +356,7 @@ export const classifyContent = async (text: string): Promise<string> => {
 
 export const summarizeText = async (text: string, useSmartModel: boolean = false): Promise<string> => {
   const ai = new GoogleGenAI({ apiKey: import.meta.env.VITE_GEMINI_API_KEY });
-  const model = useSmartModel ? "gemini-1.5-pro-latest" : "gemini-1.5-flash-latest"; 
+  const model = useSmartModel ? AI_MODELS.PRIMARY : AI_MODELS.FAST; 
   const prompt = `
     You are ScribeAI Intelligence, a premium transcription analysis engine. Provide a deep, structured analysis of the provided transcript.
     
@@ -375,7 +389,7 @@ export const summarizeText = async (text: string, useSmartModel: boolean = false
 
 export const enhanceFormatting = async (text: string, contextType: string = "General", useSmartModel: boolean = false): Promise<string> => {
   const ai = new GoogleGenAI({ apiKey: import.meta.env.VITE_GEMINI_API_KEY });
-  const model = useSmartModel ? "gemini-1.5-pro-latest" : "gemini-1.5-flash-latest";
+  const model = useSmartModel ? AI_MODELS.PRIMARY : AI_MODELS.FAST;
   
   const prompt = `
     You are ScribeAI Smart Editor. Your task is to transform a raw transcript into a polished, professional document while preserving the original meaning and nuances.
@@ -413,7 +427,7 @@ export const enhanceFormatting = async (text: string, contextType: string = "Gen
 
 export const extractKeyMoments = async (text: string, useSmartModel: boolean = false): Promise<string> => {
   const ai = new GoogleGenAI({ apiKey: import.meta.env.VITE_GEMINI_API_KEY });
-  const model = useSmartModel ? "gemini-1.5-pro-latest" : "gemini-1.5-flash-latest";
+  const model = useSmartModel ? AI_MODELS.PRIMARY : AI_MODELS.FAST;
   
   const prompt = `
     Analyze this transcript and extract the most important "Key Moments". 
@@ -442,7 +456,7 @@ export const extractKeyMoments = async (text: string, useSmartModel: boolean = f
  */
 export const findDiscussionBounds = async (text: string, useSmartModel: boolean = false): Promise<string> => {
    const ai = new GoogleGenAI({ apiKey: import.meta.env.VITE_GEMINI_API_KEY });
-   const model = useSmartModel ? "gemini-1.5-pro-latest" : "gemini-1.5-flash-latest";
+   const model = useSmartModel ? AI_MODELS.PRIMARY : AI_MODELS.FAST;
    
    const prompt = `
      Look at this transcript and identify exactly where the main discussion starts and ends. 
@@ -470,7 +484,7 @@ export const findDiscussionBounds = async (text: string, useSmartModel: boolean 
   */
  export const stripPleasantries = async (text: string, useSmartModel: boolean = false): Promise<string> => {
    const ai = new GoogleGenAI({ apiKey: import.meta.env.VITE_GEMINI_API_KEY });
-   const model = useSmartModel ? "gemini-1.5-pro-latest" : "gemini-1.5-flash-latest";
+   const model = useSmartModel ? AI_MODELS.PRIMARY : AI_MODELS.FAST;
    
    const prompt = `
      You are a professional editor. Rewrite this transcript to remove all pleasantries, "small talk", filler intros (like "how are you today", "thank you for having me"), and outros that don't contribute to the core subject matter.
@@ -496,7 +510,7 @@ export const findDiscussionBounds = async (text: string, useSmartModel: boolean 
   */
  export const refineSpeakers = async (text: string, useSmartModel: boolean = true): Promise<string> => {
    const ai = new GoogleGenAI({ apiKey: import.meta.env.VITE_GEMINI_API_KEY });
-   const model = useSmartModel ? "gemini-1.5-pro-latest" : "gemini-1.5-flash-latest";
+   const model = useSmartModel ? AI_MODELS.PRIMARY : AI_MODELS.FAST;
    
      const prompt = `
      Review the following West African transcript and refine the speaker labels. 
@@ -534,7 +548,7 @@ export const findDiscussionBounds = async (text: string, useSmartModel: boolean 
  export const analyzeVideoContent = async (mediaFile: File | Blob): Promise<string> => {
     // ... (Video logic remains similar but uses stable model)
     const ai = new GoogleGenAI({ apiKey: import.meta.env.VITE_GEMINI_API_KEY });
-    const model = "gemini-1.5-flash-latest"; // Video understanding is great on 1.5 Flash
+    const model = AI_MODELS.VISION; // Video understanding is great on Vision/Flash
   
     let finalMimeType = mediaFile.type;
     if (mediaFile instanceof File && mediaFile.name) {

@@ -1,7 +1,7 @@
 import React from 'react';
 import { 
   Lightning, SignIn, SignOut, Spinner, Moon, Sun, Microphone, UploadSimple, 
-  Link, ArrowLeft, ArrowRight, FileText, Sparkle, Users, User, Check, WarningCircle, Brain, Info, Clock, X
+  Link, ArrowLeft, ArrowRight, FileText, Sparkle, Users, User, Check, WarningCircle, Brain, Info, Clock, X, GoogleLogo
 } from '@phosphor-icons/react';
 import { AudioSource, AudioFile, TranscriptionState } from '../../types';
 import AudioRecorder from '../../components/AudioRecorder';

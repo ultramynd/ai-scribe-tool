@@ -46,17 +46,12 @@ npm install
 ### 3. Environment Variables
 Create a `.env.local` file in the root directory:
 
-```env
-# Primary API Key (Gemini)
-VITE_GEMINI_API_KEY=your_primary_key
+Create a `.env.local` file in the root directory and add your API keys. You will need:
 
-# Optional: Fallback Key for Resilience
-VITE_GEMINI_API_KEY_FALLBACK=your_backup_key
-
-# Google Drive Picker (Optional)
-VITE_GOOGLE_CLIENT_ID=your_client_id
-VITE_GOOGLE_API_KEY=your_picker_key
-```
+- `VITE_GEMINI_API_KEY`: Your primary Google Gemini API key.
+- `VITE_GEMINI_API_KEY_FALLBACK`: (Optional) A backup key for resilience.
+- `VITE_GOOGLE_CLIENT_ID`: (Optional) For Google Drive integration.
+- `VITE_GOOGLE_API_KEY`: (Optional) For Google Picker API.
 
 ### 4. Run Locally
 ```bash
