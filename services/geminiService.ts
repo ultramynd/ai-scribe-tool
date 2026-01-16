@@ -193,7 +193,8 @@ const uploadFileToGemini = async (
     // 3. Polling for file readiness
     onStatus?.("Server-side processing...", 50);
     let retries = 0;
-    while (retries < 60) {
+    const MAX_POLL_RETRIES = 300; // Increased to 300 attempts (~15 minutes)
+    while (retries < MAX_POLL_RETRIES) {
       try {
         const pollUrl = `https://generativelanguage.googleapis.com/v1beta/files/${fileName}?key=${getActiveApiKey(attempt)}`;
         const pollData = await new Promise<any>((resolve, reject) => {
@@ -220,11 +221,16 @@ const uploadFileToGemini = async (
         if (pollErr.message.includes("failed on server")) throw pollErr; 
       }
       
-      await new Promise(r => setTimeout(r, 2000));
+      // Dynamic delay: Start fast, slow down to 4s for long-running processes
+      const delay = retries < 10 ? 2000 : 4000;
+      await new Promise(r => setTimeout(r, delay));
+      
       retries++;
-      onStatus?.(`Analyzing deep features...`, 50 + retries);
+      // Visual progress capped at 99% for polling
+      const pollProgress = Math.min(99, 50 + Math.floor((retries / MAX_POLL_RETRIES) * 45));
+      onStatus?.(`AI Engine: Analyzing deep features... (${retries}/${MAX_POLL_RETRIES})`, pollProgress);
     }
-    throw new Error("Polling timeout: File took too long to process on server.");
+    throw new Error("Polling timeout: File took too long to process on server. (Max 15 minutes reached)");
   } catch (error: any) {
     logger.error("Upload process failed", error);
     if ((error.message.includes('429') || error.message.includes('fetch')) && attempt < 1) {
