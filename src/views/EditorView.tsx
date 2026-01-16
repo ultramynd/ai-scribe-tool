@@ -1,13 +1,16 @@
-import React, { useState, useContext } from 'react';
+import React, { useEffect, useRef, useState, lazy, Suspense } from 'react';
+
 import { 
   Lightning, Eye, PencilSimple, Sparkle, Export, CaretDown, CaretUp,
   ArrowSquareOut, Checks, FileText, FileCode, CloudArrowDown, 
   File as FileIcon, Plus, Microphone, UploadSimple, User, PlusCircle,
   Clock, SignOut, Spinner, SignIn, Sun, Moon, List, WarningCircle, Check, GoogleLogo, Copy
 } from '@phosphor-icons/react';
-import { ThemeContext } from '../contexts/ThemeContext';
+import { useTheme } from '../contexts/ThemeContext';
+
 import { AudioSource, TranscriptionState, AudioFile, ArchiveItem } from '../../types';
-import TranscriptionEditor from '../../components/TranscriptionEditor';
+const TranscriptionEditor = lazy(() => import('../../components/TranscriptionEditor'));
+
 
 interface EditorViewProps {
   showExitConfirm: boolean;
@@ -43,9 +46,8 @@ interface EditorViewProps {
   archiveItems: ArchiveItem[];
   setShowArchiveSidebar: (val: boolean) => void;
   showArchiveSidebar: boolean;
-  darkMode: boolean;
-  setDarkMode: (val: boolean) => void;
   setActiveTab: (tab: AudioSource | null) => void;
+
   handleBackgroundTranscribe: (file: AudioFile) => void;
   setPickerCallback: (callback: ((file: AudioFile) => void) | null) => void;
   setIsPickerOpen: (val: boolean) => void;
@@ -70,12 +72,14 @@ const EditorView: React.FC<EditorViewProps> = ({
   googleAccessToken, googleClientId, driveScriptsLoaded,
   handleGoogleLogin, handleGoogleLogout, isLoggingIn,
   archiveItems, setShowArchiveSidebar, showArchiveSidebar,
-  darkMode, setDarkMode, setActiveTab,
+  setActiveTab,
   handleBackgroundTranscribe, setPickerCallback,
+
   setIsPickerOpen, isPickerOpen, handlePickDriveFile,
   onOpenInNewTab, isTabsVisible, setIsTabsVisible, onNewSession
 }) => {
-  const { currentTheme, toggleTheme } = useContext(ThemeContext);
+  const { darkMode, setDarkMode } = useTheme();
+
   // Local state for copy feedback
   const [copiedStatus, setCopiedStatus] = React.useState<'text' | 'plain' | 'html' | null>(null);
   const [liveRecordingTrigger, setLiveRecordingTrigger] = useState(0);
@@ -84,6 +88,23 @@ const EditorView: React.FC<EditorViewProps> = ({
   const handleUploadClick = () => {
     fileInputRef.current?.click();
   };
+
+  const exitConfirmRef = useRef<HTMLButtonElement>(null);
+
+  useEffect(() => {
+    if (!showExitConfirm) return;
+    exitConfirmRef.current?.focus();
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setShowExitConfirm(false);
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [showExitConfirm, setShowExitConfirm]);
+
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -112,22 +133,31 @@ const EditorView: React.FC<EditorViewProps> = ({
       {/* Exit Confirmation Modal */}
       {showExitConfirm && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-in fade-in duration-200">
-           <div className="bg-white dark:bg-dark-card border border-slate-200 dark:border-dark-border w-full max-w-sm rounded-2xl shadow-2xl p-6 relative">
+           <div
+             role="dialog"
+             aria-modal="true"
+             aria-labelledby="exit-confirm-title"
+             aria-describedby="exit-confirm-description"
+             className="bg-white dark:bg-dark-card border border-slate-200 dark:border-dark-border w-full max-w-sm rounded-2xl shadow-2xl p-6 relative"
+           >
               <div className="w-12 h-12 bg-red-100 dark:bg-red-900/20 rounded-full flex items-center justify-center mb-4 text-red-600 dark:text-red-400">
                  <WarningCircle size={24} weight="duotone" />
               </div>
-              <h3 className="text-xl font-bold text-slate-900 dark:text-white mb-2">Unsaved Changes</h3>
-              <p className="text-slate-500 dark:text-dark-muted mb-6 leading-relaxed">
+              <h3 id="exit-confirm-title" className="text-xl font-bold text-slate-900 dark:text-white mb-2">Unsaved Changes</h3>
+              <p id="exit-confirm-description" className="text-slate-500 dark:text-dark-muted mb-6 leading-relaxed">
                  Are you sure you want to exit? Your transcription and edits will be lost permanently if you leave now.
               </p>
               <div className="flex gap-3">
                  <button 
+                   ref={exitConfirmRef}
+                   type="button"
                    onClick={() => setShowExitConfirm(false)}
                    className="flex-1 px-4 py-2.5 rounded-xl font-bold text-slate-600 dark:text-dark-text hover:bg-slate-100 dark:hover:bg-dark-border transition-colors"
                  >
                    Cancel
                  </button>
                  <button 
+                   type="button"
                    onClick={confirmExit}
                    className="flex-1 px-4 py-2.5 rounded-xl font-bold bg-red-600 hover:bg-red-700 text-white shadow-lg shadow-red-500/20 transition-all"
                  >
@@ -136,6 +166,7 @@ const EditorView: React.FC<EditorViewProps> = ({
               </div>
            </div>
         </div>
+
       )}
 
       {/* Hidden File Input */}
@@ -580,7 +611,9 @@ const EditorView: React.FC<EditorViewProps> = ({
 
       {/* Main Editor Area - Google Docs Style */}
       <main className="flex-1 w-full z-10 overflow-hidden flex flex-col h-full bg-slate-100 dark:bg-dark-bg">
-         <TranscriptionEditor 
+         <Suspense fallback={<div className="flex-1 flex items-center justify-center py-12"><Spinner size={28} className="animate-spin text-primary" /></div>}>
+           <TranscriptionEditor 
+
             initialText={transcription.text || ''}
             onTextChange={(newText) => setTranscription(prev => ({...prev, text: newText}))}
             audioUrl={getAudioUrl()}
@@ -608,7 +641,9 @@ const EditorView: React.FC<EditorViewProps> = ({
              onOpenInNewTab={onOpenInNewTab}
              liveRecordingTrigger={liveRecordingTrigger}
            />
+         </Suspense>
       </main>
+
     </div>
   );
 };

@@ -114,9 +114,9 @@ export const generateDocx = async (text: string, filename: string) => {
 };
 
 /**
- * Parses text for [MM:SS] or [HH:MM:SS] timestamps and generates an SRT file.
+ * Parses text for [MM:SS] or [HH:MM:SS] timestamps and returns SRT content.
  */
-export const generateSrt = (text: string, filename: string) => {
+export const createSrtString = (text: string) => {
   const lines = text.split('\n');
   let srtContent = '';
   let counter = 1;
@@ -133,7 +133,7 @@ export const generateSrt = (text: string, filename: string) => {
       let hours = 0;
       let minutes = parseInt(match[1]);
       let seconds = parseInt(match[2]);
-      
+
       // Handle [HH:MM:SS] vs [MM:SS]
       if (match[3]) {
         hours = parseInt(match[1]);
@@ -146,7 +146,7 @@ export const generateSrt = (text: string, filename: string) => {
 
       // Estimate End Time (arbitrary +3 seconds or until next timestamp if we implemented lookahead, but +3s is a safe default for reading)
       // A better approach is to assume the chunk lasts until the next timestamp or 4 seconds.
-      const endDate = new Date(0, 0, 0, hours, minutes, seconds + 4); 
+      const endDate = new Date(0, 0, 0, hours, minutes, seconds + 4);
       const endH = endDate.getHours().toString().padStart(2, '0');
       const endM = endDate.getMinutes().toString().padStart(2, '0');
       const endS = endDate.getSeconds().toString().padStart(2, '0');
@@ -159,6 +159,15 @@ export const generateSrt = (text: string, filename: string) => {
       counter++;
     }
   }
+
+  return srtContent;
+};
+
+/**
+ * Parses text for [MM:SS] or [HH:MM:SS] timestamps and generates an SRT file.
+ */
+export const generateSrt = (text: string, filename: string) => {
+  const srtContent = createSrtString(text);
 
   if (srtContent === '') {
     alert("No timestamps found in the format [MM:SS] to generate subtitles.");

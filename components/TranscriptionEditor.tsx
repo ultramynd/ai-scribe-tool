@@ -166,6 +166,7 @@ const TranscriptionEditor: React.FC<TranscriptionEditorProps> = ({
   // Dragging logic is handled by framer-motion
 
   const segments = React.useMemo(() => {
+      if (isEditing || !text) return [];
       const segs: { time: number; index: number }[] = [];
       const regex = /\[(\d{1,2}):(\d{2})(?::(\d{2}))?\]/g;
       let match;
@@ -177,7 +178,8 @@ const TranscriptionEditor: React.FC<TranscriptionEditorProps> = ({
           segs.push({ time: timeInSeconds, index: match.index });
       }
       return segs;
-  }, [text]);
+  }, [isEditing, text]);
+
 
   // Auto-scroll to active segment in Read mode
   useEffect(() => {
@@ -885,58 +887,76 @@ const TranscriptionEditor: React.FC<TranscriptionEditorProps> = ({
   };
 
   // --- Rendering ---
-  
-  const renderHighlightedText = () => {
+
+  const highlightedText = React.useMemo(() => {
       if (!text) return null;
       let currentSegmentIndex = -1;
       for (let i = 0; i < segments.length; i++) {
           if (playbackTime >= segments[i].time) currentSegmentIndex = i;
           else break;
       }
-      if (segments.length === 0) return <div className="prose prose-lg prose-slate dark:prose-invert max-w-none text-slate-900 dark:text-white"><ReactMarkdown>{text}</ReactMarkdown></div>;
-      
+      if (segments.length === 0) {
+          return (
+            <div className="prose prose-lg prose-slate dark:prose-invert max-w-none text-slate-900 dark:text-white">
+              <ReactMarkdown>{text}</ReactMarkdown>
+            </div>
+          );
+      }
+
       const nodes: React.ReactNode[] = [];
       for (let i = 0; i < segments.length; i++) {
           const seg = segments[i];
-          const nextSeg = segments[i+1];
+          const nextSeg = segments[i + 1];
           const endIdx = nextSeg ? nextSeg.index : text.length;
-          
+
           if (i === 0 && seg.index > 0) {
-               nodes.push(
-                  <div key="pre" className="opacity-50 mb-4 text-slate-900 dark:text-white">
-                    <ReactMarkdown className="prose prose-lg prose-slate dark:prose-invert">{text.substring(0, seg.index)}</ReactMarkdown>
-                  </div>
-                );
-          }
-          
-          let segmentText = text.substring(seg.index, endIdx);
-          const isActive = i === currentSegmentIndex;
-          
-          nodes.push(
-              <div 
-                key={i} 
-                id={`seg-${i}`}
-                onClick={() => onSeek?.(seg.time)}
-                className={`transition-all duration-300 rounded-xl p-4 my-1 border-l-4 cursor-pointer group ${
-                  isActive 
-                  ? 'bg-primary/5 border-primary shadow-sm' 
-                  : 'bg-transparent border-transparent hover:bg-slate-50 dark:hover:bg-white/5'
-                }`}
-              >
-                  <ReactMarkdown 
-                    className="prose prose-lg prose-slate dark:prose-invert max-w-none pointer-events-none"
-                    components={{
-                        p: ({node, ...props}: any) => <p className={`mb-0 leading-relaxed ${isActive ? 'text-slate-900 dark:text-white font-medium' : 'text-slate-700 dark:text-slate-300'}`} {...props} />,
-                        strong: ({node, ...props}: any) => <span className="font-bold text-primary dark:text-accent" {...props} />
-                    }}
-                  >
-                      {segmentText}
+              nodes.push(
+                <div key="pre" className="opacity-50 mb-4 text-slate-900 dark:text-white">
+                  <ReactMarkdown className="prose prose-lg prose-slate dark:prose-invert">
+                    {text.substring(0, seg.index)}
                   </ReactMarkdown>
-              </div>
+                </div>
+              );
+          }
+
+          const segmentText = text.substring(seg.index, endIdx);
+          const isActive = i === currentSegmentIndex;
+
+          nodes.push(
+            <div
+              key={i}
+              id={`seg-${i}`}
+              onClick={() => onSeek?.(seg.time)}
+              className={`transition-all duration-300 rounded-xl p-4 my-1 border-l-4 cursor-pointer group ${
+                isActive
+                  ? 'bg-primary/5 border-primary shadow-sm'
+                  : 'bg-transparent border-transparent hover:bg-slate-50 dark:hover:bg-white/5'
+              }`}
+            >
+              <ReactMarkdown
+                className="prose prose-lg prose-slate dark:prose-invert max-w-none pointer-events-none"
+                components={{
+                  p: ({node, ...props}: any) => (
+                    <p
+                      className={`mb-0 leading-relaxed ${
+                        isActive ? 'text-slate-900 dark:text-white font-medium' : 'text-slate-700 dark:text-slate-300'
+                      }`}
+                      {...props}
+                    />
+                  ),
+                  strong: ({node, ...props}: any) => (
+                    <span className="font-bold text-primary dark:text-accent" {...props} />
+                  )
+                }}
+              >
+                {segmentText}
+              </ReactMarkdown>
+            </div>
           );
       }
       return <div>{nodes}</div>;
-  };
+  }, [segments, text, playbackTime, onSeek]);
+
 
   // Auto-scroll logic
   useEffect(() => {
@@ -1181,7 +1201,8 @@ const TranscriptionEditor: React.FC<TranscriptionEditorProps> = ({
                      />
                   ) : (
                       <div key="read-mode" className="read-mode-content prose prose-lg prose-slate dark:prose-invert max-w-none">
-                         {renderHighlightedText()}
+                         {highlightedText}
+
                       </div>
                   )}
                </div>

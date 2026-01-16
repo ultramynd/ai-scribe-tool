@@ -7,6 +7,8 @@ import { AudioSource, AudioFile, TranscriptionState } from '../../types';
 import AudioRecorder from '../../components/AudioRecorder';
 import FileUploader from '../../components/FileUploader';
 import UrlLoader from '../../components/UrlLoader';
+import { useTheme } from '../contexts/ThemeContext';
+
 
 interface HomeViewProps {
   activeTab: AudioSource | null;
@@ -19,8 +21,7 @@ interface HomeViewProps {
   handleGoogleLogin: () => void;
   handleGoogleLogout: () => void;
   driveScriptsLoaded: boolean;
-  darkMode: boolean;
-  setDarkMode: (val: boolean) => void;
+
   transcriptionMode: 'verbatim' | 'polish';
   setTranscriptionMode: (mode: 'verbatim' | 'polish') => void;
   isSpeakerDetectEnabled: boolean;
@@ -55,8 +56,8 @@ const HomeView: React.FC<HomeViewProps> = ({
   activeTab, setActiveTab, safeNavigation, clearAll,
   googleAccessToken, googleClientId, isLoggingIn,
   handleGoogleLogin, handleGoogleLogout, driveScriptsLoaded,
-  darkMode, setDarkMode,
   transcriptionMode, setTranscriptionMode,
+
   isSpeakerDetectEnabled, setIsSpeakerDetectEnabled,
   isDeepThinking, setIsDeepThinking,
   isReadyToTranscribe, handleTranscribe,
@@ -67,7 +68,10 @@ const HomeView: React.FC<HomeViewProps> = ({
   handleBackgroundTranscribe, setPickerCallback, setIsPickerOpen, isPickerOpen, handlePickDriveFile,
   onStartSmartEditor, onNewSession
 }) => {
+  const { darkMode, setDarkMode } = useTheme();
+
   return (
+
     <div className="min-h-screen font-sans flex flex-col relative overflow-y-auto transition-colors duration-500">
       
       {/* Immersive Mesh Background */}

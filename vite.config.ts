@@ -14,6 +14,18 @@ export default defineConfig(({ mode }) => {
         alias: {
           '@': path.resolve(__dirname, '.'),
         }
+      },
+      build: {
+        rollupOptions: {
+          output: {
+            manualChunks: {
+              vendor: ['react', 'react-dom'],
+              editor: ['framer-motion', 'react-markdown'],
+              docx: ['docx'],
+              icons: ['@phosphor-icons/react']
+            }
+          }
+        }
       }
     };
 });

@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, lazy, Suspense } from 'react';
+
 import { Spinner } from '@phosphor-icons/react';
 import { AudioSource, AudioFile, TranscriptionState, EditorTab, ArchiveItem } from './types';
 import { transcribeAudio, classifyContent } from './services/geminiService';
@@ -8,9 +9,17 @@ import ArchiveSidebar from './components/ArchiveSidebar';
 import GoogleFilePicker from './components/GoogleFilePicker';
 import LoadingView from './src/views/LoadingView';
 import HomeView from './src/views/HomeView';
-import EditorView from './src/views/EditorView';
+const EditorView = lazy(() => import('./src/views/EditorView'));
+
 import TabBar from './components/TabBar';
-import { generateDocx, generateTxt, generateSrt } from './utils/exportUtils';
+import ErrorBoundary from './components/ErrorBoundary';
+
+import { generateDocx, generateTxt, generateSrt, createSrtString } from './utils/exportUtils';
+import { ThemeProvider } from './src/contexts/ThemeContext';
+import { useArchive } from './src/hooks/useArchive';
+import { useGoogleDriveAuth } from './src/hooks/useGoogleDriveAuth';
+import { useTabs } from './src/hooks/useTabs';
+
 
 
 
@@ -24,72 +33,28 @@ const App: React.FC = () => {
   });
   
   // Multi-Tab System
-  const [tabs, setTabs] = useState<EditorTab[]>([]);
-  const [activeTabId, setActiveTabId] = useState<string | null>(null);
   const [contentType, setContentType] = useState<string | null>(null);
+  const [isEditorMode, setIsEditorMode] = useState(false); // Read vs Edit mode
 
-  // --- Tab Management Helpers ---
-  
-  const createTab = useCallback((data: Partial<EditorTab>) => {
-    const id = Math.random().toString(36).substring(7);
-    const newTab: EditorTab = {
-      id,
-      title: data.title || 'Untitled',
-      transcription: data.transcription || { isLoading: false, text: null, error: null },
-      contentType: data.contentType || null,
-      recordedBlob: data.recordedBlob || null,
-      micUrl: data.micUrl || null,
-      uploadedFile: data.uploadedFile || null,
-      isEditorMode: data.isEditorMode ?? false,
-      showAiSidebar: data.showAiSidebar ?? false,
-    };
-    setTabs(prev => [...prev, newTab]);
-    setActiveTabId(id);
-    return id;
-  }, []);
-
-  const updateActiveTab = useCallback((updates: Partial<EditorTab>) => {
-    if (!activeTabId) return;
-    setTabs(prev => prev.map(tab => tab.id === activeTabId ? { ...tab, ...updates } : tab));
-  }, [activeTabId]);
-
-  const closeTab = useCallback((id: string) => {
-    // Memory Management: Revoke object URLs before removing tab
-    const tabToClose = tabs.find(t => t.id === id);
-    if (tabToClose) {
-      if (tabToClose.micUrl) {
-        URL.revokeObjectURL(tabToClose.micUrl);
-      }
-      if (tabToClose.uploadedFile?.previewUrl) {
-        URL.revokeObjectURL(tabToClose.uploadedFile.previewUrl);
-      }
+  const {
+    tabs,
+    setTabs,
+    activeTabId,
+    setActiveTabId,
+    activeTabObj,
+    createTab,
+    updateActiveTab,
+    closeTab
+  } = useTabs({
+    onCloseAll: () => {
+      setIsEditorMode(false);
+      setActiveTab(null);
     }
+  });
 
-    setTabs(prev => {
-      const nextTabs = prev.filter(t => t.id !== id);
-      if (activeTabId === id && nextTabs.length > 0) {
-        setActiveTabId(nextTabs[nextTabs.length - 1].id);
-      } else if (nextTabs.length === 0) {
-        setActiveTabId(null);
-        setIsEditorMode(false); // Go back home if no tabs left
-        setActiveTab(null);
-      }
-      return nextTabs;
-    });
-  }, [activeTabId, tabs]);
-
-  const activeTabObj = tabs.find(t => t.id === activeTabId);
   const [showExitConfirm, setShowExitConfirm] = useState(false);
   const [pendingAction, setPendingAction] = useState<(() => void) | null>(null);
-  
-  // Dark Mode State
-  const [darkMode, setDarkMode] = useState(() => {
-    if (typeof window !== 'undefined') {
-      return localStorage.getItem('theme') === 'dark' || 
-             (!localStorage.getItem('theme') && window.matchMedia('(prefers-color-scheme: dark)').matches);
-    }
-    return false;
-  });
+
 
   // Data States
   const [recordedBlob, setRecordedBlob] = useState<Blob | null>(null);
@@ -104,53 +69,29 @@ const App: React.FC = () => {
 
   // Auth States
   const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
-  const [driveScriptsLoaded, setDriveScriptsLoaded] = useState(false);
+  const {
+    driveScriptsLoaded,
+    googleAccessToken,
+    isLoggingIn,
+    handleGoogleLogin,
+    handleGoogleLogout,
+    setGoogleAccessToken
+  } = useGoogleDriveAuth(googleClientId);
   const [isSavingToDrive, setIsSavingToDrive] = useState(false);
   const [driveSaved, setDriveSaved] = useState(false);
-  const [googleAccessToken, setGoogleAccessToken] = useState<string | null>(() => localStorage.getItem('google_access_token'));
-  const [isLoggingIn, setIsLoggingIn] = useState(false);
-
-  // Persist Token
-  useEffect(() => {
-    if (googleAccessToken) localStorage.setItem('google_access_token', googleAccessToken);
-    else localStorage.removeItem('google_access_token');
-  }, [googleAccessToken]);
 
   // UI States
   const [progress, setProgress] = useState(0);
   const [logLines, setLogLines] = useState<string[]>([]);
-  const [isEditorMode, setIsEditorMode] = useState(false); // Read vs Edit mode
   const [showAiSidebar, setShowAiSidebar] = useState(false); // AI features sidebar
-  const [archiveItems, setArchiveItems] = useState<ArchiveItem[]>(() => {
-    try {
-      const saved = localStorage.getItem('archive_items');
-      const parsed = saved ? JSON.parse(saved) : [];
-      return Array.isArray(parsed) ? parsed : [];
-    } catch (e) {
-      console.error('Failed to parse archive items:', e);
-      return [];
-    }
-  });
+  const { archiveItems, setArchiveItems } = useArchive();
   const [showArchiveSidebar, setShowArchiveSidebar] = useState(false);
   const [isPickerOpen, setIsPickerOpen] = useState(false);
   const [pickerCallback, setPickerCallback] = useState<((file: AudioFile) => void) | null>(null);
   const [isFetchingDrive, setIsFetchingDrive] = useState(false);
 
+
   // --- Effects & Handlers ---
-
-  useEffect(() => {
-    if (darkMode) {
-      document.documentElement.classList.add('dark');
-      localStorage.setItem('theme', 'dark');
-    } else {
-      document.documentElement.classList.remove('dark');
-      localStorage.setItem('theme', 'light');
-    }
-  }, [darkMode]);
-
-  useEffect(() => {
-    localStorage.setItem('archive_items', JSON.stringify(archiveItems));
-  }, [archiveItems]);
 
   // Prevent accidental browser close/refresh
   useEffect(() => {
@@ -166,42 +107,6 @@ const App: React.FC = () => {
   }, [transcription.text]);
 
   useEffect(() => {
-    setDriveScriptsLoaded(true);
-  }, []);
-
-  const tokenClientRef = useRef<any>(null);
-
-  const handleGoogleLogin = () => {
-    if (!googleClientId || !driveScriptsLoaded) return;
-    setIsLoggingIn(true);
-    const google = (window as any).google;
-    try {
-      if (!tokenClientRef.current) {
-        tokenClientRef.current = google.accounts.oauth2.initTokenClient({
-          client_id: googleClientId,
-          scope: 'https://www.googleapis.com/auth/drive.readonly https://www.googleapis.com/auth/drive.file',
-          callback: (response: any) => {
-            setIsLoggingIn(false);
-            if (response.access_token) setGoogleAccessToken(response.access_token);
-          },
-        });
-      }
-      tokenClientRef.current.requestAccessToken({ prompt: 'consent' });
-    } catch (e) {
-      setIsLoggingIn(false);
-    }
-  };
-
-  const handleGoogleLogout = () => {
-    const google = (window as any).google;
-    if (google && google.accounts && googleAccessToken) {
-      google.accounts.oauth2.revoke(googleAccessToken, () => setGoogleAccessToken(null));
-    } else {
-      setGoogleAccessToken(null);
-    }
-  };
-
-  useEffect(() => {
     if (transcription.isLoading) {
       setProgress(0);
       setLogLines(['➜ Initializing AI session...']);
@@ -209,6 +114,7 @@ const App: React.FC = () => {
       setProgress(100);
     }
   }, [transcription.isLoading, transcription.text]);
+
 
   const [hasPeeked, setHasPeeked] = useState(false);
 
@@ -315,37 +221,10 @@ const App: React.FC = () => {
           .replace(/~~(.*?)~~/g, '<s>$1</s>')
           .replace(/\n/g, '<br>');
       } else if (format === 'srt') {
-         // Generate SRT content locally then upload
-         // We need to duplicate the logic from exportUtils or reuse it? 
-         // generateSrt triggers download. We need the STRING content.
-         // Let's modify exportUtils to export a "createSrtString" function?
-         // For now, I'll basically implement a simple SRT generator here to avoid editing utils again if not needed, 
-         // OR I can just save the raw text if I cannot generate SRT string easily.
-         // Actually, let's keep it simple.
-         // Note: generateSrt in utils creates a blob and downloads. It doesn't return string.
-         // I'll copy the SRT logic briefly for Drive upload or better yet, refactor utils?
-         // User is waiting. CLI refactor is safer.
-         // SRT Logic:
-         const lines = content.split('\n');
-         let srt = '';
-         let counter = 1;
-         const timeRegex = /\[(\d{1,2}):(\d{2})(?::(\d{2}))?\]/;
-         for (const line of lines) {
-             const trim = line.trim();
-             if(!trim) continue;
-             const match = trim.match(timeRegex);
-             if(match) {
-                 let h=0, m=parseInt(match[1]), s=parseInt(match[2]);
-                 if(match[3]) { h=parseInt(match[1]); m=parseInt(match[2]); s=parseInt(match[3]); }
-                 const start = `${h.toString().padStart(2,'0')}:${m.toString().padStart(2,'0')}:${s.toString().padStart(2,'0')},000`;
-                 const endDate = new Date(0,0,0,h,m,s+4);
-                 const end = `${endDate.getHours().toString().padStart(2,'0')}:${endDate.getMinutes().toString().padStart(2,'0')}:${endDate.getSeconds().toString().padStart(2,'0')},000`;
-                 srt += `${counter}\n${start} --> ${end}\n${trim.replace(timeRegex,'').trim()}\n\n`;
-                 counter++;
-             }
-         }
-         content = srt || content; // Fallback if no timestamps
+        const srtContent = createSrtString(content);
+        content = srtContent || content; // Fallback if no timestamps
       }
+
 
       
       form.append('file', new Blob([content], { 
@@ -366,10 +245,10 @@ const App: React.FC = () => {
         
         // Handle token expiration
         if (response.status === 401) {
-          localStorage.removeItem('googleAccessToken');
           setGoogleAccessToken(null);
           throw new Error('Session expired. Please sign in again.');
         }
+
         
         // Handle quota/permission errors
         if (response.status === 403) {
@@ -431,12 +310,12 @@ const App: React.FC = () => {
   const handleExportDocx = async () => {
     if (!transcription.text) return;
     try {
-      const { generateDocx } = await import('./utils/exportUtils');
       await generateDocx(transcription.text, `Smart_Editor_Export_${new Date().toISOString().slice(0,10)}`);
     } catch (err) {
       alert('Failed to generate Word document');
     }
   };
+
 
   const handleTranscribe = async () => {
     const statusLog = (msg: string, prg?: number) => {
@@ -749,40 +628,43 @@ const App: React.FC = () => {
   // --- Main Layout Rendering ---
 
   return (
-    <div className={`flex flex-col h-screen bg-slate-50 dark:bg-dark-bg overflow-hidden ${darkMode ? 'dark' : ''}`}>
-      {/* Top Level Tab System - Collapsible (Hidden when loading) */}
-      {!activeTabObj?.transcription.isLoading && (
-        <>
-          <div className={`relative transition-all duration-300 ease-in-out ${isTabsVisible ? 'max-h-20 opacity-100' : 'max-h-0 opacity-0'}`}>
-            <div className="overflow-hidden">
-            <TabBar 
-              tabs={tabs} 
-              activeTabId={activeTabId} 
-              onTabSelect={setActiveTabId} 
-              onTabClose={closeTab}
-              onNewTab={() => {
-                 setActiveTabId(null);
-                 setIsEditorMode(false);
-                 setActiveTab(null);
-              }}
-            />
+    <ThemeProvider>
+      <ErrorBoundary title="The app hit a snag" description="Refresh the page or reset the view to continue.">
+        <div className="flex flex-col h-screen bg-slate-50 dark:bg-dark-bg overflow-hidden">
+        {/* Top Level Tab System - Collapsible (Hidden when loading) */}
+        {!activeTabObj?.transcription.isLoading && (
+          <>
+            <div className={`relative transition-all duration-300 ease-in-out ${isTabsVisible ? 'max-h-20 opacity-100' : 'max-h-0 opacity-0'}`}>
+              <div className="overflow-hidden">
+              <TabBar 
+                tabs={tabs} 
+                activeTabId={activeTabId} 
+                onTabSelect={setActiveTabId} 
+                onTabClose={closeTab}
+                onNewTab={() => {
+                   setActiveTabId(null);
+                   setIsEditorMode(false);
+                   setActiveTab(null);
+                }}
+              />
+              </div>
             </div>
-          </div>
-          
-          {/* Zen Mode "Drawer Handle" */}
-          <div className="relative z-[70] flex justify-center -mt-0.5 pointer-events-none">
-              <button 
-                 onClick={() => setIsTabsVisible(!isTabsVisible)}
-                 className="pointer-events-auto h-2.5 w-24 bg-slate-200 dark:bg-[#151515] hover:bg-indigo-500 dark:hover:bg-indigo-500 hover:h-4 transition-all duration-300 rounded-b-xl flex items-center justify-center group opacity-50 hover:opacity-100 shadow-sm border border-t-0 border-white/[0.05]"
-                 title={isTabsVisible ? "Hide Tabs (Zen Mode)" : "Show Project Tabs"}
-              >
-                 <div className="w-8 h-1 rounded-full bg-slate-400 dark:bg-slate-700 group-hover:bg-white/80 transition-colors"></div>
-              </button>
-          </div>
-        </>
-      )}
+            
+            {/* Zen Mode "Drawer Handle" */}
+            <div className="relative z-[70] flex justify-center -mt-0.5 pointer-events-none">
+                <button 
+                   onClick={() => setIsTabsVisible(!isTabsVisible)}
+                   className="pointer-events-auto h-2.5 w-24 bg-slate-200 dark:bg-[#151515] hover:bg-indigo-500 dark:hover:bg-indigo-500 hover:h-4 transition-all duration-300 rounded-b-xl flex items-center justify-center group opacity-50 hover:opacity-100 shadow-sm border border-t-0 border-white/[0.05]"
+                   title={isTabsVisible ? "Hide Tabs (Zen Mode)" : "Show Project Tabs"}
+                >
+                   <div className="w-8 h-1 rounded-full bg-slate-400 dark:bg-slate-700 group-hover:bg-white/80 transition-colors"></div>
+                </button>
+            </div>
+          </>
+        )}
 
-      <div className="flex-1 overflow-y-auto relative">
+        <div className="flex-1 overflow-y-auto relative">
+
         {/* Case 1: Active Loading Tab */}
         {activeTabObj?.transcription.isLoading && (
           <LoadingView 
@@ -795,62 +677,72 @@ const App: React.FC = () => {
 
         {/* Case 2: Active Completed Tab (Editor) */}
         {activeTabId && !activeTabObj?.transcription.isLoading && activeTabObj?.transcription.text !== null && (
-          <EditorView 
-            isTabsVisible={isTabsVisible}
-            setIsTabsVisible={setIsTabsVisible}
-            showExitConfirm={showExitConfirm}
-            setShowExitConfirm={setShowExitConfirm}
-            onNewSession={handleNewSession}
-            confirmExit={confirmExit}
-            safeNavigation={safeNavigation}
-            clearAll={clearAll}
-            isEditorMode={activeTabObj?.isEditorMode || false}
-            setIsEditorMode={(val) => updateActiveTab({ isEditorMode: val })}
-            showAiSidebar={activeTabObj?.showAiSidebar || false}
-            setShowAiSidebar={(val) => updateActiveTab({ showAiSidebar: val })}
-            transcription={activeTabObj?.transcription || transcription}
-            setTranscription={(val: React.SetStateAction<TranscriptionState>) => {
-              if (typeof val === 'function') {
-                const currentTranscription = activeTabObj?.transcription || transcription;
-                const nextTranscription = (val as (prev: TranscriptionState) => TranscriptionState)(currentTranscription);
-                updateActiveTab({ transcription: nextTranscription });
-              } else {
-                updateActiveTab({ transcription: val });
-              }
-            }}
-            handleSaveToDrive={handleSaveToDrive}
-            isSavingToDrive={isSavingToDrive}
-            driveSaved={driveSaved}
-            contentType={activeTabObj?.contentType || null}
-            setShowArchiveSidebar={setShowArchiveSidebar}
-            showArchiveSidebar={showArchiveSidebar}
-            getAudioUrl={() => {
-               if (activeTabObj?.micUrl) return activeTabObj.micUrl;
-               if (activeTabObj?.uploadedFile?.previewUrl) return activeTabObj.uploadedFile.previewUrl;
-               return null;
-            }}
-            getOriginalFile={() => activeTabObj?.uploadedFile || null}
-            handleExportDocx={() => generateDocx(transcription.text || '', "Transcription")}
-            handleExportTxt={() => generateTxt(transcription.text || '', "Transcription")}
-            handleExportSrt={() => generateSrt(transcription.text || '', "Transcription")}
-            googleAccessToken={googleAccessToken}
-            googleClientId={googleClientId}
-            driveScriptsLoaded={driveScriptsLoaded}
-            handleGoogleLogin={handleGoogleLogin}
-            handleGoogleLogout={handleGoogleLogout}
-            isLoggingIn={isLoggingIn}
-            archiveItems={archiveItems}
-            darkMode={darkMode}
-            setDarkMode={setDarkMode}
-            setActiveTab={setActiveTab}
-            handleBackgroundTranscribe={handleBackgroundTranscribe}
-            setPickerCallback={setPickerCallback}
-            setIsPickerOpen={setIsPickerOpen}
-            isPickerOpen={isPickerOpen}
-            handlePickDriveFile={handlePickDriveFile}
-            onOpenInNewTab={handleOpenInNewTab}
-          />
+          <ErrorBoundary title="Editor crashed" description="Reset the view to recover your session.">
+            <Suspense
+              fallback={(
+                <div className="flex-1 flex items-center justify-center py-12">
+                  <Spinner size={28} className="animate-spin text-primary" />
+                </div>
+              )}
+            >
+              <EditorView
+              isTabsVisible={isTabsVisible}
+              setIsTabsVisible={setIsTabsVisible}
+              showExitConfirm={showExitConfirm}
+              setShowExitConfirm={setShowExitConfirm}
+              onNewSession={handleNewSession}
+              confirmExit={confirmExit}
+              safeNavigation={safeNavigation}
+              clearAll={clearAll}
+              isEditorMode={activeTabObj?.isEditorMode || false}
+              setIsEditorMode={(val) => updateActiveTab({ isEditorMode: val })}
+              showAiSidebar={activeTabObj?.showAiSidebar || false}
+              setShowAiSidebar={(val) => updateActiveTab({ showAiSidebar: val })}
+              transcription={activeTabObj?.transcription || transcription}
+              setTranscription={(val: React.SetStateAction<TranscriptionState>) => {
+                if (typeof val === 'function') {
+                  const currentTranscription = activeTabObj?.transcription || transcription;
+                  const nextTranscription = (val as (prev: TranscriptionState) => TranscriptionState)(currentTranscription);
+                  updateActiveTab({ transcription: nextTranscription });
+                } else {
+                  updateActiveTab({ transcription: val });
+                }
+              }}
+              handleSaveToDrive={handleSaveToDrive}
+              isSavingToDrive={isSavingToDrive}
+              driveSaved={driveSaved}
+              contentType={activeTabObj?.contentType || null}
+              setShowArchiveSidebar={setShowArchiveSidebar}
+              showArchiveSidebar={showArchiveSidebar}
+              getAudioUrl={() => {
+                if (activeTabObj?.micUrl) return activeTabObj.micUrl;
+                if (activeTabObj?.uploadedFile?.previewUrl) return activeTabObj.uploadedFile.previewUrl;
+                return null;
+              }}
+              getOriginalFile={() => activeTabObj?.uploadedFile || null}
+              handleExportDocx={() => generateDocx(transcription.text || '', "Transcription")}
+              handleExportTxt={() => generateTxt(transcription.text || '', "Transcription")}
+              handleExportSrt={() => generateSrt(transcription.text || '', "Transcription")}
+              googleAccessToken={googleAccessToken}
+              googleClientId={googleClientId}
+              driveScriptsLoaded={driveScriptsLoaded}
+              handleGoogleLogin={handleGoogleLogin}
+              handleGoogleLogout={handleGoogleLogout}
+              isLoggingIn={isLoggingIn}
+              archiveItems={archiveItems}
+              setActiveTab={setActiveTab}
+              handleBackgroundTranscribe={handleBackgroundTranscribe}
+              setPickerCallback={setPickerCallback}
+              setIsPickerOpen={setIsPickerOpen}
+              isPickerOpen={isPickerOpen}
+              handlePickDriveFile={handlePickDriveFile}
+              onOpenInNewTab={handleOpenInNewTab}
+            />
+            </Suspense>
+          </ErrorBoundary>
         )}
+
+
 
         {/* Case 3: No Active Tab or No Transcription (Home) */}
         {(!activeTabId || (activeTabObj && !activeTabObj.transcription.isLoading && activeTabObj.transcription.text === null)) && (
@@ -880,9 +772,8 @@ const App: React.FC = () => {
             isLoggingIn={isLoggingIn}
             archiveItems={archiveItems}
             setShowArchiveSidebar={setShowArchiveSidebar}
-            darkMode={darkMode}
-            setDarkMode={setDarkMode}
             handleBackgroundTranscribe={handleBackgroundTranscribe}
+
             setPickerCallback={setPickerCallback}
             setIsPickerOpen={setIsPickerOpen}
             isPickerOpen={isPickerOpen}
@@ -947,6 +838,8 @@ const App: React.FC = () => {
         onSelect={handlePickDriveFile}
       />
     </div>
+    </ErrorBoundary>
+    </ThemeProvider>
   );
 };
 
