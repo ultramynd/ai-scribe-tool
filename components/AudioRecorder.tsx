@@ -17,7 +17,7 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({ onRecordingComplete, isTr
   
   
   // Live Transcription State
-  const [isLiveEnabled, setIsLiveEnabled] = useState(true); // Default to enabled with Groq
+  const [isLiveEnabled, setIsLiveEnabled] = useState(false); // Default to disabled as requested
   const [liveTranscript, setLiveTranscript] = useState('');
   const [interimTranscript, setInterimTranscript] = useState('');
   const audioStreamRecorderRef = useRef<AudioStreamRecorder | null>(null);
@@ -31,78 +31,89 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({ onRecordingComplete, isTr
   const streamRef = useRef<MediaStream | null>(null);
   const timerIntervalRef = useRef<number | null>(null);
 
-  const startVisualizer = (stream: MediaStream) => {
+  useEffect(() => {
     if (!canvasRef.current) return;
-    audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
-    const source = audioContextRef.current.createMediaStreamSource(stream);
-    analyserRef.current = audioContextRef.current.createAnalyser();
-    analyserRef.current.fftSize = 32; // Reduced from 64 for less processing
-    source.connect(analyserRef.current);
-
-    const bufferLength = analyserRef.current.frequencyBinCount;
-    const dataArray = new Uint8Array(bufferLength);
     const canvas = canvasRef.current;
     const canvasCtx = canvas.getContext('2d');
     if (!canvasCtx) return;
 
-    let lastDrawTime = 0;
-    const draw = (timestamp: number) => {
-      if (!analyserRef.current) return;
+    let phase = 0;
+    const dataArray = new Uint8Array(16); // Small buffer for simple wave scaling
+
+    const draw = () => {
       animationFrameRef.current = requestAnimationFrame(draw);
       
-      // Cap visualizer at ~30fps to save CPU for transcription/recording
-      if (timestamp - lastDrawTime < 33) return;
-      lastDrawTime = timestamp;
-
-      analyserRef.current.getByteFrequencyData(dataArray);
+      let normalizedAmp = 0;
+      if (analyserRef.current) {
+        analyserRef.current.getByteFrequencyData(dataArray);
+        let sum = 0;
+        for(let i = 0; i < dataArray.length; i++) sum += dataArray[i];
+        normalizedAmp = sum / (dataArray.length * 255);
+      }
 
       canvasCtx.clearRect(0, 0, canvas.width, canvas.height);
+      const width = canvas.width;
+      const height = canvas.height;
+      const centerY = height / 2;
       
-      const barWidth = 4;
-      const gap = 3;
-      const barsCount = bufferLength;
-      
-      const totalWidth = barsCount * (barWidth + gap);
-      let x = (canvas.width - totalWidth) / 2;
+      const waves = [
+        { color: '#710096', opacity: 0.1, amplitude: 0.4, speed: 0.04, frequency: 0.03 },
+        { color: '#5EC5D4', opacity: 0.2, amplitude: 0.6, speed: 0.06, frequency: 0.02 },
+        { color: '#710096', opacity: 0.3, amplitude: 0.8, speed: 0.03, frequency: 0.025 },
+        { color: '#5EC5D4', opacity: 0.5, amplitude: 1.0, speed: 0.05, frequency: 0.015 }
+      ];
 
-      for (let i = 0; i < barsCount; i++) {
-        // Create a symmetric effect by mirroring the data
-        const index = i < barsCount / 2 ? i : barsCount - 1 - i;
-        const value = dataArray[index];
-        const percent = value / 255;
-        const height = Math.max(6, percent * canvas.height * 0.8);
-        
-        // Gradient for bars
-        const gradient = canvasCtx.createLinearGradient(0, (canvas.height - height) / 2, 0, (canvas.height + height) / 2);
-        gradient.addColorStop(0, '#710096'); // Primary
-        gradient.addColorStop(1, '#5EC5D4'); // Accent
-        
-        canvasCtx.fillStyle = gradient;
-        
-        const y = (canvas.height - height) / 2;
-        
+      phase += 0.02; // Slower basic phase movement
+
+      waves.forEach((wave) => {
         canvasCtx.beginPath();
-        canvasCtx.roundRect(x, y, barWidth, height, 20);
-        canvasCtx.fill();
+        canvasCtx.lineWidth = 1.5;
+        canvasCtx.strokeStyle = wave.color;
+        canvasCtx.globalAlpha = wave.opacity;
 
-        // Subtle glow effect
-        if (isRecording) {
-            canvasCtx.shadowBlur = 15;
-            canvasCtx.shadowColor = '#5EC5D440';
+        // Base amplitude: if recording use mic, else use a subtle "breathing" effect
+        const baseAmp = isRecording 
+          ? (normalizedAmp * 40 + 5) 
+          : (Math.sin(phase * 0.5) * 2 + 3);
+          
+        const amp = baseAmp * wave.amplitude;
+
+        for (let x = 0; x <= width; x += 2) {
+          // Sine wave calculation with phase shift and frequency
+          // The Math.sin(x / width * Math.PI) creates the "pinch" at both ends
+          const y = centerY + Math.sin(x * wave.frequency + phase * wave.speed * 20) * amp * Math.sin(x / width * Math.PI);
+          if (x === 0) canvasCtx.moveTo(x, y);
+          else canvasCtx.lineTo(x, y);
         }
-
-        x += barWidth + gap;
-      }
+        
+        canvasCtx.stroke();
+      });
     };
-    requestAnimationFrame(draw);
+
+    draw();
+    return () => {
+      if (animationFrameRef.current) cancelAnimationFrame(animationFrameRef.current);
+    };
+  }, [isRecording]);
+
+  const startVisualizer = (stream: MediaStream) => {
+    try {
+      audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
+      const source = audioContextRef.current.createMediaStreamSource(stream);
+      analyserRef.current = audioContextRef.current.createAnalyser();
+      analyserRef.current.fftSize = 32;
+      source.connect(analyserRef.current);
+    } catch (e) {
+      console.warn("Visualizer init failed", e);
+    }
   };
 
   const stopVisualizer = () => {
-    if (animationFrameRef.current) cancelAnimationFrame(animationFrameRef.current);
     if (audioContextRef.current) {
-      audioContextRef.current.close();
+      audioContextRef.current.close().catch(() => {});
       audioContextRef.current = null;
     }
+    analyserRef.current = null;
   };
 
   const startRecording = async () => {
@@ -188,16 +199,12 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({ onRecordingComplete, isTr
       {/* Visualizer & Timer Group */}
       <div className="relative w-full flex flex-col items-center justify-center mb-8">
           <div className="relative z-10 flex flex-col items-center">
-              {/* Elegant Bar Visualizer */}
-              <div className="w-48 h-20 mb-4">
-                <canvas ref={canvasRef} width={200} height={100} className="w-full h-full" />
-                {!isRecording && duration === 0 && (
-                    <div className="flex justify-center gap-1.5 h-full items-center opacity-10">
-                        {[1, 2, 3, 4, 5, 4, 3, 2, 1].map((h, i) => (
-                            <div key={i} className="w-1 bg-slate-400 rounded-full" style={{ height: `${h * 4}px` }}></div>
-                        ))}
-                    </div>
-                )}
+              {/* Elegant Wave Visualizer */}
+              <div className="w-48 h-20 mb-4 relative">
+                <canvas ref={canvasRef} width={200} height={100} className="w-full h-full relative z-10" />
+                
+                {/* Visualizer Glow Background */}
+                <div className={`absolute inset-0 bg-gradient-to-r from-primary/10 to-accent/10 blur-2xl rounded-full transition-opacity duration-1000 ${isRecording ? 'opacity-100' : 'opacity-20'}`}></div>
               </div>
 
               {/* High-end Timer */}
