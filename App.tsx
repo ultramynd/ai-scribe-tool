@@ -231,10 +231,15 @@ const App: React.FC = () => {
   }, [micUrl]);
 
   const handleSaveToDrive = async (format: 'doc' | 'txt' | 'srt' = 'doc') => {
-    if (!googleAccessToken || !transcription.text) {
-      handleGoogleLogin();
+    // FIX: Check active tab's text, not global transcription
+    const currentText = activeTabObj?.transcription.text || transcription.text;
+    
+    if (!googleAccessToken || !currentText) {
+      if (!currentText) alert("No text to save.");
+      else handleGoogleLogin();
       return;
     }
+
     
     setIsSavingToDrive(true);
     
@@ -265,7 +270,7 @@ const App: React.FC = () => {
       form.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
       
       // Content preparation
-      let content = transcription.text || '';
+      let content = currentText || '';
       
       if (format === 'doc') {
         // HTML conversion for Google Docs
@@ -572,10 +577,15 @@ const App: React.FC = () => {
     setContentType(null);
     setShowExitConfirm(false);
     setPendingAction(null);
+    setActiveTabId(null); // Deselect active tab to return to Home
+    setIsEditorMode(false);
   }, []);
 
   const safeNavigation = (action: () => void) => {
-    if (transcription.text) {
+    // FIX: Check active tab state if available
+    const hasUnsavedContent = activeTabObj ? !!activeTabObj.transcription.text : !!transcription.text;
+    
+    if (hasUnsavedContent) {
       setPendingAction(() => action);
       setShowExitConfirm(true);
     } else {
@@ -610,6 +620,14 @@ const App: React.FC = () => {
       mimeType: file.type
     };
     handleBackgroundTranscribe(audioFile);
+  };
+
+  // --- NEW SESSION HANDLER ---
+  const handleNewSession = (source: AudioSource) => {
+      safeNavigation(() => {
+          clearAll();
+          setActiveTab(source);
+      });
   };
 
   const handlePickDriveFile = async (file: { id: string; name: string; mimeType: string }) => {
@@ -756,6 +774,7 @@ const App: React.FC = () => {
             setIsTabsVisible={setIsTabsVisible}
             showExitConfirm={showExitConfirm}
             setShowExitConfirm={setShowExitConfirm}
+            onNewSession={handleNewSession}
             confirmExit={confirmExit}
             safeNavigation={safeNavigation}
             clearAll={clearAll}
@@ -858,6 +877,7 @@ const App: React.FC = () => {
             transcriptionError={activeTabObj?.transcription.error || transcription.error}
             setEditorMode={setIsEditorMode}
             onStartSmartEditor={() => handleOpenInNewTab('', 'New Document')}
+            onNewSession={handleNewSession}
             driveScriptsLoaded={driveScriptsLoaded}
             googleClientId={googleClientId}
           />

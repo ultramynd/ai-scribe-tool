@@ -146,6 +146,47 @@ export const transcribeAudio = async (
   onStatus?: StatusCallback
 ): Promise<string> => {
   onStatus?.("Preparing Media for AI Engine...", 2);
+
+  // --- 1. PREPARE CONTENT (Upload ONCE) ---
+  let finalMimeType = mimeType;
+  if (mediaFile instanceof File && mediaFile.name) {
+      const detectedMime = getMimeTypeFromExtension(mediaFile.name);
+      if (detectedMime) finalMimeType = detectedMime;
+  }
+  if (!finalMimeType || finalMimeType === 'application/octet-stream') {
+      finalMimeType = 'audio/mp3';
+  }
+
+  let contentPart: any;
+  const MAX_INLINE_SIZE = 10 * 1024 * 1024; // 10MB Limit for Inline
+
+  try {
+    if (mediaFile.size < MAX_INLINE_SIZE) {
+      onStatus?.("Buffering audio for inline execution...", 12);
+      const base64Data = await blobToBase64(mediaFile);
+      contentPart = {
+        inlineData: {
+          mimeType: finalMimeType,
+          data: base64Data
+        }
+      };
+    } else {
+      // Upload logic handles its own errors
+      // This happens BEFORE the retry loop, so we don't re-upload on 429/503
+      const fileUri = await uploadFileToGemini(mediaFile, finalMimeType, onStatus);
+      contentPart = {
+        fileData: {
+          mimeType: finalMimeType,
+          fileUri: fileUri
+        }
+      };
+    }
+  } catch (prepError: any) {
+    logger.error("Media Preparation Failed", prepError);
+    throw new Error(`Media Upload Failed: ${prepError.message}`);
+  }
+
+  // --- 2. EXECUTE WITH RETRY (Generation Only) ---
   
   // Model Configuration from Central Config
   const PRIMARY_MODEL = AI_MODELS.PRIMARY;
@@ -167,16 +208,7 @@ export const transcribeAudio = async (
       const ai = new GoogleGenAI({ apiKey: activeApiKey });
       const modelName = currentModel;
       
-      onStatus?.(`Engine initialized: ${modelName} ${useFallbackKey ? '(Backup Key)' : '(Primary)'}`, 8);
-  
-      let finalMimeType = mimeType;
-      if (mediaFile instanceof File && mediaFile.name) {
-         const detectedMime = getMimeTypeFromExtension(mediaFile.name);
-         if (detectedMime) finalMimeType = detectedMime;
-      }
-      if (!finalMimeType || finalMimeType === 'application/octet-stream') {
-         finalMimeType = 'audio/mp3';
-      }
+      onStatus?.(`Engine initialized: ${modelName} ${useFallbackKey ? '(Backup Key)' : '(Primary)'} (Attempt ${attempt + 1})`, 8);
 
       // STRICT PROMPTING
       const speakerInstruction = detectSpeakers 
@@ -218,28 +250,6 @@ export const transcribeAudio = async (
         Output only the transcription. No preamble.
       `;
 
-      let contentPart: any;
-      const MAX_INLINE_SIZE = 0; // Force binary upload for robustness
-
-      if (mediaFile.size < MAX_INLINE_SIZE) {
-        onStatus?.("Buffering audio for inline execution...", 12);
-        const base64Data = await blobToBase64(mediaFile);
-        contentPart = {
-          inlineData: {
-            mimeType: finalMimeType,
-            data: base64Data
-          }
-        };
-      } else {
-        // Upload logic handles its own errors
-        contentPart = {
-          fileData: {
-            mimeType: finalMimeType,
-            fileUri: await uploadFileToGemini(mediaFile, finalMimeType, onStatus)
-          }
-        };
-      }
-
       onStatus?.(`Generating transcription with ${modelName}...`, 60);
 
       const fakeProgressTimer = setInterval(() => {
@@ -252,7 +262,7 @@ export const transcribeAudio = async (
             model: modelName,
             contents: {
               parts: [
-                  contentPart,
+                  contentPart, // Re-use the already uploaded content
                   { text: autoEdit ? autoEditPrompt : rawPrompt }
               ]
             }
@@ -331,6 +341,7 @@ export const transcribeAudio = async (
     else if (msg.includes('quota') || msg.includes('429')) userMessage = "Rate Limits Exceeded. Please try again in a few minutes.";
     else if (msg.includes('network') || msg.includes('fetch')) userMessage = "Network Connection Error. Please check your internet.";
     else if (msg.includes('safety') || msg.includes('blocked')) userMessage = "Content Blocked by AI Safety Filters.";
+    else if (msg.includes('media upload failed')) userMessage = error.message; // Pass through upload errors
     
     throw new Error(userMessage);
   }

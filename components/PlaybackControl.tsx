@@ -36,8 +36,16 @@ const PlaybackControl: React.FC<PlaybackControlProps> = ({
     const updateTime = () => {
         setCurrentTime(audio.currentTime);
         if (onTimeUpdate) onTimeUpdate(audio.currentTime);
+        
+        // Retry getting duration if it was missing or infinite
+        if (!duration || duration === Infinity || duration === 0) {
+           if (Number.isFinite(audio.duration) && audio.duration > 0) {
+               setDuration(audio.duration);
+           }
+        }
     };
     const updateDuration = () => {
+        // Handle explicit duration change or metadata load
         if (Number.isFinite(audio.duration)) {
             setDuration(audio.duration);
         }
@@ -50,16 +58,18 @@ const PlaybackControl: React.FC<PlaybackControlProps> = ({
 
     audio.addEventListener('timeupdate', updateTime);
     audio.addEventListener('loadedmetadata', updateDuration);
+    audio.addEventListener('durationchange', updateDuration); // Add durationchange listener
     audio.addEventListener('ended', onEnded);
     audio.addEventListener('error', onError);
 
     return () => {
       audio.removeEventListener('timeupdate', updateTime);
       audio.removeEventListener('loadedmetadata', updateDuration);
+      audio.removeEventListener('durationchange', updateDuration);
       audio.removeEventListener('ended', onEnded);
       audio.removeEventListener('error', onError);
     };
-  }, [onTimeUpdate]);
+  }, [onTimeUpdate, duration]); // Add duration dependency to ensure we stop checking once found
 
   useEffect(() => {
     if (audioRef.current) {

@@ -51,6 +51,7 @@ interface EditorViewProps {
   isPickerOpen: boolean;
   handlePickDriveFile: (file: { id: string; name: string; mimeType: string }) => void;
   onOpenInNewTab: (content: string, title?: string) => void;
+  onNewSession: (source: AudioSource) => void;
 
   isTabsVisible: boolean;
   setIsTabsVisible: (val: boolean) => void;
@@ -71,7 +72,7 @@ const EditorView: React.FC<EditorViewProps> = ({
   darkMode, setDarkMode, setActiveTab,
   handleBackgroundTranscribe, setPickerCallback,
   setIsPickerOpen, isPickerOpen, handlePickDriveFile,
-  onOpenInNewTab, isTabsVisible, setIsTabsVisible
+  onOpenInNewTab, isTabsVisible, setIsTabsVisible, onNewSession
 }) => {
   const { currentTheme, toggleTheme } = useContext(ThemeContext);
   // Local state for copy feedback
@@ -179,7 +180,7 @@ const EditorView: React.FC<EditorViewProps> = ({
                           
                           {/* Audio Recording */}
                           <button 
-                             onClick={() => safeNavigation(() => { clearAll(); setActiveTab(AudioSource.MICROPHONE); })}
+                             onClick={() => onNewSession(AudioSource.MICROPHONE)}
                             className="w-full flex items-center gap-3 px-3 py-2 text-left text-[11px] font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-white/5 rounded-xl transition-all group"
                           >
                             <div className="w-7 h-7 rounded-lg bg-red-100 dark:bg-red-900/20 flex items-center justify-center group-hover:scale-110 transition-transform">
@@ -193,7 +194,7 @@ const EditorView: React.FC<EditorViewProps> = ({
 
                           {/* Upload Media */}
                           <button 
-                             onClick={() => safeNavigation(() => { clearAll(); setActiveTab(AudioSource.FILE); })}
+                             onClick={() => onNewSession(AudioSource.FILE)}
                             className="w-full flex items-center gap-3 px-3 py-2 text-left text-[11px] font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-white/5 rounded-xl transition-all group"
                           >
                             <div className="w-7 h-7 rounded-lg bg-blue-100 dark:bg-blue-900/20 flex items-center justify-center group-hover:scale-110 transition-transform">
@@ -207,7 +208,7 @@ const EditorView: React.FC<EditorViewProps> = ({
 
                           {/* From Link / Drive */}
                           <button 
-                             onClick={() => safeNavigation(() => { clearAll(); setActiveTab(AudioSource.URL); })}
+                             onClick={() => onNewSession(AudioSource.URL)}
                             className="w-full flex items-center gap-3 px-3 py-2 text-left text-[11px] font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-white/5 rounded-xl transition-all group"
                           >
                             <div className="w-7 h-7 rounded-lg bg-slate-100 dark:bg-white/10 flex items-center justify-center group-hover:scale-110 transition-transform">
@@ -223,7 +224,7 @@ const EditorView: React.FC<EditorViewProps> = ({
 
                           {/* Empty Project */}
                           <button 
-                             onClick={() => safeNavigation(() => { clearAll(); setActiveTab(AudioSource.FILE); })}
+                             onClick={() => onNewSession(AudioSource.FILE)}
                             className="w-full flex items-center gap-3 px-3 py-2 text-left text-[11px] font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-white/5 rounded-xl transition-all group"
                           >
                             <div className="w-7 h-7 rounded-lg bg-indigo-100 dark:bg-indigo-900/20 flex items-center justify-center group-hover:scale-110 transition-transform">
@@ -534,7 +535,7 @@ const EditorView: React.FC<EditorViewProps> = ({
                 <div className="absolute top-full right-0 mt-2 opacity-0 group-hover:opacity-100 pointer-events-none group-hover:pointer-events-auto transition-all duration-200 scale-95 group-hover:scale-100 origin-top-right z-50">
                   <div className="bg-white dark:bg-dark-card rounded-2xl shadow-xl border border-slate-100 dark:border-dark-border p-1.5 min-w-[160px]">
                     <button 
-                      onClick={() => safeNavigation(() => { clearAll(); setActiveTab(null); })}
+                      onClick={() => onNewSession(null as any)} // Will effectively reset
                       className="w-full flex items-center gap-3 px-3 py-2.5 text-left text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-white/5 rounded-xl transition-all"
                     >
                       <Plus size={16} weight="bold" className="text-primary" />
@@ -593,8 +594,8 @@ const EditorView: React.FC<EditorViewProps> = ({
             onEditingChange={setIsEditorMode}
             showAiSidebar={showAiSidebar}
             onAiSidebarToggle={() => setShowAiSidebar(!showAiSidebar)}
-            onStartRecording={() => safeNavigation(() => { clearAll(); setActiveTab(AudioSource.MICROPHONE); })}
-            onUploadClick={() => safeNavigation(() => { clearAll(); setActiveTab(AudioSource.FILE); })}
+            onStartRecording={() => onNewSession(AudioSource.MICROPHONE)}
+            onUploadClick={() => onNewSession(AudioSource.FILE)}
             googleAccessToken={googleAccessToken}
             onBackgroundTranscribe={handleBackgroundTranscribe}
             onAttachDrive={() => {

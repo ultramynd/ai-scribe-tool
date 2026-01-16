@@ -30,7 +30,8 @@ const UrlLoader: React.FC<UrlLoaderProps> = ({ onFileLoaded, isLoading, googleAc
       setFetchStatus('error');
       return;
     }
-    onAttachDrive?.();
+    // Open the local picker instead of relying on the parent prop
+    setIsDrivePickerOpen(true);
   };
 
   const fetchDriveFile = async (fileId: string, token: string, fileName?: string, mimeType?: string) => {
@@ -154,6 +155,19 @@ const UrlLoader: React.FC<UrlLoaderProps> = ({ onFileLoaded, isLoading, googleAc
 
   return (
     <div className="w-full max-w-md mx-auto">
+      {/* Google Drive Picker Modal */}
+      {googleAccessToken && (
+        <GoogleFilePicker 
+          isOpen={isDrivePickerOpen} 
+          accessToken={googleAccessToken}
+          onClose={() => setIsDrivePickerOpen(false)} 
+          onSelect={(file) => {
+            setIsDrivePickerOpen(false);
+            fetchDriveFile(file.id, googleAccessToken, file.name, file.mimeType);
+          }}
+        />
+      )}
+
       <div className="bg-white dark:bg-dark-card rounded-[2rem] p-4 sm:p-6 border border-gray-100 dark:border-dark-border shadow-sm">
         
         {/* Only show Drive picker if Client ID is configured */}
