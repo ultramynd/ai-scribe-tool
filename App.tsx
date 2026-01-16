@@ -54,6 +54,17 @@ const App: React.FC = () => {
   }, [activeTabId]);
 
   const closeTab = useCallback((id: string) => {
+    // Memory Management: Revoke object URLs before removing tab
+    const tabToClose = tabs.find(t => t.id === id);
+    if (tabToClose) {
+      if (tabToClose.micUrl) {
+        URL.revokeObjectURL(tabToClose.micUrl);
+      }
+      if (tabToClose.uploadedFile?.previewUrl) {
+        URL.revokeObjectURL(tabToClose.uploadedFile.previewUrl);
+      }
+    }
+
     setTabs(prev => {
       const nextTabs = prev.filter(t => t.id !== id);
       if (activeTabId === id && nextTabs.length > 0) {
@@ -65,7 +76,7 @@ const App: React.FC = () => {
       }
       return nextTabs;
     });
-  }, [activeTabId]);
+  }, [activeTabId, tabs]);
 
   const activeTabObj = tabs.find(t => t.id === activeTabId);
   const [showExitConfirm, setShowExitConfirm] = useState(false);
@@ -229,7 +240,27 @@ const App: React.FC = () => {
   useEffect(() => {
     return () => { if (micUrl) URL.revokeObjectURL(micUrl); };
   }, [micUrl]);
+  
+  useEffect(() => {
+    return () => { if (uploadedFile?.previewUrl) URL.revokeObjectURL(uploadedFile.previewUrl); };
+  }, [uploadedFile?.previewUrl]);
 
+  const clearAll = useCallback(() => {
+    if (micUrl) URL.revokeObjectURL(micUrl);
+    if (uploadedFile?.previewUrl) URL.revokeObjectURL(uploadedFile.previewUrl);
+    
+    setRecordedBlob(null);
+    setMicUrl(null);
+    setUploadedFile(null);
+    setTranscription({ isLoading: false, text: null, error: null });
+    setProgress(0);
+    setActiveTab(null);
+    setContentType(null);
+    setShowExitConfirm(false);
+    setPendingAction(null);
+    setActiveTabId(null); // Deselect active tab to return to Home
+    setIsEditorMode(false);
+  }, [micUrl, uploadedFile]);
   const handleSaveToDrive = async (format: 'doc' | 'txt' | 'srt' = 'doc') => {
     // FIX: Check active tab's text, not global transcription
     const currentText = activeTabObj?.transcription.text || transcription.text;
@@ -567,19 +598,7 @@ const App: React.FC = () => {
     return false;
   };
 
-  const clearAll = useCallback(() => {
-    setRecordedBlob(null);
-    setMicUrl(null);
-    setUploadedFile(null);
-    setTranscription({ isLoading: false, text: null, error: null });
-    setProgress(0);
-    setActiveTab(null);
-    setContentType(null);
-    setShowExitConfirm(false);
-    setPendingAction(null);
-    setActiveTabId(null); // Deselect active tab to return to Home
-    setIsEditorMode(false);
-  }, []);
+
 
   const safeNavigation = (action: () => void) => {
     // FIX: Check active tab state if available
@@ -912,7 +931,13 @@ const App: React.FC = () => {
           }
           setShowArchiveSidebar(false);
         }}
-        onDeleteItem={(id) => setArchiveItems(prev => prev.filter(i => i.id !== id))}
+        onDeleteItem={(id) => {
+          const item = archiveItems.find(i => i.id === id);
+          if (item?.audioUrl && item.audioUrl.startsWith('blob:')) {
+            URL.revokeObjectURL(item.audioUrl);
+          }
+          setArchiveItems(prev => prev.filter(i => i.id !== id));
+        }}
       />
 
       <GoogleFilePicker 

@@ -80,6 +80,8 @@ async function executeGaiRequest(
       };
       
       xhr.onerror = () => reject(new Error("Network connection lost during AI generation."));
+      xhr.ontimeout = () => reject(new Error("AI generation timed out (5 minutes). Please try again."));
+      xhr.timeout = 300000; // 5 minutes for generation
       xhr.send(JSON.stringify(payload));
     });
   } catch (error: any) {
@@ -148,6 +150,8 @@ const uploadFileToGemini = async (
           }
         };
         xhr.onerror = () => reject(new Error("Network connection failed during upload initialization."));
+        xhr.ontimeout = () => reject(new Error("Upload initialization timed out (30 seconds)."));
+        xhr.timeout = 30000; // 30 seconds for init
         xhr.send(JSON.stringify({ file: { display_name: displayName, mime_type: mimeType } }));
       });
     } catch (e: any) {
@@ -184,6 +188,8 @@ const uploadFileToGemini = async (
       };
 
       xhr.onerror = () => reject(new Error("Network error during upload (XHR)."));
+      xhr.ontimeout = () => reject(new Error("File upload timed out (10 minutes)."));
+      xhr.timeout = 600000; // 10 minutes for upload
       xhr.send(mediaFile);
     });
 
@@ -219,13 +225,15 @@ const uploadFileToGemini = async (
             }
           };
           xhr.onerror = () => reject(new Error("Network link lost during server processing..."));
+          xhr.ontimeout = () => reject(new Error("Status polling timed out (30 seconds)."));
+          xhr.timeout = 30000; // 30 seconds for polling
           xhr.send();
         });
         
         if (pollData.state === 'ACTIVE') return fileUri;
         if (pollData.state === 'FAILED') throw new Error("File processing failed on server.");
       } catch (pollErr: any) {
-        // If it's a network error during polling, we don't want to crash. 
+        // If it's a network error or timeout during polling, we don't want to crash. 
         // We just log it and let the loop retry.
         logger.warn(`Polling attempt ${retries + 1} encountered an issue: ${pollErr.message}. Retrying...`);
         if (pollErr.message.includes("failed on server")) throw pollErr; 
@@ -238,7 +246,7 @@ const uploadFileToGemini = async (
       retries++;
       // Visual progress capped at 99% for polling
       const pollProgress = Math.min(99, 50 + Math.floor((retries / MAX_POLL_RETRIES) * 45));
-      onStatus?.(`AI Engine: Analyzing deep features... (${retries}/${MAX_POLL_RETRIES})`, pollProgress);
+      onStatus?.(`AI Engine: Processing... (Attempt ${retries}/${MAX_POLL_RETRIES})`, pollProgress);
     }
     throw new Error("Polling timeout: File took too long to process on server. (Max 15 minutes reached)");
   } catch (error: any) {

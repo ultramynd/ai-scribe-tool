@@ -79,6 +79,8 @@ export const transcribeWithGroq = async (
       };
       
       xhr.onerror = () => reject(new Error("Network connection error during Groq transcription."));
+      xhr.ontimeout = () => reject(new Error("Groq engine timed out (2 minutes)."));
+      xhr.timeout = 120000; // 2 minutes for Groq
       xhr.send(formData);
     });
     return text;

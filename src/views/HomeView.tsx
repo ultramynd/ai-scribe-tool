@@ -48,6 +48,7 @@ interface HomeViewProps {
   isPickerOpen: boolean;
   handlePickDriveFile: (file: { id: string; name: string; mimeType: string }) => void;
   onStartSmartEditor: () => void;
+  onNewSession: (source: AudioSource) => void;
 }
 
 const HomeView: React.FC<HomeViewProps> = ({
@@ -64,7 +65,7 @@ const HomeView: React.FC<HomeViewProps> = ({
   setShowArchiveSidebar, archiveItems, setEditorMode,
   isAutoEditEnabled, setIsAutoEditEnabled, isWebSpeechSupported,
   handleBackgroundTranscribe, setPickerCallback, setIsPickerOpen, isPickerOpen, handlePickDriveFile,
-  onStartSmartEditor
+  onStartSmartEditor, onNewSession
 }) => {
   return (
     <div className="min-h-screen font-sans flex flex-col relative overflow-y-auto transition-colors duration-500">

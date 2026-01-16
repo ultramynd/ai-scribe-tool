@@ -53,6 +53,8 @@ const UrlLoader: React.FC<UrlLoaderProps> = ({ onFileLoaded, isLoading, googleAc
                         else reject(new Error(`Meta status ${xhr.status}`));
                     };
                     xhr.onerror = () => reject(new Error("Meta network error"));
+                    xhr.ontimeout = () => reject(new Error("Drive metadata request timed out."));
+                    xhr.timeout = 20000; // 20s for meta
                     xhr.send();
                  });
                  finalFileName = metaData.name;
@@ -74,6 +76,8 @@ const UrlLoader: React.FC<UrlLoaderProps> = ({ onFileLoaded, isLoading, googleAc
                   else reject(new Error(`Drive Connection Error: ${xhr.status} ${xhr.statusText}`));
               };
               xhr.onerror = () => reject(new Error("Network connection error during Drive download."));
+              xhr.ontimeout = () => reject(new Error("Drive download timed out."));
+              xhr.timeout = 300000; // 5 min for file download
               xhr.send();
           });
           
@@ -144,6 +148,8 @@ const UrlLoader: React.FC<UrlLoaderProps> = ({ onFileLoaded, isLoading, googleAc
               else reject(new Error(`Server returned error: ${xhr.status} ${xhr.statusText}`));
           };
           xhr.onerror = () => reject(new Error("Network connection error."));
+          xhr.ontimeout = () => reject(new Error("Direct download timed out."));
+          xhr.timeout = 120000; // 2 min for general URL fetch
           xhr.send();
       });
       const mimeType = blob.type || 'audio/mp3';
