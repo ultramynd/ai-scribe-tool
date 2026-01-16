@@ -97,29 +97,39 @@ const uploadFileToGemini = async (
   onStatus?.(`${attempt > 0 ? 'Retrying' : 'Initializing'} resumable upload (${Math.round(mediaFile.size / 1024 / 1024)}MB)...`, 5);
 
   try {
-    // 1. Initial request to get the resumable session URL
-    const initialResponse = await fetch(uploadUrl, {
-      method: 'POST',
-      headers: {
-        'X-Goog-Upload-Protocol': 'resumable',
-        'X-Goog-Upload-Command': 'start',
-        'X-Goog-Upload-Header-Content-Length': mediaFile.size.toString(),
-        'X-Goog-Upload-Header-Content-Type': mimeType,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({ file: { display_name: displayName, mime_type: mimeType } })
-    });
-
-    if (!initialResponse.ok) {
-      if (initialResponse.status === 429 && attempt < 1 && import.meta.env.VITE_GEMINI_API_KEY_FALLBACK) {
-        return uploadFileToGemini(mediaFile, mimeType, onStatus, attempt + 1);
-      }
-      const errText = await initialResponse.text();
-      throw new Error(`Upload Init Failed: ${initialResponse.status} ${errText}`);
+    // 1. Initial request to get the resumable session URL using XHR for maximum stability
+    let sessionUrl: string;
+    try {
+      sessionUrl = await new Promise<string>((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        xhr.open('POST', uploadUrl);
+        xhr.setRequestHeader('X-Goog-Upload-Protocol', 'resumable');
+        xhr.setRequestHeader('X-Goog-Upload-Command', 'start');
+        xhr.setRequestHeader('X-Goog-Upload-Header-Content-Length', mediaFile.size.toString());
+        xhr.setRequestHeader('X-Goog-Upload-Header-Content-Type', mimeType);
+        xhr.setRequestHeader('Content-Type', 'application/json');
+        
+        xhr.onload = () => {
+          if (xhr.status >= 200 && xhr.status < 300) {
+            const url = xhr.getResponseHeader('x-goog-upload-url');
+            if (url) resolve(url);
+            else reject(new Error("No upload session URL in response"));
+          } else {
+             if (xhr.status === 429 && attempt < 1 && import.meta.env.VITE_GEMINI_API_KEY_FALLBACK) {
+                reject({ isRateLimit: true });
+             } else {
+                reject(new Error(`Upload Session Init Failed (${xhr.status}): ${xhr.responseText}`));
+             }
+          }
+        };
+        xhr.onerror = () => reject(new Error("Network connection failed during upload initialization."));
+        xhr.send(JSON.stringify({ file: { display_name: displayName, mime_type: mimeType } }));
+      });
+    } catch (e: any) {
+      if (e.isRateLimit) return uploadFileToGemini(mediaFile, mimeType, onStatus, attempt + 1);
+      throw e;
     }
 
-    const sessionUrl = initialResponse.headers.get('x-goog-upload-url');
-    if (!sessionUrl) throw new Error("Failed to get upload session URL");
 
     // 2. Perform the actual upload using XHR for better progress and reliability
     const fileInfo = await new Promise<any>((resolve, reject) => {
