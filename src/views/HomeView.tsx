@@ -440,10 +440,14 @@ const HomeView: React.FC<HomeViewProps> = ({
         {transcriptionError && (
           <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[100] animate-in slide-in-from-bottom-5 fade-in duration-300">
             <div className="bg-red-50 dark:bg-red-900/90 text-red-900 dark:text-red-100 px-6 py-4 rounded-2xl border border-red-100 dark:border-red-800 shadow-2xl flex items-center gap-4 backdrop-blur-xl">
-               <div className="bg-red-100 dark:bg-red-800 p-2 rounded-full text-red-600 dark:text-red-200 min-w-[36px] min-h-[36px] flex items-center justify-center"><Info size={20} weight="duotone" /></div>
-               <div>
-                  <h4 className="font-bold text-sm">Transcription Failed</h4>
-                  <p className="text-xs opacity-90 mt-0.5 max-w-[260px] leading-relaxed">{transcriptionError}</p>
+                <div className={`${transcriptionError.includes('Quota') ? 'bg-amber-100 dark:bg-amber-900 border border-amber-200 dark:border-amber-800 text-amber-600 dark:text-amber-200' : 'bg-red-100 dark:bg-red-800 text-red-600 dark:text-red-200'} p-2.5 rounded-2xl min-w-[42px] min-h-[42px] flex items-center justify-center shadow-sm`}>
+                 {transcriptionError.includes('Quota') ? <Clock size={22} weight="duotone" className="animate-pulse" /> : <Info size={22} weight="duotone" />}
+               </div>
+               <div className="flex-1">
+                  <h4 className={`font-black text-sm uppercase tracking-wider ${transcriptionError.includes('Quota') ? 'text-amber-700 dark:text-amber-300' : 'text-red-900 dark:text-red-100'}`}>
+                    {transcriptionError.includes('Quota') ? 'Engine Resting' : 'Transcription Failed'}
+                  </h4>
+                  <p className="text-[11px] font-medium opacity-80 mt-1 max-w-[280px] leading-relaxed tracking-tight">{transcriptionError}</p>
                </div>
                <button 
                   onClick={() => setTranscription(prev => ({...prev, error: null}))} 

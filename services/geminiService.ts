@@ -378,7 +378,15 @@ export const transcribeAudio = async (
     const msg = error.message?.toLowerCase() || "";
 
     if (msg.includes('api key')) userMessage = "Invalid API Key. Please check your settings.";
-    else if (msg.includes('quota') || msg.includes('429')) userMessage = "Rate Limits Exceeded. Please try again in a few minutes.";
+    else if (msg.includes('quota') || msg.includes('429')) {
+      const now = new Date();
+      // Gemini free-tier quotas typically reset every 60 seconds. 
+      // We estimate 65 seconds from now to be safe.
+      const resetTime = new Date(now.getTime() + 65 * 1000).toLocaleTimeString([], { 
+        hour: '2-digit', minute: '2-digit', second: '2-digit' 
+      });
+      userMessage = `Daily/Per-Minute Quota Exceeded. You can try again at approximately ${resetTime}.`;
+    }
     else if (msg.includes('network') || msg.includes('fetch')) userMessage = "Network Connection Error. Please check your internet.";
     else if (msg.includes('safety') || msg.includes('blocked')) userMessage = "Content Blocked by AI Safety Filters.";
     else if (msg.includes('media upload failed')) userMessage = error.message; // Pass through upload errors
