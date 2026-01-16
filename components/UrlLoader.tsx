@@ -44,29 +44,38 @@ const UrlLoader: React.FC<UrlLoaderProps> = ({ onFileLoaded, isLoading, googleAc
 
           if (!fileName) {
              try {
-                 const metaResp = await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}?fields=name,mimeType`, {
-                    headers: { Authorization: `Bearer ${token}` }
+                 const metaData = await new Promise<any>((resolve, reject) => {
+                    const xhr = new XMLHttpRequest();
+                    xhr.open('GET', `https://www.googleapis.com/drive/v3/files/${fileId}?fields=name,mimeType`);
+                    xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+                    xhr.onload = () => {
+                        if (xhr.status >= 200 && xhr.status < 300) resolve(JSON.parse(xhr.responseText));
+                        else reject(new Error(`Meta status ${xhr.status}`));
+                    };
+                    xhr.onerror = () => reject(new Error("Meta network error"));
+                    xhr.send();
                  });
-                 if (metaResp.ok) {
-                     const meta = await metaResp.json();
-                     finalFileName = meta.name;
-                     finalMimeType = meta.mimeType;
-                 }
+                 finalFileName = metaData.name;
+                 finalMimeType = metaData.mimeType;
              } catch (e) {
                  console.warn("Could not fetch metadata, proceeding with download", e);
              }
           }
 
-          const response = await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`, {
-              headers: { Authorization: `Bearer ${token}` }
+          const blob = await new Promise<Blob>((resolve, reject) => {
+              const xhr = new XMLHttpRequest();
+              xhr.open('GET', `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`);
+              xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+              xhr.responseType = 'blob';
+              
+              xhr.onload = () => {
+                  if (xhr.status >= 200 && xhr.status < 300) resolve(xhr.response);
+                  else if (xhr.status === 403) reject(new Error("Permission denied. You may not have access to this specific file."));
+                  else reject(new Error(`Drive Connection Error: ${xhr.status} ${xhr.statusText}`));
+              };
+              xhr.onerror = () => reject(new Error("Network connection error during Drive download."));
+              xhr.send();
           });
-          
-          if (!response.ok) {
-              if (response.status === 403) throw new Error("Permission denied. You may not have access to this specific file.");
-              throw new Error(`Drive Connection Error: ${response.statusText}`);
-          }
-          
-          const blob = await response.blob();
           
           if (blob.type.includes('text/html')) {
               throw new Error("File is too large for automatic download. Please download it manually from Drive, then use 'Upload File'.");
@@ -126,10 +135,17 @@ const UrlLoader: React.FC<UrlLoaderProps> = ({ onFileLoaded, isLoading, googleAc
     }
 
     try {
-      const response = await fetch(url);
-      if (!response.ok) throw new Error(`Server returned error: ${response.statusText}`);
-
-      const blob = await response.blob();
+      const blob = await new Promise<Blob>((resolve, reject) => {
+          const xhr = new XMLHttpRequest();
+          xhr.open('GET', url);
+          xhr.responseType = 'blob';
+          xhr.onload = () => {
+              if (xhr.status >= 200 && xhr.status < 300) resolve(xhr.response);
+              else reject(new Error(`Server returned error: ${xhr.status} ${xhr.statusText}`));
+          };
+          xhr.onerror = () => reject(new Error("Network connection error."));
+          xhr.send();
+      });
       const mimeType = blob.type || 'audio/mp3';
       const file = new File([blob], "downloaded_media", { type: mimeType });
       const previewUrl = URL.createObjectURL(blob);

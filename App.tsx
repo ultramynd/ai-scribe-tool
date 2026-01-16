@@ -639,11 +639,18 @@ const App: React.FC = () => {
       // Reuse logic from UrlLoader - we should move this to a utility if possible
       // For now, I'll implement a basic version or call handleBackgroundTranscribe with a placeholder
       // Actually, I'll implement fetchDriveFile here too
-      const response = await fetch(`https://www.googleapis.com/drive/v3/files/${file.id}?alt=media`, {
-        headers: { Authorization: `Bearer ${googleAccessToken}` }
+      const blob = await new Promise<Blob>((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        xhr.open('GET', `https://www.googleapis.com/drive/v3/files/${file.id}?alt=media`);
+        xhr.setRequestHeader('Authorization', `Bearer ${googleAccessToken}`);
+        xhr.responseType = 'blob';
+        xhr.onload = () => {
+          if (xhr.status >= 200 && xhr.status < 300) resolve(xhr.response);
+          else reject(new Error(`Drive fetch failed: ${xhr.status}`));
+        };
+        xhr.onerror = () => reject(new Error('Drive network error'));
+        xhr.send();
       });
-      if (!response.ok) throw new Error('Drive fetch failed');
-      const blob = await response.blob();
       const audioFile: AudioFile = {
         file: new File([blob], file.name, { type: file.mimeType }),
         previewUrl: URL.createObjectURL(blob),

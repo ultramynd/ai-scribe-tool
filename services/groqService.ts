@@ -60,23 +60,28 @@ export const transcribeWithGroq = async (
 
   try {
     onStatus?.("Dispatching to Groq edge network...");
-    const response = await fetch('https://api.groq.com/openai/v1/audio/transcriptions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${apiKey}`,
-      },
-      body: formData
+    const text = await new Promise<string>((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      xhr.open('POST', 'https://api.groq.com/openai/v1/audio/transcriptions');
+      xhr.setRequestHeader('Authorization', `Bearer ${apiKey}`);
+      
+      xhr.onload = () => {
+        if (xhr.status >= 200 && xhr.status < 300) {
+          resolve(xhr.responseText.trim());
+        } else {
+          try {
+            const errorData = JSON.parse(xhr.responseText);
+            reject(new Error(errorData.error?.message || `Groq API error: ${xhr.status}`));
+          } catch (e) {
+            reject(new Error(`Groq API error: ${xhr.status} ${xhr.statusText}`));
+          }
+        }
+      };
+      
+      xhr.onerror = () => reject(new Error("Network connection error during Groq transcription."));
+      xhr.send(formData);
     });
-
-    onStatus?.("Groq is processing at warp speed...");
-
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      throw new Error(errorData.error?.message || `Groq API error: ${response.status} ${response.statusText}`);
-    }
-
-    const text = await response.text();
-    return text.trim();
+    return text;
   } catch (error: any) {
     console.error("Groq Transcription Error:", error);
     throw error;

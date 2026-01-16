@@ -43,15 +43,18 @@ const GoogleFilePicker: React.FC<GoogleFilePickerProps> = ({ accessToken, onSele
         q = `name contains '${query}' and trashed = false and (mimeType contains 'audio/' or mimeType contains 'video/' or mimeType = 'application/vnd.google-apps.folder')`;
       }
 
-      const response = await fetch(
-        `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(q)}&fields=files(id,name,mimeType,modifiedTime,size,iconLink,thumbnailLink)&pageSize=100&orderBy=folder,name`,
-        {
-          headers: { Authorization: `Bearer ${accessToken}` }
-        }
-      );
-
-      if (!response.ok) throw new Error('Failed to fetch files');
-      const data = await response.json();
+      const data = await new Promise<any>((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        const url = `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(q)}&fields=files(id,name,mimeType,modifiedTime,size,iconLink,thumbnailLink)&pageSize=100&orderBy=folder,name`;
+        xhr.open('GET', url);
+        xhr.setRequestHeader('Authorization', `Bearer ${accessToken}`);
+        xhr.onload = () => {
+          if (xhr.status >= 200 && xhr.status < 300) resolve(JSON.parse(xhr.responseText));
+          else reject(new Error(`Drive fetch failed: ${xhr.status}`));
+        };
+        xhr.onerror = () => reject(new Error('Network error listing files'));
+        xhr.send();
+      });
       setFiles(data.files || []);
     } catch (err) {
       console.error(err);

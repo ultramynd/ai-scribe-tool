@@ -1,4 +1,3 @@
-import { GoogleGenAI } from "@google/genai";
 import { blobToBase64 } from "../utils/audioUtils";
 import { logger } from "../utils/logger";
 import { AI_MODELS, FALLBACK_CONFIG } from "../src/config/aiModels";
@@ -44,19 +43,45 @@ const getActiveApiKey = (attempt: number): string => {
 };
 
 /**
- * Generic wrapper for Gemini AI Generation requests with retry and fallback support.
+ * Generic wrapper for Gemini AI Generation requests with manual XHR for maximum stability.
+ * This bypasses the SDK's internal fetch() to prevent "Failed to fetch" errors.
  */
-async function executeGaiRequest<T>(
-  action: (ai: GoogleGenAI, model: string) => Promise<T>,
+async function executeGaiRequest(
+  payload: any,
   model: string,
   onStatus?: StatusCallback,
   attempt: number = 0
-): Promise<T> {
+): Promise<any> {
   const apiKey = getActiveApiKey(attempt);
-  const ai = new GoogleGenAI({ apiKey });
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
   
   try {
-    return await action(ai, model);
+    return await new Promise((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      xhr.open('POST', url);
+      xhr.setRequestHeader('Content-Type', 'application/json');
+      
+      xhr.onload = () => {
+        if (xhr.status >= 200 && xhr.status < 300) {
+          try {
+            const data = JSON.parse(xhr.responseText);
+            if (data.candidates && data.candidates[0] && data.candidates[0].content && data.candidates[0].content.parts) {
+               resolve({ text: data.candidates[0].content.parts[0].text });
+            } else {
+               resolve(data);
+            }
+          } catch (e) {
+            reject(new Error("Failed to parse AI response."));
+          }
+        } else {
+          const msg = `AI Error (${xhr.status}): ${xhr.responseText}`;
+          reject(new Error(msg));
+        }
+      };
+      
+      xhr.onerror = () => reject(new Error("Network connection lost during AI generation."));
+      xhr.send(JSON.stringify(payload));
+    });
   } catch (error: any) {
     logger.error(`AI Request Attempt ${attempt + 1} Failed`, { model, error: error.message });
     
@@ -71,9 +96,9 @@ async function executeGaiRequest<T>(
         else onStatus("Connection lost, reconnecting...");
       }
       
-      const delay = Math.pow(2, attempt) * 1000; // Exponential backoff
+      const delay = Math.pow(2, attempt) * 1000;
       await new Promise(r => setTimeout(r, delay));
-      return executeGaiRequest(action, model, onStatus, attempt + 1);
+      return executeGaiRequest(payload, model, onStatus, attempt + 1);
     }
     throw error;
   }
@@ -274,7 +299,7 @@ export const transcribeAudio = async (
         throw new Error("API Key is missing. Please check your environment configuration.");
       }
       
-      const ai = new GoogleGenAI({ apiKey: activeApiKey });
+      // manual construction of part object
       const modelName = currentModel;
       
       onStatus?.(`Engine initialized: ${modelName} ${useFallbackKey ? '(Backup Key)' : '(Primary)'} (Attempt ${attempt + 1})`, 8);
@@ -326,17 +351,16 @@ export const transcribeAudio = async (
          onStatus?.(msgs[Math.floor(Math.random() * msgs.length)]);
       }, 3000);
 
-      const response = await executeGaiRequest(async (genAi, model) => {
-        return await genAi.models.generateContent({
-          model: model,
-          contents: {
-            parts: [
-              contentPart,
-              { text: autoEdit ? autoEditPrompt : rawPrompt }
-            ]
-          }
-        });
-      }, modelName, onStatus, attempt);
+      const payload = {
+        contents: [{
+          parts: [
+            contentPart,
+            { text: autoEdit ? autoEditPrompt : rawPrompt }
+          ]
+        }]
+      };
+ 
+      const response = await executeGaiRequest(payload, modelName, onStatus, attempt);
       
       clearInterval(fakeProgressTimer);
 
@@ -426,20 +450,18 @@ export const classifyContent = async (text: string): Promise<string> => {
   const model = AI_MODELS.FAST; 
   const sample = text.substring(0, 2000);
   const prompt = `Classify this text into one category: Song, Podcast, Interview, Meeting, Lecture, Video, Voice Note, News. Return ONLY the category name.\n\nText:\n${sample}`;
-
+ 
   try {
-    const response = await executeGaiRequest(async (ai, m) => {
-      return await ai.models.generateContent({ model: m, contents: prompt });
-    }, model);
+    const payload = { contents: [{ parts: [{ text: prompt }] }] };
+    const response = await executeGaiRequest(payload, model);
     return String(response.text || "").trim() || "Unknown";
   } catch (e) {
     logger.warn("Classification failed", e);
     return "Media";
   }
 };
-
+ 
 export const summarizeText = async (text: string, useSmartModel: boolean = false): Promise<string> => {
-  const ai = new GoogleGenAI({ apiKey: import.meta.env.VITE_GEMINI_API_KEY });
   const model = useSmartModel ? AI_MODELS.PRIMARY : AI_MODELS.FAST; 
   const prompt = `
     You are ScribeAI Intelligence, a premium transcription analysis engine. Provide a deep, structured analysis of the provided transcript.
@@ -463,9 +485,8 @@ export const summarizeText = async (text: string, useSmartModel: boolean = false
     ${text}
   `;
   try {
-    const response = await executeGaiRequest(async (ai, m) => {
-      return await ai.models.generateContent({ model: m, contents: prompt });
-    }, model);
+    const payload = { contents: [{ parts: [{ text: prompt }] }] };
+    const response = await executeGaiRequest(payload, model);
     return String(response.text || "Could not generate summary.");
   } catch (e) {
     logger.error("Summarization error", e);
@@ -474,7 +495,6 @@ export const summarizeText = async (text: string, useSmartModel: boolean = false
 };
 
 export const enhanceFormatting = async (text: string, contextType: string = "General", useSmartModel: boolean = false): Promise<string> => {
-  const ai = new GoogleGenAI({ apiKey: import.meta.env.VITE_GEMINI_API_KEY });
   const model = useSmartModel ? AI_MODELS.PRIMARY : AI_MODELS.FAST;
   
   const prompt = `
@@ -503,9 +523,8 @@ export const enhanceFormatting = async (text: string, contextType: string = "Gen
   `;
   
   try {
-    const response = await executeGaiRequest(async (ai, m) => {
-      return await ai.models.generateContent({ model: m, contents: prompt });
-    }, model);
+    const payload = { contents: [{ parts: [{ text: prompt }] }] };
+    const response = await executeGaiRequest(payload, model);
     return String(response.text || text);
   } catch (e) {
     logger.error("Enhance Formatting error", e);
@@ -514,7 +533,6 @@ export const enhanceFormatting = async (text: string, contextType: string = "Gen
 };
 
 export const extractKeyMoments = async (text: string, useSmartModel: boolean = false): Promise<string> => {
-  const ai = new GoogleGenAI({ apiKey: import.meta.env.VITE_GEMINI_API_KEY });
   const model = useSmartModel ? AI_MODELS.PRIMARY : AI_MODELS.FAST;
   
   const prompt = `
@@ -531,9 +549,8 @@ export const extractKeyMoments = async (text: string, useSmartModel: boolean = f
   `;
   
   try {
-    const response = await executeGaiRequest(async (ai, m) => {
-      return await ai.models.generateContent({ model: m, contents: prompt });
-    }, model);
+    const payload = { contents: [{ parts: [{ text: prompt }] }] };
+    const response = await executeGaiRequest(payload, model);
     return String(response.text || "No key moments identified.");
   } catch (e) {
     logger.error("Key Moments error", e);
@@ -545,7 +562,6 @@ export const extractKeyMoments = async (text: string, useSmartModel: boolean = f
  * Identifies the start and end of the main discussion.
  */
 export const findDiscussionBounds = async (text: string, useSmartModel: boolean = false): Promise<string> => {
-   const ai = new GoogleGenAI({ apiKey: import.meta.env.VITE_GEMINI_API_KEY });
    const model = useSmartModel ? AI_MODELS.PRIMARY : AI_MODELS.FAST;
    
    const prompt = `
@@ -561,9 +577,8 @@ export const findDiscussionBounds = async (text: string, useSmartModel: boolean 
    `;
    
    try {
-     const response = await executeGaiRequest(async (ai, m) => {
-       return await ai.models.generateContent({ model: m, contents: prompt });
-     }, model);
+     const payload = { contents: [{ parts: [{ text: prompt }] }] };
+     const response = await executeGaiRequest(payload, model);
      return String(response.text || "Could not identify discussion bounds.");
    } catch (e) {
      logger.error("Discussion Bounds error", e);
@@ -575,7 +590,6 @@ export const findDiscussionBounds = async (text: string, useSmartModel: boolean 
   * Removes pleasantries and fluff, keeping only the core interview/discussion content.
   */
  export const stripPleasantries = async (text: string, useSmartModel: boolean = false): Promise<string> => {
-   const ai = new GoogleGenAI({ apiKey: import.meta.env.VITE_GEMINI_API_KEY });
    const model = useSmartModel ? AI_MODELS.PRIMARY : AI_MODELS.FAST;
    
    const prompt = `
@@ -589,9 +603,8 @@ export const findDiscussionBounds = async (text: string, useSmartModel: boolean 
    `;
    
    try {
-     const response = await executeGaiRequest(async (ai, m) => {
-       return await ai.models.generateContent({ model: m, contents: prompt });
-     }, model);
+     const payload = { contents: [{ parts: [{ text: prompt }] }] };
+     const response = await executeGaiRequest(payload, model);
      return String(response.text || text);
    } catch (e) {
      logger.error("Strip Pleasantries error", e);
@@ -599,51 +612,36 @@ export const findDiscussionBounds = async (text: string, useSmartModel: boolean 
    }
  };
  
- /**
-  * Refines speaker labels based on context.
-  */
- export const refineSpeakers = async (text: string, useSmartModel: boolean = true): Promise<string> => {
-   const ai = new GoogleGenAI({ apiKey: import.meta.env.VITE_GEMINI_API_KEY });
-   const model = useSmartModel ? AI_MODELS.PRIMARY : AI_MODELS.FAST;
-   
-     const prompt = `
-     Review the following West African transcript and refine the speaker labels. 
-     1. **Identity Extraction**: Identify if "Speaker 1", "Speaker 2", etc. can be replaced with actual names based on conversation context (e.g., someone says "Gaza", "Kojo", "Blessing").
-     2. **Role Mapping**: If the speaker's role is clear (e.g., Interviewer, Host, Guest, Doctor), append it in parentheses like "KOJO (Host)".
-     3. **Turn Correction**: Correct misattributed turns if the flow of conversation suggests a different speaker.
-     4. **Format Hook**: Keep the format: "NAME (ROLE if known) [MM:SS]: Transcript".
-     
-     CRITICAL OUTPUT RULES:
-     - Return ONLY the full refined transcript.
-     - Preserve all original formatting, bolding, and italics.
-     - Do NOT include any introductory text, notes, or concluding summaries.
-     - If you cannot identify any names, return the transcript exactly as is.
-   `;
-   
-   try {
-    const response = await executeGaiRequest(async (ai, m) => {
-      return await ai.models.generateContent({
-        model: m,
-        contents: {
-          parts: [{ text: prompt }, { text: text }]
-        }
-      });
-    }, model);
+export const refineSpeakers = async (text: string, useSmartModel: boolean = true): Promise<string> => {
+  const model = useSmartModel ? AI_MODELS.PRIMARY : AI_MODELS.FAST;
+  const prompt = `
+    Review the following West African transcript and refine the speaker labels. 
+    1. **Identity Extraction**: Identify if "Speaker 1", "Speaker 2", etc. can be replaced with actual names based on conversation context (e.g., someone says "Gaza", "Kojo", "Blessing").
+    2. **Role Mapping**: If the speaker's role is clear (e.g., Interviewer, Host, Guest, Doctor), append it in parentheses like "KOJO (Host)".
+    3. **Turn Correction**: Correct misattributed turns if the flow of conversation suggests a different speaker.
+    4. **Format Hook**: Keep the format: "NAME (ROLE if known) [MM:SS]: Transcript".
     
-    const output = String(response.text || text).trim();
-    return output.replace(/^```markdown\n/, '').replace(/^```\n/, '').replace(/\n```$/, '');
-  } catch (e) {
-    logger.error("Refine Speakers error", e);
-    return text;
-  }
+    CRITICAL OUTPUT RULES:
+    - Return ONLY the full refined transcript.
+    - Preserve all original formatting, bolding, and italics.
+    - Do NOT include any introductory text, notes, or concluding summaries.
+    - If you cannot identify any names, return the transcript exactly as is.
+  `;
+  
+  try {
+   const payload = {
+     contents: [{ parts: [{ text: prompt }, { text: text }] }]
+   };
+   const response = await executeGaiRequest(payload, model);
+   const output = String(response.text || text).trim();
+   return output.replace(/^```markdown\n/, '').replace(/^```\n/, '').replace(/\n```$/, '');
+ } catch (e) {
+   logger.error("Refine Speakers error", e);
+   return text;
+ }
 };
-
- /**
-  * Analyzes video visual content for key info
-  */
- export const analyzeVideoContent = async (mediaFile: File | Blob): Promise<string> => {
-    // ... (Video logic remains similar but uses stable model)
-    const ai = new GoogleGenAI({ apiKey: import.meta.env.VITE_GEMINI_API_KEY });
+ 
+export const analyzeVideoContent = async (mediaFile: File | Blob): Promise<string> => {
     const model = AI_MODELS.VISION; // Video understanding is great on Vision/Flash
   
     let finalMimeType = mediaFile.type;
@@ -676,12 +674,11 @@ export const findDiscussionBounds = async (text: string, useSmartModel: boolean 
         4. **Context**: Infer context (e.g. formal meeting, vlog, tutorial).
       `;
   
-      const response = await executeGaiRequest(async (ai, m) => {
-        return await ai.models.generateContent({
-          model: m,
-          contents: { parts: [contentPart, { text: prompt }] },
-        });
-      }, model);
+      const payload = {
+        contents: [{ parts: [contentPart, { text: prompt }] }]
+      };
+      
+      const response = await executeGaiRequest(payload, model);
   
       return String(response.text || "No analysis could be generated.");
     } catch (error: any) {
