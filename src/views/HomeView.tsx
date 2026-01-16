@@ -1,7 +1,7 @@
 import React from 'react';
 import { 
   Lightning, SignIn, SignOut, Spinner, Moon, Sun, Microphone, UploadSimple, 
-  Link, ArrowLeft, ArrowRight, FileText, Sparkle, Users, Check, WarningCircle, Brain, Info, Clock, X
+  Link, ArrowLeft, ArrowRight, FileText, Sparkle, Users, User, Check, WarningCircle, Brain, Info, Clock, X
 } from '@phosphor-icons/react';
 import { AudioSource, AudioFile, TranscriptionState } from '../../types';
 import AudioRecorder from '../../components/AudioRecorder';
@@ -98,7 +98,7 @@ const HomeView: React.FC<HomeViewProps> = ({
                className="flex items-center gap-2.5 px-5 py-2.5 rounded-2xl bg-white dark:bg-dark-card border border-slate-100 dark:border-white/5 text-xs font-bold text-slate-600 dark:text-slate-300 hover:shadow-md transition-all group"
              >
                <Clock size={18} weight="duotone" className="text-slate-400 group-hover:text-primary transition-colors" />
-               <span className="hidden sm:inline">Tabs</span>
+               <span className="hidden sm:inline">Tabs and Sessions</span>
                {archiveItems.length > 0 && (
                  <div className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse ml-0.5"></div>
                )}
@@ -109,10 +109,12 @@ const HomeView: React.FC<HomeViewProps> = ({
                googleAccessToken ? (
                  <button 
                     onClick={handleGoogleLogout}
-                    className="w-10 h-10 rounded-2xl bg-white dark:bg-dark-card border border-slate-100 dark:border-white/5 flex items-center justify-center hover:shadow-md transition-all group"
-                    title="Sign Out"
+                    className="w-10 h-10 rounded-2xl bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-100 dark:border-emerald-500/20 flex items-center justify-center hover:shadow-md transition-all group relative"
+                    title="Disconnect Google Drive"
                   >
-                    <SignOut size={18} weight="bold" className="text-slate-400 group-hover:text-primary transition-transform" />
+                    <GoogleLogo size={18} weight="bold" className="text-emerald-600 dark:text-emerald-400 group-hover:opacity-0 transition-opacity" />
+                    <SignOut size={18} weight="bold" className="text-red-500 absolute opacity-0 group-hover:opacity-100 transition-opacity" />
+                    <div className="absolute top-0 right-0 -mt-1 -mr-1 w-2.5 h-2.5 bg-emerald-500 rounded-full border-2 border-white dark:border-[#0a0a0a]"></div>
                   </button>
                ) : (
                  googleClientId && (
@@ -120,9 +122,9 @@ const HomeView: React.FC<HomeViewProps> = ({
                       onClick={handleGoogleLogin}
                       disabled={isLoggingIn}
                       className="w-10 h-10 rounded-2xl bg-white dark:bg-dark-card border border-slate-100 dark:border-white/5 flex items-center justify-center hover:shadow-md transition-all group"
-                      title="Sign In"
+                      title="Connect Google Drive"
                     >
-                      {isLoggingIn ? <Spinner size={18} weight="bold" className="animate-spin text-primary" /> : <SignIn size={18} weight="bold" className="text-slate-400 group-hover:text-primary transition-colors" />}
+                      {isLoggingIn ? <Spinner size={18} weight="bold" className="animate-spin text-primary" /> : <GoogleLogo size={18} weight="bold" className="text-slate-400 group-hover:text-primary transition-colors" />}
                     </button>
                  )
                )
@@ -436,14 +438,20 @@ const HomeView: React.FC<HomeViewProps> = ({
 
         {/* Error Notification */}
         {transcriptionError && (
-          <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 animate-in slide-in-from-bottom-5 fade-in">
-            <div className="bg-red-50 dark:bg-red-900/20 text-red-900 dark:text-red-200 px-6 py-4 rounded-2xl border border-red-100 dark:border-red-800 shadow-2xl flex items-center gap-4">
-               <div className="bg-red-100 dark:bg-red-800/40 p-2 rounded-full text-red-600 dark:text-red-300"><Info size={20} weight="duotone" /></div>
+          <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[100] animate-in slide-in-from-bottom-5 fade-in duration-300">
+            <div className="bg-red-50 dark:bg-red-900/90 text-red-900 dark:text-red-100 px-6 py-4 rounded-2xl border border-red-100 dark:border-red-800 shadow-2xl flex items-center gap-4 backdrop-blur-xl">
+               <div className="bg-red-100 dark:bg-red-800 p-2 rounded-full text-red-600 dark:text-red-200 min-w-[36px] min-h-[36px] flex items-center justify-center"><Info size={20} weight="duotone" /></div>
                <div>
                   <h4 className="font-bold text-sm">Transcription Failed</h4>
-                  <p className="text-xs opacity-80 mt-0.5">{transcriptionError}</p>
+                  <p className="text-xs opacity-90 mt-0.5 max-w-[260px] leading-relaxed">{transcriptionError}</p>
                </div>
-               <button onClick={() => setTranscription(prev => ({...prev, error: null}))} className="ml-2 hover:bg-red-100 dark:hover:bg-red-800/40 p-1 rounded-full"><span className="sr-only">Dismiss</span><X size={16} /></button>
+               <button 
+                  onClick={() => setTranscription(prev => ({...prev, error: null}))} 
+                  className="ml-2 hover:bg-red-100 dark:hover:bg-red-800 p-2 rounded-full transition-colors cursor-pointer active:scale-95 flex-shrink-0 relative z-50"
+                  title="Dismiss"
+                >
+                  <X size={18} weight="bold" />
+                </button>
             </div>
           </div>
         )}

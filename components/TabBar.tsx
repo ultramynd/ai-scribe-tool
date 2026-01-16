@@ -16,41 +16,38 @@ const TabBar: React.FC<TabBarProps> = ({ tabs, activeTabId, onTabSelect, onTabCl
   if (tabs.length === 0) return null;
 
   return (
-    <div className="w-full bg-white/40 dark:bg-dark-bg/40 backdrop-blur-3xl border-b border-slate-200 dark:border-white/[0.05] px-4 py-2 flex items-center gap-2 overflow-x-auto no-scrollbar relative z-[60]">
+    <div className="w-full bg-[#050505] dark:bg-[#050505] border-t-2 border-indigo-500 border-b border-white/[0.05] px-2 py-1.5 flex items-center gap-1 overflow-x-auto no-scrollbar relative z-[60]">
       <AnimatePresence mode="popLayout">
         {tabs.map((tab) => (
           <motion.div
             key={tab.id}
-            initial={{ opacity: 0, y: -10, scale: 0.95 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.9, y: 10 }}
-            whileHover={{ y: -1 }}
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.9 }}
             onClick={() => onTabSelect(tab.id)}
             className={`
-              group relative flex items-center gap-2 px-4 py-2.5 rounded-2xl text-[11px] font-black uppercase tracking-wider transition-all cursor-pointer min-w-[140px] max-w-[220px] border
+              group relative flex items-center gap-2 px-3 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-widest transition-all cursor-pointer min-w-[120px] max-w-[200px] border select-none
               ${activeTabId === tab.id 
-                ? 'bg-white dark:bg-dark-card border-slate-200 dark:border-white/[0.04] shadow-lg shadow-slate-900/[0.04] text-primary dark:text-white ring-1 ring-black/5 dark:ring-white/[0.02]' 
-                : 'bg-transparent border-transparent text-slate-500 dark:text-slate-400 hover:bg-slate-100/50 dark:hover:bg-white/5 hover:text-slate-700 dark:hover:text-slate-200'}
+                ? 'bg-[#151515] border-white/[0.1] text-indigo-100 shadow-sm' 
+                : 'bg-transparent border-transparent text-slate-500 hover:bg-white/[0.03] hover:text-slate-300'}
             `}
           >
-            <div className={`w-2 h-2 rounded-full ${tab.transcription.isLoading ? 'bg-amber-500 animate-pulse' : (activeTabId === tab.id ? 'bg-primary dark:bg-accent' : 'bg-slate-300 dark:bg-slate-600')}`}></div>
-            <FileText size={14} weight={activeTabId === tab.id ? "duotone" : "bold"} className="shrink-0" />
-            <span className="flex-1 truncate">{tab.title || 'New Transcription'}</span>
+            {/* Dot Indicator */}
+            <div className={`w-1.5 h-1.5 rounded-full shrink-0 ${activeTabId === tab.id ? 'bg-indigo-400 shadow-[0_0_8px_rgba(99,102,241,0.5)]' : 'bg-slate-700'}`}></div>
+            
+            <FileText size={12} weight={activeTabId === tab.id ? "fill" : "regular"} className="shrink-0 opacity-70" />
+            
+            <span className="flex-1 truncate pt-0.5">{tab.title || 'New Document'}</span>
+            
             <button
               onClick={(e) => {
                 e.stopPropagation();
                 onTabClose(tab.id);
               }}
-              className="p-1 rounded-lg opacity-0 group-hover:opacity-100 hover:bg-red-50 hover:text-red-500 dark:hover:bg-red-900/20 transition-all shrink-0"
+              className={`p-0.5 rounded-full opacity-0 group-hover:opacity-100 transition-all shrink-0 ${activeTabId === tab.id ? 'hover:bg-white/10 hover:text-white' : 'hover:bg-white/5 hover:text-red-400'}`}
             >
               <X size={10} weight="bold" />
             </button>
-            {activeTabId === tab.id && (
-              <motion.div 
-                layoutId="activeTabGlow"
-                className="absolute inset-0 rounded-2xl ring-2 ring-primary/20 dark:ring-accent/20 pointer-events-none"
-              />
-            )}
           </motion.div>
         ))}
       </AnimatePresence>
@@ -58,14 +55,13 @@ const TabBar: React.FC<TabBarProps> = ({ tabs, activeTabId, onTabSelect, onTabCl
       {/* New Tab Button */}
       <button 
         onClick={onNewTab}
-        className="w-10 h-10 flex items-center justify-center rounded-2xl text-slate-400 dark:text-slate-200 hover:bg-white dark:hover:bg-dark-card hover:text-primary dark:hover:text-accent hover:shadow-xl hover:shadow-slate-900/[0.05] transition-all shrink-0 border border-transparent hover:border-slate-100 dark:hover:border-white/5"
+        className="w-8 h-8 flex items-center justify-center rounded-full text-slate-500 hover:text-indigo-400 hover:bg-white/[0.05] transition-all shrink-0 ml-1"
         title="New Document"
       >
-        <Plus size={18} weight="bold" />
+        <Plus size={16} weight="regular" />
       </button>
 
-      {/* Separator - Removed */}
-      {/* Zen Mode Toggle - Removed (Moved to Editor Header) */}
+      <div className="flex-1" /> {/* Spacer to push content left */}
     </div>
   );
 };

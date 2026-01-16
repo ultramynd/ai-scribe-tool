@@ -198,11 +198,38 @@ const App: React.FC = () => {
     }
   }, [transcription.isLoading, transcription.text]);
 
+  const [hasPeeked, setHasPeeked] = useState(false);
+
+  // Drawer Peek Animation (Swipe In/Out) when entering Editor
+  useEffect(() => {
+    if (activeTabId && !activeTabObj?.transcription.isLoading && activeTabObj?.transcription.text && !hasPeeked) {
+      // Sequence: Show -> Hide -> Show -> Hide
+      const sequence = async () => {
+        // Initial Delay
+        await new Promise(r => setTimeout(r, 800)); 
+        
+        setIsTabsVisible(true); // Swipe In 1
+        await new Promise(r => setTimeout(r, 600)); 
+        
+        setIsTabsVisible(false); // Swipe Out 1
+        await new Promise(r => setTimeout(r, 300));
+        
+        setIsTabsVisible(true); // Swipe In 2
+        await new Promise(r => setTimeout(r, 600));
+
+        setIsTabsVisible(false); // Swipe Out 2 (Final)
+        setHasPeeked(true);
+      };
+
+      sequence();
+    }
+  }, [activeTabId, activeTabObj?.transcription.isLoading, activeTabObj?.transcription.text, hasPeeked]);
+
   useEffect(() => {
     return () => { if (micUrl) URL.revokeObjectURL(micUrl); };
   }, [micUrl]);
 
-  const handleSaveToDrive = async (format: 'doc' | 'txt' = 'doc') => {
+  const handleSaveToDrive = async (format: 'doc' | 'txt' | 'srt' = 'doc') => {
     if (!googleAccessToken || !transcription.text) {
       handleGoogleLogin();
       return;
@@ -221,23 +248,26 @@ const App: React.FC = () => {
       
       const fileName = `ScribeAI Transcription - ${timestamp}`;
       
-      // Prepare metadata based on format
+      let mimeType = 'application/vnd.google-apps.document';
+      if (format === 'txt') mimeType = 'text/plain';
+      else if (format === 'srt') mimeType = 'text/plain'; // Drive treats SRT as text usually
+
+      // Prepare metadata
       const metadata = {
         name: fileName,
-        mimeType: format === 'doc' 
-          ? 'application/vnd.google-apps.document' 
-          : 'text/plain',
+        mimeType: mimeType,
         description: `Transcription created with ScribeAI on ${timestamp}`
       };
       
-      // Create form data for multipart upload
+      // Create form data
       const form = new FormData();
       form.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
       
-      // For Google Docs, convert markdown to HTML for better formatting
+      // Content preparation
       let content = transcription.text || '';
+      
       if (format === 'doc') {
-        // Basic markdown to HTML conversion for Google Docs
+        // HTML conversion for Google Docs
         content = content
           .replace(/^### (.*$)/gim, '<h3>$1</h3>')
           .replace(/^## (.*$)/gim, '<h2>$1</h2>')
@@ -247,7 +277,39 @@ const App: React.FC = () => {
           .replace(/__(.*?)__/g, '<u>$1</u>')
           .replace(/~~(.*?)~~/g, '<s>$1</s>')
           .replace(/\n/g, '<br>');
+      } else if (format === 'srt') {
+         // Generate SRT content locally then upload
+         // We need to duplicate the logic from exportUtils or reuse it? 
+         // generateSrt triggers download. We need the STRING content.
+         // Let's modify exportUtils to export a "createSrtString" function?
+         // For now, I'll basically implement a simple SRT generator here to avoid editing utils again if not needed, 
+         // OR I can just save the raw text if I cannot generate SRT string easily.
+         // Actually, let's keep it simple.
+         // Note: generateSrt in utils creates a blob and downloads. It doesn't return string.
+         // I'll copy the SRT logic briefly for Drive upload or better yet, refactor utils?
+         // User is waiting. CLI refactor is safer.
+         // SRT Logic:
+         const lines = content.split('\n');
+         let srt = '';
+         let counter = 1;
+         const timeRegex = /\[(\d{1,2}):(\d{2})(?::(\d{2}))?\]/;
+         for (const line of lines) {
+             const trim = line.trim();
+             if(!trim) continue;
+             const match = trim.match(timeRegex);
+             if(match) {
+                 let h=0, m=parseInt(match[1]), s=parseInt(match[2]);
+                 if(match[3]) { h=parseInt(match[1]); m=parseInt(match[2]); s=parseInt(match[3]); }
+                 const start = `${h.toString().padStart(2,'0')}:${m.toString().padStart(2,'0')}:${s.toString().padStart(2,'0')},000`;
+                 const endDate = new Date(0,0,0,h,m,s+4);
+                 const end = `${endDate.getHours().toString().padStart(2,'0')}:${endDate.getMinutes().toString().padStart(2,'0')}:${endDate.getSeconds().toString().padStart(2,'0')},000`;
+                 srt += `${counter}\n${start} --> ${end}\n${trim.replace(timeRegex,'').trim()}\n\n`;
+                 counter++;
+             }
+         }
+         content = srt || content; // Fallback if no timestamps
       }
+
       
       form.append('file', new Blob([content], { 
         type: format === 'doc' ? 'text/html' : 'text/plain' 
@@ -642,21 +704,38 @@ const App: React.FC = () => {
   // --- Main Layout Rendering ---
 
   return (
-    <div className={`flex flex-col h-screen overflow-hidden ${darkMode ? 'dark' : ''}`}>
-      {/* Top Level Tab System - Collapsible */}
-      <div className={`transition-all duration-300 ease-in-out overflow-hidden ${isTabsVisible ? 'max-h-20 opacity-100' : 'max-h-0 opacity-0'}`}>
-        <TabBar 
-          tabs={tabs} 
-          activeTabId={activeTabId} 
-          onTabSelect={setActiveTabId} 
-          onTabClose={closeTab}
-          onNewTab={() => {
-             setActiveTabId(null);
-             setIsEditorMode(false);
-             setActiveTab(null);
-          }}
-        />
-      </div>
+    <div className={`flex flex-col h-screen bg-slate-50 dark:bg-dark-bg overflow-hidden ${darkMode ? 'dark' : ''}`}>
+      {/* Top Level Tab System - Collapsible (Hidden when loading) */}
+      {!activeTabObj?.transcription.isLoading && (
+        <>
+          <div className={`relative transition-all duration-300 ease-in-out ${isTabsVisible ? 'max-h-20 opacity-100' : 'max-h-0 opacity-0'}`}>
+            <div className="overflow-hidden">
+            <TabBar 
+              tabs={tabs} 
+              activeTabId={activeTabId} 
+              onTabSelect={setActiveTabId} 
+              onTabClose={closeTab}
+              onNewTab={() => {
+                 setActiveTabId(null);
+                 setIsEditorMode(false);
+                 setActiveTab(null);
+              }}
+            />
+            </div>
+          </div>
+          
+          {/* Zen Mode "Drawer Handle" */}
+          <div className="relative z-[70] flex justify-center -mt-0.5 pointer-events-none">
+              <button 
+                 onClick={() => setIsTabsVisible(!isTabsVisible)}
+                 className="pointer-events-auto h-2.5 w-24 bg-slate-200 dark:bg-[#151515] hover:bg-indigo-500 dark:hover:bg-indigo-500 hover:h-4 transition-all duration-300 rounded-b-xl flex items-center justify-center group opacity-50 hover:opacity-100 shadow-sm border border-t-0 border-white/[0.05]"
+                 title={isTabsVisible ? "Hide Tabs (Zen Mode)" : "Show Project Tabs"}
+              >
+                 <div className="w-8 h-1 rounded-full bg-slate-400 dark:bg-slate-700 group-hover:bg-white/80 transition-colors"></div>
+              </button>
+          </div>
+        </>
+      )}
 
       <div className="flex-1 overflow-y-auto relative">
         {/* Case 1: Active Loading Tab */}
@@ -703,8 +782,9 @@ const App: React.FC = () => {
                return null;
             }}
             getOriginalFile={() => activeTabObj?.uploadedFile || null}
-            handleExportDocx={handleExportDocx}
-            handleExportTxt={handleExportTxt}
+            handleExportDocx={() => generateDocx(transcription.text || '', "Transcription")}
+            handleExportTxt={() => generateTxt(transcription.text || '', "Transcription")}
+            handleExportSrt={() => generateSrt(transcription.text || '', "Transcription")}
             googleAccessToken={googleAccessToken}
             googleClientId={googleClientId}
             driveScriptsLoaded={driveScriptsLoaded}
@@ -760,7 +840,19 @@ const App: React.FC = () => {
             setIsPickerOpen={setIsPickerOpen}
             isPickerOpen={isPickerOpen}
             handlePickDriveFile={handlePickDriveFile}
-            setTranscription={setTranscription}
+            setTranscription={(val: React.SetStateAction<TranscriptionState>) => {
+              if (activeTabId) {
+                if (typeof val === 'function') {
+                  const current = activeTabObj?.transcription || transcription;
+                  const next = (val as Function)(current);
+                  updateActiveTab({ transcription: next });
+                } else {
+                  updateActiveTab({ transcription: val });
+                }
+              } else {
+                setTranscription(val);
+              }
+            }}
             setContentType={setContentType}
             transcriptionError={activeTabObj?.transcription.error || transcription.error}
             setEditorMode={setIsEditorMode}

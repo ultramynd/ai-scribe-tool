@@ -1,83 +1,75 @@
 # ScribeAI
 
-![ScribeAI Banner](https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6)
-
-**ScribeAI** is a premium, AI-powered transcription and documentation tool designed for speed, accuracy, and depth. It transforms audio and video files into intelligent, formatted transcripts with powerful analysis features.
-
-Copyright © **Clasier Publishing**. All rights reserved.
+**ScribeAI** is an advanced, AI-powered transcription and documentation platform designed for professionals who need speed, accuracy, and nuance. Built on **Google Gemini 1.5 Pro/Flash**, it goes beyond simple speech-to-text by understanding context, speakers, and even regional dialects (including West African Pidgin).
 
 ---
 
-## 🚀 Key Features
+## ✨ key Features
 
-### 🎙️ Advanced Transcription
-- **Dual Modes**: 
-  - **Verbatim**: Captures every utterance, stutter, and filler word for 100% accuracy.
-  - **Polish**: Uses "Deep Thinking" AI to generate an intelligent, clean-read version while preserving the speaker's voice.
-- **Micro-Diarization**: Automatically identifies and labels speakers (Speaker 1, Speaker 2, etc.).
-- **Live Recording**: Built-in audio recorder for capturing real-time conversations.
-- **Multilingual Support**: Handles accents, dialects (e.g., Nigerian Pidgin), and mixed-language audio with precision.
+### 🎙️ Intelligent Transcription
+- **Deep Inference Engines**: Automatically switches between **Gemini 1.5 Pro** (for reasoning) and **Flash** (for speed) based on task complexity.
+- **Dialect-Aware**: Specifically trained prompts to handle **West African English, Nigerian Pidgin, and mixed-language** audio without "correcting" the unique voice.
+- **Micro-Diarization**: Accurately identifies and labels speakers.
 
-### 🧠 AI Analysis & Intelligence
-- **Smart Summaries**: Generates executive summaries of long recordings.
-- **Key Moments**: Extracts critical takeaways with timestamps.
-- **Discussion Bounds**: Automatically identifies the start and end of core content (skipping pleasantries).
-- **Visual Analysis**: Processes video files to describe visual context, actions, and on-screen text.
-- **Draggable Insight Cards**: All AI results (Summaries, Key Moments) appear in floating, movable cards for a flexible workspace.
+### 🧠 Smart Analysis
+- **Executive Summaries**: Instant one-page summaries of hour-long meetings.
+- **Key Moments Extraction**: Identifies decisions, action items, and crucial timestamps.
+- **Discussion Bounds**: Automatically ignores pleasantries and focuses on the core content.
 
-### 📝 Rich Text Editor
-- **Interactive Formatting**: Bold, Italic, Underline, and interactive Strikethrough (click to delete).
-- **Read vs. Edit Modes**: Switch between a clean reading experience and a full-featured text editor.
-- **Floating Toolbar**: Context-aware formatting tools that stay within reach.
-- **Google Docs Experience**: A familiar, page-based layout with auto-saving history (Undo/Redo).
+### 🎨 Premium Experience
+- **Zen Mode**: A distraction-free environment for pure writing.
+- **Dark Mode**: Fully polished dark UI for late-night sessions.
+- **Rich Text Editor**: A Notion-style editor with interactive tools.
 
-### ☁️ Integrations & Workflow
-- **Google Drive Integration**: Directly pick audio/video files from your Google Drive.
-- **Background Processing**: Queue multiple files to transcribe in the background while you work.
-- **Export Options**: Download transcripts as `.txt`, `.docx` (Word), or `.srt` (Subtitles).
-- **Session Persistence**: Secure Google Sign-In keeps you logged in across reloads.
+### 🛡️ Resilience
+- **Smart Fallback**: Automatically switches API keys and Models if quotas are exceeded to ensure 99.9% uptime.
 
 ---
 
-## 🛠️ Getting Started
+## 🛠️ Installation & Setup
 
 ### Prerequisites
-- Node.js (v18 or higher)
-- A Google Cloud Project with the **Gemini API** enabled.
+- Node.js v18+
+- A Google Cloud API Key (Gemini API)
 
-### Installation
+### 1. Clone the Repository
+```bash
+git clone https://github.com/your-username/ai-scribe-tool.git
+cd ai-scribe-tool
+```
 
-1. **Clone the repository**:
-   ```bash
-   git clone https://github.com/your-repo/scribe-ai.git
-   cd scribe-ai
-   ```
+### 2. Install Dependencies
+```bash
+npm install
+```
 
-2. **Install dependencies**:
-   ```bash
-   npm install
-   ```
+### 3. Environment Variables
+Create a `.env.local` file in the root directory:
 
-3. **Configure Environment**:
-   Create a `.env` file in the root directory and add your keys:
-   ```env
-   VITE_GEMINI_API_KEY=your_gemini_api_key_here
-   VITE_GOOGLE_CLIENT_ID=your_google_client_id_here
-   VITE_GOOGLE_API_KEY=your_google_picker_api_key_here
-   ```
+```env
+# Primary API Key (Gemini)
+VITE_GEMINI_API_KEY=your_primary_key
 
-4. **Run Locally**:
-   ```bash
-   npm run dev
-   ```
-   Access the app at `http://localhost:5173`.
+# Optional: Fallback Key for Resilience
+VITE_GEMINI_API_KEY_FALLBACK=your_backup_key
+
+# Google Drive Picker (Optional)
+VITE_GOOGLE_CLIENT_ID=your_client_id
+VITE_GOOGLE_API_KEY=your_picker_key
+```
+
+### 4. Run Locally
+```bash
+npm run dev
+```
 
 ---
 
-## 🔒 Privacy & Security
-- **Local-First Processing**: Audio buffering often happens locally before secure transmission.
-- **Google OAuth**: Secure authentication via your Google account.
-- **Transient Data**: Files are processed by Gemini 1.5 Flash/Pro and are not stored permanently on ScribeAI servers.
+## 🔒 Security
+ScribeAI operates with a **Local-First** philosophy.
+- Audio buffering is handled locally.
+- Files are processed transiently by the AI model.
+- No data is permanently stored on ScribeAI servers.
 
 ---
 

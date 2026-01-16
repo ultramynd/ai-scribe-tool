@@ -2,7 +2,7 @@ import React from 'react';
 import { 
   X, Clock, CheckCircle, WarningCircle, Spinner, 
   FileText, Trash, ArrowLineUpRight, HardDrive, 
-  DotsThreeVertical, FileAudio, FileVideo, Plus
+  DotsThreeVertical, FileAudio, FileVideo, Plus, ArrowsClockwise
 } from '@phosphor-icons/react';
 import { ArchiveItem } from '../types';
 
@@ -16,14 +16,7 @@ interface ArchiveSidebarProps {
 }
 
 const ArchiveSidebar: React.FC<ArchiveSidebarProps> = ({ isOpen, onClose, items, onSelectItem, onDeleteItem, onUploadFile }) => {
-  const fileInputRef = React.useRef<HTMLInputElement>(null);
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file && onUploadFile) {
-      onUploadFile(file);
-    }
-  };
   return (
     <>
       {/* Backdrop */}
@@ -47,8 +40,8 @@ const ArchiveSidebar: React.FC<ArchiveSidebarProps> = ({ isOpen, onClose, items,
                 <Clock size={20} weight="duotone" />
               </div>
               <div>
-                <h3 className="text-lg font-bold text-slate-900 dark:text-white leading-tight">Transcription Archive</h3>
-                <p className="text-[10px] text-slate-400 dark:text-dark-muted font-bold uppercase tracking-widest mt-0.5">History & Queued Tasks</p>
+                <h3 className="text-lg font-bold text-slate-900 dark:text-white leading-tight">Sessions</h3>
+                <h3 className="text-[10px] text-slate-400 dark:text-dark-muted font-bold uppercase tracking-widest mt-0.5">Manage your workspace</h3>
               </div>
             </div>
             <button 
@@ -59,23 +52,7 @@ const ArchiveSidebar: React.FC<ArchiveSidebarProps> = ({ isOpen, onClose, items,
             </button>
           </div>
 
-          {/* Action Bar */}
-          <div className="px-6 py-4 bg-slate-50/80 dark:bg-dark-bg/50 border-b border-slate-100 dark:border-dark-border">
-            <input 
-              type="file" 
-              ref={fileInputRef} 
-              onChange={handleFileChange} 
-              className="hidden" 
-              accept="audio/*,video/*"
-            />
-            <button 
-              onClick={() => fileInputRef.current?.click()}
-              className="w-full flex items-center justify-center gap-2.5 py-3 px-4 bg-primary text-white rounded-2xl font-bold text-xs shadow-lg shadow-primary/20 hover:scale-[1.02] transition-all active:scale-95"
-            >
-              <Plus size={18} weight="bold" />
-              <span>Import New Media</span>
-            </button>
-          </div>
+
 
           {/* List */}
           <div className="flex-1 overflow-y-auto p-4 custom-scrollbar">
@@ -84,8 +61,8 @@ const ArchiveSidebar: React.FC<ArchiveSidebarProps> = ({ isOpen, onClose, items,
                 <div className="w-16 h-16 rounded-[2rem] bg-slate-50 dark:bg-dark-bg flex items-center justify-center mb-6">
                   <FileText size={28} weight="duotone" />
                 </div>
-                <p className="text-sm font-bold">Your archive is empty</p>
-                <p className="text-xs mt-2">Any transcription you start will automatically be saved here for later access.</p>
+                <p className="text-sm font-bold">No active sessions</p>
+                <p className="text-xs mt-2">Any transcription you start will automatically appear here.</p>
               </div>
             ) : (
               <div className="space-y-3">
@@ -128,13 +105,35 @@ const ArchiveSidebar: React.FC<ArchiveSidebarProps> = ({ isOpen, onClose, items,
 
                       {/* Delete Button */}
                       <button 
-                        onClick={() => onDeleteItem(item.id)}
-                        className="absolute top-4 right-4 p-2 rounded-lg text-slate-300 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 opacity-0 group-hover:opacity-100 transition-all"
+                        onClick={(e) => { e.stopPropagation(); onDeleteItem(item.id); }}
+                        className="absolute top-4 right-4 p-2 rounded-lg text-slate-300 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 opacity-0 group-hover:opacity-100 transition-all z-20"
                         title="Remove from archive"
                       >
                         <Trash size={16} weight="duotone" />
                       </button>
+
+                      {/* Restart/Retry Button (Only on Error) */}
+                      {item.status === 'error' && (
+                        <button 
+                          onClick={(e) => { e.stopPropagation(); onSelectItem(item); }}
+                          className="absolute top-4 right-12 p-2 rounded-lg text-slate-300 hover:text-primary hover:bg-primary/10 opacity-0 group-hover:opacity-100 transition-all z-20"
+                          title="Restart Session"
+                        >
+                          <ArrowsClockwise size={16} weight="bold" />
+                        </button>
+                      )}
                     </div>
+
+                    {item.status === 'error' && item.error && (
+                      <div className="mt-3 p-2.5 rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-100 dark:border-red-900/30">
+                        <div className="flex items-start gap-2">
+                          <WarningCircle size={14} weight="fill" className="text-red-500 mt-0.5 flex-shrink-0" />
+                          <p className="text-[10px] text-red-600 dark:text-red-300 font-medium leading-relaxed">
+                            {item.error}
+                          </p>
+                        </div>
+                      </div>
+                    )}
 
                     {item.status === 'complete' && (
                       <button 

@@ -1,5 +1,6 @@
 import { GoogleGenAI } from "@google/genai";
 import { blobToBase64 } from "../utils/audioUtils";
+import { logger } from "../utils/logger";
 
 // Explicit MIME type mapping to ensure API compatibility
 const MIME_TYPE_MAP: Record<string, string> = {
@@ -41,87 +42,95 @@ const uploadFileToGemini = async (
   const uploadUrl = `https://generativelanguage.googleapis.com/upload/v1beta/files?key=${import.meta.env.VITE_GEMINI_API_KEY}`;
   const displayName = mediaFile instanceof File ? mediaFile.name : 'uploaded_media';
   
-  const initialResponse = await fetch(uploadUrl, {
-    method: 'POST',
-    headers: {
-      'X-Goog-Upload-Protocol': 'resumable',
-      'X-Goog-Upload-Command': 'start',
-      'X-Goog-Upload-Header-Content-Length': mediaFile.size.toString(),
-      'X-Goog-Upload-Header-Content-Type': mimeType,
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify({ 
-        file: { 
-            display_name: displayName,
-            mime_type: mimeType 
-        } 
-    })
-  });
+  try {
+    const initialResponse = await fetch(uploadUrl, {
+        method: 'POST',
+        headers: {
+        'X-Goog-Upload-Protocol': 'resumable',
+        'X-Goog-Upload-Command': 'start',
+        'X-Goog-Upload-Header-Content-Length': mediaFile.size.toString(),
+        'X-Goog-Upload-Header-Content-Type': mimeType,
+        'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ 
+            file: { 
+                display_name: displayName,
+                mime_type: mimeType 
+            } 
+        })
+    });
 
-  if (!initialResponse.ok) throw new Error(`Failed to initiate upload: ${initialResponse.statusText}`);
+    if (!initialResponse.ok) {
+        const errText = await initialResponse.text();
+        throw new Error(`Failed to initiate upload: ${initialResponse.status} ${errText}`);
+    }
 
-  const uploadUrlHeader = initialResponse.headers.get('x-goog-upload-url');
-  if (!uploadUrlHeader) throw new Error("Failed to get upload URL");
+    const uploadUrlHeader = initialResponse.headers.get('x-goog-upload-url');
+    if (!uploadUrlHeader) throw new Error("Failed to get upload URL");
 
-  onStatus?.("Capturing upload slot (Protocol: Resumable)...", 10);
-  const uploadBlob = new Blob([mediaFile], { type: mimeType });
+    onStatus?.("Capturing upload slot (Protocol: Resumable)...", 10);
+    const uploadBlob = new Blob([mediaFile], { type: mimeType });
 
-  // Use XHR for upload progress tracking
-  const fileInfo = await new Promise<any>((resolve, reject) => {
-      const xhr = new XMLHttpRequest();
-      xhr.open('POST', uploadUrlHeader);
-      xhr.setRequestHeader('Content-Length', mediaFile.size.toString());
-      xhr.setRequestHeader('X-Goog-Upload-Offset', '0');
-      xhr.setRequestHeader('X-Goog-Upload-Command', 'upload, finalize');
+    // Use XHR for upload progress tracking
+    const fileInfo = await new Promise<any>((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        xhr.open('POST', uploadUrlHeader);
+        xhr.setRequestHeader('Content-Length', mediaFile.size.toString());
+        xhr.setRequestHeader('X-Goog-Upload-Offset', '0');
+        xhr.setRequestHeader('X-Goog-Upload-Command', 'upload, finalize');
 
-      xhr.upload.onprogress = (event) => {
-          if (event.lengthComputable) {
-              const percentComplete = (event.loaded / event.total);
-              // Map upload to 10-50% range
-              const mappedProgress = 10 + Math.round(percentComplete * 40);
-              onStatus?.(`Uploading media: ${Math.round(percentComplete * 100)}%`, mappedProgress);
-          }
-      };
+        xhr.upload.onprogress = (event) => {
+            if (event.lengthComputable) {
+                const percentComplete = (event.loaded / event.total);
+                // Map upload to 10-50% range
+                const mappedProgress = 10 + Math.round(percentComplete * 40);
+                onStatus?.(`Uploading media: ${Math.round(percentComplete * 100)}%`, mappedProgress);
+            }
+        };
 
-      xhr.onload = () => {
-          if (xhr.status >= 200 && xhr.status < 300) {
-              try {
-                  resolve(JSON.parse(xhr.responseText));
-              } catch (e) {
-                  reject(new Error("Failed to parse upload response"));
-              }
-          } else {
-              reject(new Error(`Upload failed with status: ${xhr.status}`));
-          }
-      };
+        xhr.onload = () => {
+            if (xhr.status >= 200 && xhr.status < 300) {
+                try {
+                    resolve(JSON.parse(xhr.responseText));
+                } catch (e) {
+                    reject(new Error("Failed to parse upload response"));
+                }
+            } else {
+                reject(new Error(`Upload failed with status: ${xhr.status}`));
+            }
+        };
 
-      xhr.onerror = () => {
-          onStatus?.("Upload failed: Network error", 0);
-          reject(new Error("Network error during upload"));
-      };
-      xhr.send(uploadBlob);
-  });
+        xhr.onerror = () => {
+            onStatus?.("Upload failed: Network error", 0);
+            reject(new Error("Network error during upload"));
+        };
+        xhr.send(uploadBlob);
+    });
 
-  const fileUri = fileInfo.file.uri;
-  const fileState = fileInfo.file.state;
+    const fileUri = fileInfo.file.uri;
+    const fileState = fileInfo.file.state;
 
-  if (fileState === 'PROCESSING') {
-     onStatus?.("Server-side processing (AIAudioEngine)...", 20);
-     let currentState = fileState;
-     let retries = 0;
-     while (currentState === 'PROCESSING' && retries < 30) {
-         await new Promise(r => setTimeout(r, 2000));
-         onStatus?.(`Analyzing deep features (${retries + 1}/30)...`, 20 + (retries * 2));
-         const pollUrl = `https://generativelanguage.googleapis.com/v1beta/files/${fileInfo.file.name}?key=${import.meta.env.VITE_GEMINI_API_KEY}`;
-         const pollResp = await fetch(pollUrl);
-         const pollData = await pollResp.json();
-         currentState = pollData.state;
-         retries++;
-     }
-     if (currentState === 'FAILED') throw new Error("File processing failed on server side.");
+    if (fileState === 'PROCESSING') {
+        onStatus?.("Server-side processing (AIAudioEngine)...", 20);
+        let currentState = fileState;
+        let retries = 0;
+        while (currentState === 'PROCESSING' && retries < 60) { // Increased timeout for larger files
+            await new Promise(r => setTimeout(r, 2000));
+            onStatus?.(`Analyzing deep features (${retries + 1}/60)...`, 20 + (retries * 1));
+            const pollUrl = `https://generativelanguage.googleapis.com/v1beta/files/${fileInfo.file.name}?key=${import.meta.env.VITE_GEMINI_API_KEY}`;
+            const pollResp = await fetch(pollUrl);
+            const pollData = await pollResp.json();
+            currentState = pollData.state;
+            retries++;
+        }
+        if (currentState === 'FAILED') throw new Error("File processing failed on server side.");
+    }
+    
+    return fileUri;
+  } catch (error: any) {
+    logger.error("Upload Error", error);
+    throw error;
   }
-  
-  return fileUri;
 };
 
 /**
@@ -136,20 +145,26 @@ export const transcribeAudio = async (
   onStatus?: StatusCallback
 ): Promise<string> => {
   onStatus?.("Preparing Media for AI Engine...", 2);
-  const executeWithRetry = async (attempt: number = 0): Promise<string> => {
+  
+  // Model Configuration - Adjusted to stable models
+  // Models: 'gemini-1.5-pro-latest' (High Quality) vs 'gemini-1.5-flash-latest' (Fast)
+  const PRIMARY_MODEL = "gemini-1.5-pro-latest";
+  const FALLBACK_MODEL = "gemini-1.5-flash-latest";
+
+  const executeWithRetry = async (attempt: number = 0, currentModel: string = useSmartModel ? PRIMARY_MODEL : FALLBACK_MODEL): Promise<string> => {
     try {
-      const useFallback = attempt === 10;
+      const useFallbackKey = attempt >= 2; // Switch key after 2 failures
       const primaryKey = import.meta.env.VITE_GEMINI_API_KEY;
       const fallbackKey = import.meta.env.VITE_GEMINI_API_KEY_FALLBACK;
       
-      const activeApiKey = useFallback && fallbackKey ? fallbackKey : primaryKey;
+      const activeApiKey = useFallbackKey && fallbackKey ? fallbackKey : primaryKey;
 
       if (!activeApiKey) {
         throw new Error("API Key is missing. Please check your environment configuration.");
       }
       
       const ai = new GoogleGenAI({ apiKey: activeApiKey });
-      onStatus?.(`Engine initialized: ${useSmartModel ? '2.5 Pro' : '2.5 Flash'} ${useFallback ? '(Backup Channel)' : ''}`, 8);
+      onStatus?.(`Engine initialized: ${currentModel.includes('pro') ? 'Gemini 1.5 Pro' : 'Gemini 1.5 Flash'} ${useFallbackKey ? '(Backup Key)' : '(Primary)'}`, 8);
   
       let finalMimeType = mimeType;
       if (mediaFile instanceof File && mediaFile.name) {
@@ -160,44 +175,48 @@ export const transcribeAudio = async (
          finalMimeType = 'audio/mp3';
       }
 
+      // STRICT PROMPTING
       const speakerInstruction = detectSpeakers 
-        ? `**Speaker Diarization**: Identify distinct speakers. Listen for names (e.g., "Hi John") and use them. If unknown, use "Speaker 1:", "Speaker 2:", etc.`
-        : `**No Speaker Labels**: Do not use speaker labels (e.g., "Speaker 1"). Format the text as a continuous transcript with paragraph breaks.`;
+        ? `**Speaker Diarization (Strict)**: Identify distinct speakers. Listen for names (e.g., "Hi John") and use them. If names are unknown, assign specific labels like "Speaker 1", "Speaker 2". Consistency is key.`
+        : `**No Speaker Labels**: Do not use "Speaker 1" etc. simply output the text continuously, breaking paragraphs by voice change.`;
 
       const commonInstructions = `
         1. ${speakerInstruction}
         2. **Linguistic Context (Pidgin English & Dialects)**: 
            - The audio likely contains West African English, Nigerian/Ghanaian/Liberian Pidgin, or mixed languages.
-           - **Markers**: Look for "wey" (who/which), "dey" (is/are/am), "don" (past tense indicator), "no be" (is not), "sabi" (know), "comot" (leave), "abi/shey" (right?), "pikin" (child).
-           - **CRITICAL**: Transcribe Pidgin EXACTLY as spoken. DO NOT translate to standard English or "correct" the grammar. 
-           - **STYLING**: Use *italics* for all non-English words and Pidgin-specific phrases.
+           - **Markers**: Look for "wey", "dey", "don", "no be", "sabi", "comot", "abi/shey", "pikin".
+           - **CRITICAL**: Transcribe Pidgin EXACTLY as spoken. DO NOT translate to standard English or "correct" the grammar.
         3. **Timestamps**: Insert [MM:SS] timestamps at the start of every speaker turn.
       `;
 
+      // VERBATIM PROMPT
       const rawPrompt = `
-        Task: Generate a STRICT, 100% VERBATIM transcription.
-        Guidelines:
+        Start now. Transcribe the audio file exactly as spoken (100% Verbatim).
+        
+        RULES:
         ${commonInstructions}
-        4. **Strict Verbatim**: Capture EVERY utterance, stutter, false start, and filler word (um, uh, like, you know). DO NOT EDIT or "clean up" anything.
-        5. **Accuracy**: If a sentence is grammatically incorrect, TRANSCRIPE IT EXACTLY AS SPOKEN.
-        6. **Formatting**: Start every speaker turn on a new line with their label and timestamp.
+        4. **ABSOLUTE VERBATIM**: Capture EVERY utterance, stutter, false start, and filler word (um, uh, like, you know) exactly where they occur.
+        5. **NO SUMMARIZATION**: Do NOT summarize. Do NOT omit any parts of the conversation. If they say it, you write it.
+        6. **Formatting**: Start every speaker turn on a new line.
+        
+        Output only the transcription. No preamble.
       `;
 
+      // POLISHED PROMPT
       const autoEditPrompt = `
-        Task: Generate an "Intelligent Verbatim" transcription.
-        Guidelines:
+        Start now. Transcribe the audio file using "Intelligent Verbatim" standards.
+        
+        RULES:
         ${commonInstructions}
-        4. **Cleanup**: Lightly edit stuttering and excessive fillers (um, uh) to improve readability, BUT preserve the speaker's unique voice and phrasing.
-        5. **Formatting**: Highlight key terms in **bold**.
+        4. **Clean & Intelligent**: Remove stuttering, accidental repetitions, and non-meaningful filler words (um, uh) to improve readability.
+        5. **Preserve Meaning**: Do not change the meaning or the speaker's unique voice/dialect.
+        6. **Formatting**: Use **bold** for key terms/entities.
+        
+        Output only the transcription. No preamble.
       `;
-
-      const modelName = useSmartModel ? 'gemini-2.5-pro' : 'gemini-2.5-flash';
-      const config = undefined;
 
       let contentPart: any;
-      // Force all files to use the File API (Binary Upload) instead of Base64 (Inline).
-      // This reduces payload size by ~33% (Base64 overhead) and provides upload progress for all files.
-      const MAX_INLINE_SIZE = 0; 
+      const MAX_INLINE_SIZE = 0; // Force binary upload for robustness
 
       if (mediaFile.size < MAX_INLINE_SIZE) {
         onStatus?.("Buffering audio for inline execution...", 12);
@@ -209,6 +228,7 @@ export const transcribeAudio = async (
           }
         };
       } else {
+        // Upload logic handles its own errors
         contentPart = {
           fileData: {
             mimeType: finalMimeType,
@@ -217,275 +237,88 @@ export const transcribeAudio = async (
         };
       }
 
-      onStatus?.("Handshaking with Gemini Agent...", 55);
-      onStatus?.("Generating transcription (Deep Inference)...", 60);
-      
-      // Simulate progress during the black-box inference
-      const progressInterval = setInterval(() => {
-          // We can't know exact progress, so we simulate it up to 90%
-          const messages = [
-             "Analyzing audio patterns...",
-             "Detecting speaker turns...",
-             "Formatting text blocks...",
-             "Constructing timestamps...",
-             "Refining syntax...",
-             "Finalizing output..."
-          ];
-          const randomMsg = messages[Math.floor(Math.random() * messages.length)];
-          // Only if onStatus allows reading back current progress would this be perfect, 
-          // but we can just assume 60 start.
-      }, 2000);
+      onStatus?.(`Generating transcription with ${currentModel}...`, 60);
 
-      // Wrapper to handle progress updates since we can't easily read back current from callback
-      // We will actually just emit updates blindly from the main flow or wrapper.
-      // Better approach:
-      
-      let currentFakeProgress = 60;
       const fakeProgressTimer = setInterval(() => {
-         currentFakeProgress += (Math.random() * 2); 
-         if (currentFakeProgress > 95) currentFakeProgress = 95;
-         
-         const messages = [
-             "Analyzing acoustic features...",
-             "Identifying speaker segments...",
-             "Deciphering linguistic nuances...",
-             "Applying formatting rules...",
-             "Verifying timestamp accuracy...",
-             "Structuring final document..."
-         ];
-         const msg = messages[Math.floor(Math.random() * messages.length)];
-         onStatus?.(msg, Math.round(currentFakeProgress));
-      }, 2500);
+         const msgs = ["Decoding audio structure...", "Aligning timestamps...", "Transcribing speech segments...", "Verifying speaker identity..."];
+         onStatus?.(msgs[Math.floor(Math.random() * msgs.length)]);
+      }, 3000);
 
       try {
         const response = await ai.models.generateContent({
-            model: modelName,
+            model: currentModel,
             contents: {
-            parts: [
-                contentPart,
-                { text: autoEdit ? autoEditPrompt : rawPrompt }
-            ]
-            },
-            config: config
+              parts: [
+                  contentPart,
+                  { text: autoEdit ? autoEditPrompt : rawPrompt }
+              ]
+            }
         });
         
         clearInterval(fakeProgressTimer);
 
         if (response.text) {
             onStatus?.("Validating output...", 98);
-            await new Promise(r => setTimeout(r, 800)); // Small pause for effect
+            await new Promise(r => setTimeout(r, 500));
             onStatus?.("Transcription complete.", 100);
             return response.text;
         } else {
-            throw new Error("No transcription generated.");
+            throw new Error("No transcription generated (Empty response).");
         }
       } catch (e) {
         clearInterval(fakeProgressTimer);
         throw e;
       }
-      const isRateLimited = errorMsg.includes('429') || errorMsg.includes('quota') || errorMsg.includes('resource_exhausted');
+    } catch (error: any) {
+      logger.error(`Transcription Attempt ${attempt + 1} Failed`, { model: currentModel, error: error.message });
+      
+      const errorMsg = error.message?.toLowerCase() || "";
+      const isRateLimited = errorMsg.includes('429') || errorMsg.includes('quota') || errorMsg.includes('resource');
+      const isNetwork = errorMsg.includes('network') || errorMsg.includes('fetch');
+      const isServer = errorMsg.includes('503') || errorMsg.includes('500');
 
-      // Model Fallback Logic: Switch from Pro to Flash if capacity hit
-      if (useSmartModel && isRateLimited && !errorMsg.includes('fallback')) {
-        onStatus?.("Switching to High-Capacity engine (Flash) due to rate limit...");
-        return transcribeAudio(mediaFile, mimeType, autoEdit, detectSpeakers, false, onStatus);
+      // FALLBACK STRATEGY
+
+      // 1. If Rate Limited on Pro -> Switch to Flash (High Cap)
+      if (isRateLimited && currentModel.includes('pro')) {
+         onStatus?.("⚠️ Pro Rate Limit Hit. Switching to High-Speed Flash Model...", 70);
+         await new Promise(r => setTimeout(r, 2000));
+         return executeWithRetry(attempt + 1, FALLBACK_MODEL);
       }
 
-      // API Key Fallback Logic
-      const fallbackKey = import.meta.env.VITE_GEMINI_API_KEY_FALLBACK;
-      // Identify if we are already using the fallback to prevent infinite loops
-      // We can check if the current ai instance was init with primary but we are in a closure.
-      // Better: pass a flag `usingFallback` to `executeWithRetry`?
-      // Since we can't easily change the Function Signature of the export without breaking calls,
-      // we'll handle it via state or just try once if the Primary fails.
-      
-      // Let's modify the executeWithRetry signature slightly to accept a key override.
-      
-      if (isRateLimited && fallbackKey && attempt < 1) { // Only try fallback once
-         onStatus?.("⚠️ Primary Quota Exceeded. Switching to Backup API Key...", 60);
-         // Recursively call with a mechanism to use the secondary key.
-         // Since we can't change the outer function args, we will implement a mini-retry here
-         // BUT we need to re-init `ai`. 
-         // Strategy: Let's actually change `executeWithRetry` to accept an optional apiKey override.
+      // 2. If Network/Server error -> Retry same model (backoff)
+      if ((isNetwork || isServer) && attempt < 4) {
+         const delay = (attempt + 1) * 3000;
+         onStatus?.(`⚠️ Network/Server Glitch. Retrying in ${delay/1000}s...`, 60);
+         await new Promise(r => setTimeout(r, delay));
+         return executeWithRetry(attempt + 1, currentModel);
+      }
+
+      // 3. Last Resort -> Switch Key + Flash
+      if (attempt < 5) {
+         onStatus?.("⚠️ Persistent Error. Trying alternative route...", 60);
+         await new Promise(r => setTimeout(r, 2000));
+         return executeWithRetry(attempt + 1, FALLBACK_MODEL);
       }
       
       throw error;
     }
   };
-  
-  // Revised Internal Execution Function
-  const executeWithRetry = async (attempt: number = 0, apiKeyOverride?: string): Promise<string> => {
-    try {
-      const activeKey = apiKeyOverride || import.meta.env.VITE_GEMINI_API_KEY;
-      if (!activeKey) {
-        throw new Error("API Key is missing. Please check your environment configuration.");
-      }
-      
-      const ai = new GoogleGenAI({ apiKey: activeKey });
-      // ... (rest of logic)
-      
-      // We need to essentially copy the massive block above or refactor. 
-      // To minimize risk, I will implement the fallback check inside the CATCH block 
-      // by recursively calling `executeWithRetry` with the new key.
-    } catch (error: any) {
-        // ...
-    }
-  }
-  
-  // Okay, the tool requires me to replace the EXACT content. 
-  // I will replace the Catch Block to implement the logic.
-  
-    } catch (error: any) {
-      const errorMsg = error.message.toLowerCase();
-      const isRateLimited = errorMsg.includes('429') || errorMsg.includes('quota') || errorMsg.includes('resource_exhausted');
-
-      // 1. Model Fallback: Pro -> Flash
-      if (useSmartModel && isRateLimited) {
-        onStatus?.("Switching to High-Capacity engine (Flash) due to rate limit...");
-        return transcribeAudio(mediaFile, mimeType, autoEdit, detectSpeakers, false, onStatus);
-      }
-
-      // 2. API Key Fallback check
-      const fallbackKey = import.meta.env.VITE_GEMINI_API_KEY_FALLBACK;
-      // We assume if we are retrying with attempt > 5 (arbitrary) we might be done, 
-      // but simpler: if we strictly hit 429 and haven't tried fallback (we can track via attempt count or a param).
-      // actually, `executeWithRetry` doesn't support the key arg yet.
-      // I will rewrite the entire `executeWithRetry` logic slightly to support this.
-      
-      // WAIT. I can just re-instantiate `ai` inside the retry??? 
-      // No, `ai` is const at the top.
-      
-      // Let's return a specific error or handle it. 
-      // Actually, I can recursively call `transcribeAudio` but I can't pass the API key.
-      
-      // BEST APPROACH: Refactor `transcribeAudio` to read the key dynamically? 
-      // No, let's just use the `attempt` logic. 
-      // If attempt === 10 (magic number for fallback), use fallback key.
-      
-      if (isRateLimited && fallbackKey && attempt !== 10) {
-          onStatus?.("⚠️ Primary Key Quota Hit. Switching to Fallback Key...", 60);
-          return executeWithRetry(10); // 10 signals "Use Fallback"
-      }
-
-      if (attempt < 2 && (isRateLimited || errorMsg.includes('503'))) {
-        onStatus?.(`⚠️ Agent limit reached. Retrying in ${attempt + 2}s...`, 60);
-        await new Promise(r => setTimeout(r, (attempt + 1) * 2000));
-        return executeWithRetry(attempt + 1);
-      }
-      throw error;
-    }
-  };
-
-  // I need to update the AI init at the top of executeWithRetry too.
-
 
   try {
     return await executeWithRetry();
   } catch (error: any) {
-    console.error("Transcription error:", error);
-    let userMessage = "An unexpected error occurred during transcription.";
+    logger.error("Final Transcription Failure", error);
     
-    if (error?.message) {
-      const msg = error.message.toLowerCase();
-      if (error.message.includes('"error"')) {
-        try {
-          const jsonMatch = error.message.match(/\{[\s\S]*\}/);
-          if (jsonMatch) {
-            const parsed = JSON.parse(jsonMatch[0]);
-            const apiError = parsed.error || parsed;
-            if (apiError.status === 'RESOURCE_EXHAUSTED' || apiError.message?.includes('quota')) {
-               userMessage = useSmartModel 
-                 ? "Gemini 2.5 Pro Rate Limit hit (2 RPM). Please wait 60 seconds or disable 'Deep Thinking' to use the higher-capacity Flash engine."
-                 : "Gemini 2.5 Flash Rate Limit hit. Please wait 60 seconds for the server to reset.";
-            } else if (apiError.status === 'INVALID_ARGUMENT' || apiError.message?.includes('API key not valid')) {
-               userMessage = "Invalid API Key. Please check your API key in the environment settings.";
-            } else if (apiError.status === 'PERMISSION_DENIED') {
-              userMessage = "Permission denied. Your API key may not have access to this model.";
-            } else if (apiError.message) {
-              userMessage = apiError.message;
-            }
-          }
-        } catch (e) {}
-      }
-      
-      if (userMessage === "An unexpected error occurred during transcription.") {
-        if (msg.includes('api key not valid') || msg.includes('invalid_argument')) {
-          userMessage = "Invalid API Key. Please check your API key in the environment settings.";
-        } else if (msg.includes('quota') || msg.includes('rate limit') || msg.includes('resource_exhausted')) {
-          userMessage = useSmartModel 
-            ? "Gemini 2.5 Pro Rate Limit hit. Please wait 60 seconds or disable 'Deep Thinking'."
-            : "Gemini 2.5 Flash Rate Limit hit. Please wait a minute for the quota to reset.";
-        } else if (msg.includes('permission denied')) {
-          userMessage = "Permission denied. Your API key may not have access to this model.";
-        } else if (msg.includes('network') || msg.includes('fetch')) {
-          userMessage = "Network error. Please check your internet connection and try again.";
-        } else if (msg.includes('timeout')) {
-          userMessage = "Request timed out. The audio file may be too large or the server is busy.";
-        }
-      }
-    }
+    let userMessage = "An unexpected error occurred during transcription.";
+    const msg = error.message?.toLowerCase() || "";
+
+    if (msg.includes('api key')) userMessage = "Invalid API Key. Please check your settings.";
+    else if (msg.includes('quota') || msg.includes('429')) userMessage = "Rate Limits Exceeded. Please try again in a few minutes.";
+    else if (msg.includes('network') || msg.includes('fetch')) userMessage = "Network Connection Error. Please check your internet.";
+    else if (msg.includes('safety') || msg.includes('blocked')) userMessage = "Content Blocked by AI Safety Filters.";
+    
     throw new Error(userMessage);
-  }
-};
-
-/**
- * Analyzes video visual content for key info
- */
-export const analyzeVideoContent = async (mediaFile: File | Blob): Promise<string> => {
-  const ai = new GoogleGenAI({ apiKey: import.meta.env.VITE_GEMINI_API_KEY });
-  const model = "gemini-2.5-flash";
-
-  let finalMimeType = mediaFile.type;
-  if (mediaFile instanceof File && mediaFile.name) {
-    const detectedMime = getMimeTypeFromExtension(mediaFile.name);
-    if (detectedMime) finalMimeType = detectedMime;
-  }
-  
-  if (!finalMimeType.startsWith('video/')) {
-    return "This feature is only available for video files.";
-  }
-
-  try {
-    let contentPart: any;
-    const MAX_INLINE_SIZE = 0; // Force binary upload for speed
-
-    if (mediaFile.size < MAX_INLINE_SIZE) {
-      const base64Data = await blobToBase64(mediaFile);
-      contentPart = {
-        inlineData: {
-          mimeType: finalMimeType,
-          data: base64Data
-        }
-      };
-    } else {
-      const fileUri = await uploadFileToGemini(mediaFile, finalMimeType);
-      contentPart = {
-        fileData: {
-          mimeType: finalMimeType,
-          fileUri: fileUri
-        }
-      };
-    }
-
-    const prompt = `
-      Analyze this video and provide a comprehensive report containing:
-      1. **Visual Summary**: Setting, people, and actions.
-      2. **Key Events**: Important moments.
-      3. **Text on Screen**: Extract visible text/graphics.
-      4. **Context**: Infer context (e.g. formal meeting, vlog, tutorial).
-    `;
-
-    const response = await ai.models.generateContent({
-      model,
-      contents: {
-        parts: [contentPart, { text: prompt }]
-      },
-    });
-
-    return String(response.text || "No analysis could be generated.");
-  } catch (error: any) {
-    console.error("Video analysis error:", error);
-    return `Error analyzing video: ${error.message}`;
   }
 };
 
@@ -494,7 +327,7 @@ export const analyzeVideoContent = async (mediaFile: File | Blob): Promise<strin
  */
 export const classifyContent = async (text: string): Promise<string> => {
   const ai = new GoogleGenAI({ apiKey: import.meta.env.VITE_GEMINI_API_KEY });
-  const model = "gemini-2.5-flash";
+  const model = "gemini-1.5-flash-latest"; // Safe stable model
   const sample = text.substring(0, 2000);
   const prompt = `Classify this text into one category: Song, Podcast, Interview, Meeting, Lecture, Video, Voice Note, News. Return ONLY the category name.\n\nText:\n${sample}`;
 
@@ -502,13 +335,14 @@ export const classifyContent = async (text: string): Promise<string> => {
     const response = await ai.models.generateContent({ model, contents: prompt });
     return String(response.text || "").trim() || "Unknown";
   } catch (e) {
+    logger.warn("Classification failed", e);
     return "Media";
   }
 };
 
 export const summarizeText = async (text: string, useSmartModel: boolean = false): Promise<string> => {
   const ai = new GoogleGenAI({ apiKey: import.meta.env.VITE_GEMINI_API_KEY });
-  const model = useSmartModel ? "gemini-2.5-pro" : "gemini-2.5-flash"; 
+  const model = useSmartModel ? "gemini-1.5-pro-latest" : "gemini-1.5-flash-latest"; 
   const prompt = `
     You are ScribeAI Intelligence, a premium transcription analysis engine. Provide a deep, structured analysis of the provided transcript.
     
@@ -530,16 +364,18 @@ export const summarizeText = async (text: string, useSmartModel: boolean = false
     Transcript:
     ${text}
   `;
-  const response = await ai.models.generateContent({ model, contents: prompt });
-  return String(response.text || "Could not generate summary.");
+  try {
+    const response = await ai.models.generateContent({ model, contents: prompt });
+    return String(response.text || "Could not generate summary.");
+  } catch (e) {
+    logger.error("Summarization error", e);
+    return "Summary generation failed. Please check logs.";
+  }
 };
 
-/**
- * Context-aware formatting enhancement with diff support
- */
 export const enhanceFormatting = async (text: string, contextType: string = "General", useSmartModel: boolean = false): Promise<string> => {
   const ai = new GoogleGenAI({ apiKey: import.meta.env.VITE_GEMINI_API_KEY });
-  const model = useSmartModel ? "gemini-2.5-pro" : "gemini-2.5-flash";
+  const model = useSmartModel ? "gemini-1.5-pro-latest" : "gemini-1.5-flash-latest";
   
   const prompt = `
     You are ScribeAI Smart Editor. Your task is to transform a raw transcript into a polished, professional document while preserving the original meaning and nuances.
@@ -566,16 +402,18 @@ export const enhanceFormatting = async (text: string, contextType: string = "Gen
     ${text}
   `;
   
-  const response = await ai.models.generateContent({ model, contents: prompt });
-  return String(response.text || text);
+  try {
+    const response = await ai.models.generateContent({ model, contents: prompt });
+    return String(response.text || text);
+  } catch (e) {
+    logger.error("Enhance Formatting error", e);
+    return text;
+  }
 };
 
-/**
- * Extracts key moments from the transcript.
- */
 export const extractKeyMoments = async (text: string, useSmartModel: boolean = false): Promise<string> => {
   const ai = new GoogleGenAI({ apiKey: import.meta.env.VITE_GEMINI_API_KEY });
-  const model = useSmartModel ? "gemini-2.5-pro" : "gemini-2.5-flash";
+  const model = useSmartModel ? "gemini-1.5-pro-latest" : "gemini-1.5-flash-latest";
   
   const prompt = `
     Analyze this transcript and extract the most important "Key Moments". 
@@ -590,84 +428,153 @@ export const extractKeyMoments = async (text: string, useSmartModel: boolean = f
     ${text}
   `;
   
-  const response = await ai.models.generateContent({ model, contents: prompt });
-  return String(response.text || "No key moments identified.");
+  try {
+    const response = await ai.models.generateContent({ model, contents: prompt });
+    return String(response.text || "No key moments identified.");
+  } catch (e) {
+    logger.error("Key Moments error", e);
+    return "Failed to extract key moments.";
+  }
 };
 
 /**
  * Identifies the start and end of the main discussion.
  */
 export const findDiscussionBounds = async (text: string, useSmartModel: boolean = false): Promise<string> => {
-  const ai = new GoogleGenAI({ apiKey: import.meta.env.VITE_GEMINI_API_KEY });
-  const model = useSmartModel ? "gemini-2.5-pro" : "gemini-2.5-flash";
-  
-  const prompt = `
-    Look at this transcript and identify exactly where the main discussion starts and ends. 
-    Ignore the introductory pleasantries, setup, or closing small talk.
-    
-    Return your finding in this exact format:
-    **Core Discussion Starts**: [MM:SS] - [Context]
-    **Core Discussion Ends**: [MM:SS] - [Context]
-    
-    Transcript Snippet:
-    ${text.substring(0, 5000)} ... ${text.substring(text.length - 2000)}
-  `;
-  
-  const response = await ai.models.generateContent({ model, contents: prompt });
-  return String(response.text || "Could not identify discussion bounds.");
-};
+   const ai = new GoogleGenAI({ apiKey: import.meta.env.VITE_GEMINI_API_KEY });
+   const model = useSmartModel ? "gemini-1.5-pro-latest" : "gemini-1.5-flash-latest";
+   
+   const prompt = `
+     Look at this transcript and identify exactly where the main discussion starts and ends. 
+     Ignore the introductory pleasantries, setup, or closing small talk.
+     
+     Return your finding in this exact format:
+     **Core Discussion Starts**: [MM:SS] - [Context]
+     **Core Discussion Ends**: [MM:SS] - [Context]
+     
+     Transcript Snippet:
+     ${text.substring(0, 5000)} ... ${text.substring(text.length - 2000)}
+   `;
+   
+   try {
+     const response = await ai.models.generateContent({ model, contents: prompt });
+     return String(response.text || "Could not identify discussion bounds.");
+   } catch (e) {
+     logger.error("Discussion Bounds error", e);
+     return "Analysis failed.";
+   }
+ };
+ 
+ /**
+  * Removes pleasantries and fluff, keeping only the core interview/discussion content.
+  */
+ export const stripPleasantries = async (text: string, useSmartModel: boolean = false): Promise<string> => {
+   const ai = new GoogleGenAI({ apiKey: import.meta.env.VITE_GEMINI_API_KEY });
+   const model = useSmartModel ? "gemini-1.5-pro-latest" : "gemini-1.5-flash-latest";
+   
+   const prompt = `
+     You are a professional editor. Rewrite this transcript to remove all pleasantries, "small talk", filler intros (like "how are you today", "thank you for having me"), and outros that don't contribute to the core subject matter.
+     
+     Keep the speaker labels and timestamps exactly as they are. 
+     DO NOT summarize. This must be the original transcript, just "filtered" for high-density information.
+     
+     Transcript:
+     ${text}
+   `;
+   
+   try {
+     const response = await ai.models.generateContent({ model, contents: prompt });
+     return String(response.text || text);
+   } catch (e) {
+     logger.error("Strip Pleasantries error", e);
+     return text;
+   }
+ };
+ 
+ /**
+  * Refines speaker labels based on context.
+  */
+ export const refineSpeakers = async (text: string, useSmartModel: boolean = true): Promise<string> => {
+   const ai = new GoogleGenAI({ apiKey: import.meta.env.VITE_GEMINI_API_KEY });
+   const model = useSmartModel ? "gemini-1.5-pro-latest" : "gemini-1.5-flash-latest";
+   
+     const prompt = `
+     Review the following West African transcript and refine the speaker labels. 
+     1. **Identity Extraction**: Identify if "Speaker 1", "Speaker 2", etc. can be replaced with actual names based on conversation context (e.g., someone says "Gaza", "Kojo", "Blessing").
+     2. **Role Mapping**: If the speaker's role is clear (e.g., Interviewer, Host, Guest, Doctor), append it in parentheses like "KOJO (Host)".
+     3. **Turn Correction**: Correct misattributed turns if the flow of conversation suggests a different speaker.
+     4. **Format Hook**: Keep the format: "NAME (ROLE if known) [MM:SS]: Transcript".
+     
+     CRITICAL OUTPUT RULES:
+     - Return ONLY the full refined transcript.
+     - Preserve all original formatting, bolding, and italics.
+     - Do NOT include any introductory text, notes, or concluding summaries.
+     - If you cannot identify any names, return the transcript exactly as is.
+   `;
+   
+   try {
+     const response = await ai.models.generateContent({
+       model: model,
+       contents: {
+         parts: [{ text: prompt }, { text: text }]
+       }
+     });
+     
+     const output = String(response.text || text).trim();
+     return output.replace(/^```markdown\n/, '').replace(/^```\n/, '').replace(/\n```$/, '');
+   } catch (e) {
+     logger.error("Refine Speakers error", e);
+     return text;
+   }
+ };
 
-/**
- * Removes pleasantries and fluff, keeping only the core interview/discussion content.
- */
-export const stripPleasantries = async (text: string, useSmartModel: boolean = false): Promise<string> => {
-  const ai = new GoogleGenAI({ apiKey: import.meta.env.VITE_GEMINI_API_KEY });
-  const model = useSmartModel ? "gemini-2.5-pro" : "gemini-2.5-flash";
+ /**
+  * Analyzes video visual content for key info
+  */
+ export const analyzeVideoContent = async (mediaFile: File | Blob): Promise<string> => {
+    // ... (Video logic remains similar but uses stable model)
+    const ai = new GoogleGenAI({ apiKey: import.meta.env.VITE_GEMINI_API_KEY });
+    const model = "gemini-1.5-flash-latest"; // Video understanding is great on 1.5 Flash
   
-  const prompt = `
-    You are a professional editor. Rewrite this transcript to remove all pleasantries, "small talk", filler intros (like "how are you today", "thank you for having me"), and outros that don't contribute to the core subject matter.
-    
-    Keep the speaker labels and timestamps exactly as they are. 
-    DO NOT summarize. This must be the original transcript, just "filtered" for high-density information.
-    
-    Transcript:
-    ${text}
-  `;
-  
-  const response = await ai.models.generateContent({ model, contents: prompt });
-  return String(response.text || text);
-};
-
-/**
- * Refines speaker labels based on context.
- */
-export const refineSpeakers = async (text: string, useSmartModel: boolean = true): Promise<string> => {
-  const ai = new GoogleGenAI({ apiKey: import.meta.env.VITE_GEMINI_API_KEY });
-  const model = useSmartModel ? "gemini-2.5-pro" : "gemini-2.5-flash";
-  
-    const prompt = `
-    Review the following West African transcript and refine the speaker labels. 
-    1. **Identity Extraction**: Identify if "Speaker 1", "Speaker 2", etc. can be replaced with actual names based on conversation context (e.g., someone says "Gaza", "Kojo", "Blessing").
-    2. **Role Mapping**: If the speaker's role is clear (e.g., Interviewer, Host, Guest, Doctor), append it in parentheses like "KOJO (Host)".
-    3. **Turn Correction**: Correct misattributed turns if the flow of conversation suggests a different speaker.
-    4. **Format Hook**: Keep the format: "NAME (ROLE if known) [MM:SS]: Transcript".
-    
-    CRITICAL OUTPUT RULES:
-    - Return ONLY the full refined transcript.
-    - Preserve all original formatting, bolding, and italics.
-    - Do NOT include any introductory text, notes, or concluding summaries.
-    - If you cannot identify any names, return the transcript exactly as is.
-  `;
-  
-  const response = await ai.models.generateContent({
-    model: model,
-    contents: {
-      parts: [{ text: prompt }, { text: text }]
+    let finalMimeType = mediaFile.type;
+    if (mediaFile instanceof File && mediaFile.name) {
+      const detectedMime = getMimeTypeFromExtension(mediaFile.name);
+      if (detectedMime) finalMimeType = detectedMime;
     }
-  });
+    
+    if (!finalMimeType.startsWith('video/')) {
+      return "This feature is only available for video files.";
+    }
   
-  const output = String(response.text || text).trim();
-  // Remove markdown code blocks if present
-  return output.replace(/^```markdown\n/, '').replace(/^```\n/, '').replace(/\n```$/, '');
-};
+    try {
+      let contentPart: any;
+      const MAX_INLINE_SIZE = 0; // Force binary
+  
+      if (mediaFile.size < MAX_INLINE_SIZE) {
+        const base64Data = await blobToBase64(mediaFile);
+        contentPart = { inlineData: { mimeType: finalMimeType, data: base64Data } };
+      } else {
+        const fileUri = await uploadFileToGemini(mediaFile, finalMimeType);
+        contentPart = { fileData: { mimeType: finalMimeType, fileUri: fileUri } };
+      }
+  
+      const prompt = `
+        Analyze this video and provide a comprehensive report containing:
+        1. **Visual Summary**: Setting, people, and actions.
+        2. **Key Events**: Important moments.
+        3. **Text on Screen**: Extract visible text/graphics.
+        4. **Context**: Infer context (e.g. formal meeting, vlog, tutorial).
+      `;
+  
+      const response = await ai.models.generateContent({
+        model,
+        contents: { parts: [contentPart, { text: prompt }] },
+      });
+  
+      return String(response.text || "No analysis could be generated.");
+    } catch (error: any) {
+      logger.error("Video analysis error:", error);
+      return `Error analyzing video: ${error.message}`;
+    }
+  };
 

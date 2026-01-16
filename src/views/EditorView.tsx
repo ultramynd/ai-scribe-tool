@@ -2,8 +2,8 @@ import React, { useState, useContext } from 'react';
 import { 
   Lightning, Eye, PencilSimple, Sparkle, Export, CaretDown, CaretUp,
   ArrowSquareOut, Checks, FileText, FileCode, CloudArrowDown, 
-  File as FileIcon, Plus, Microphone, UploadSimple, User, 
-  Clock, SignOut, Spinner, SignIn, Sun, Moon, List, WarningCircle, Check
+  File as FileIcon, Plus, Microphone, UploadSimple, User, PlusCircle,
+  Clock, SignOut, Spinner, SignIn, Sun, Moon, List, WarningCircle, Check, GoogleLogo, Copy
 } from '@phosphor-icons/react';
 import { ThemeContext } from '../contexts/ThemeContext';
 import { AudioSource, TranscriptionState, AudioFile, ArchiveItem } from '../../types';
@@ -21,7 +21,7 @@ interface EditorViewProps {
   setShowAiSidebar: (val: boolean) => void;
   transcription: TranscriptionState;
   setTranscription: React.Dispatch<React.SetStateAction<TranscriptionState>>;
-  handleSaveToDrive: (type?: 'doc' | 'txt') => void;
+  handleSaveToDrive: (type?: 'doc' | 'txt' | 'srt') => void;
   isSavingToDrive: boolean;
   driveSaved: boolean;
   contentType: string | null;
@@ -29,9 +29,14 @@ interface EditorViewProps {
   getOriginalFile: () => AudioFile | null;
   handleExportDocx: () => void;
   handleExportTxt: () => void;
+  handleExportSrt: () => void;
   googleAccessToken: string | null;
   googleClientId: string | undefined;
   driveScriptsLoaded: boolean;
+// ... (rest of props)
+
+// ...
+
   handleGoogleLogin: () => void;
   handleGoogleLogout: () => void;
   isLoggingIn: boolean;
@@ -46,7 +51,7 @@ interface EditorViewProps {
   isPickerOpen: boolean;
   handlePickDriveFile: (file: { id: string; name: string; mimeType: string }) => void;
   onOpenInNewTab: (content: string, title?: string) => void;
-  onOpenInNewTab: (content: string, title?: string) => void;
+
   isTabsVisible: boolean;
   setIsTabsVisible: (val: boolean) => void;
 }
@@ -59,7 +64,7 @@ const EditorView: React.FC<EditorViewProps> = ({
   transcription, setTranscription,
   handleSaveToDrive, isSavingToDrive, driveSaved,
   contentType, getAudioUrl, getOriginalFile,
-  handleExportDocx, handleExportTxt,
+  handleExportDocx, handleExportTxt, handleExportSrt,
   googleAccessToken, googleClientId, driveScriptsLoaded,
   handleGoogleLogin, handleGoogleLogout, isLoggingIn,
   archiveItems, setShowArchiveSidebar,
@@ -71,6 +76,28 @@ const EditorView: React.FC<EditorViewProps> = ({
   const { currentTheme, toggleTheme } = useContext(ThemeContext);
   // Local state for copy feedback
   const [copiedStatus, setCopiedStatus] = React.useState<'text' | 'plain' | 'html' | null>(null);
+  const [liveRecordingTrigger, setLiveRecordingTrigger] = useState(0);
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
+
+  const handleUploadClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      const audioFile: AudioFile = {
+          file,
+          previewUrl: URL.createObjectURL(file),
+          base64: null,
+          mimeType: file.type
+      };
+      // For "Add", we likely want to background transcribe/add to sessions? 
+      // User said "Add to document". 
+      // If we use handleBackgroundTranscribe, it adds to sidebar. That's a safe "Add".
+      handleBackgroundTranscribe(audioFile);
+    }
+  };
 
   const handleCopyFeedback = (type: 'text' | 'plain' | 'html') => {
     setCopiedStatus(type);
@@ -109,11 +136,20 @@ const EditorView: React.FC<EditorViewProps> = ({
         </div>
       )}
 
+      {/* Hidden File Input */}
+      <input 
+        type="file" 
+        ref={fileInputRef} 
+        onChange={handleFileChange} 
+        className="hidden" 
+        accept="audio/*,video/*" 
+      />
+
       {/* Main Bar / Header */}
       <header className="sticky top-0 z-50 bg-white/40 dark:bg-dark-bg/40 backdrop-blur-3xl border-b border-slate-200 dark:border-white/[0.05] transition-all duration-300">
         <div className="max-w-7xl mx-auto px-6 h-20 flex items-center justify-between text-slate-900 dark:text-white">
             {/* Left Group: Branding + Menu Actions */}
-            <div className="flex items-center gap-6">
+            <div className="flex items-center gap-4">
                {/* Branding */}
                <div className="flex items-center gap-3.5 cursor-pointer group" onClick={() => safeNavigation(clearAll)}>
                  <div className="w-10 h-10 bg-primary rounded-xl flex items-center justify-center shadow-lg shadow-primary/20 group-hover:scale-110 transition-transform duration-500">
@@ -127,42 +163,35 @@ const EditorView: React.FC<EditorViewProps> = ({
                  </div>
                </div>
 
-               <div className="w-px h-8 bg-slate-200 dark:bg-dark-border mx-2"></div>
-               
-               {/* Toggle Tabs (Zen Mode) */}
-               <button
-                   onClick={() => setIsTabsVisible(!isTabsVisible)}
-                   className={`w-10 h-10 rounded-xl flex items-center justify-center transition-all group ${!isTabsVisible ? 'bg-primary/10 text-primary dark:text-accent' : 'text-slate-400 hover:text-slate-700 dark:text-slate-500 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-white/5'}`}
-                   title={isTabsVisible ? "Hide Tabs (Zen Mode)" : "Show Tabs"}
-               >
-                   <ArrowSquareOut size={16} weight="bold" className={`transition-transform duration-300 ${!isTabsVisible ? 'rotate-180' : ''}`} />
-               </button>
-
                {/* New Session Button */}
                <div className="relative group/new">
                   <button 
-                    className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-slate-100 dark:bg-dark-card border border-slate-200 dark:border-white/5 text-slate-600 dark:text-slate-300 hover:bg-white dark:hover:bg-white/5 hover:shadow-md transition-all"
+                    className="flex items-center gap-2 px-3.5 py-2 rounded-full border border-slate-200 dark:border-white/10 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-white/5 hover:border-slate-300 dark:hover:border-white/20 transition-all"
                   >
-                    <Plus size={16} weight="bold" className="text-primary dark:text-accent" />
-                    <span className="text-[11px] font-bold uppercase tracking-wider">New</span>
+                    <Plus size={14} weight="bold" className="text-indigo-500 dark:text-indigo-400" />
+                    <span className="text-[10px] font-bold uppercase tracking-widest">New</span>
                     <CaretDown size={10} weight="bold" className="ml-0.5 opacity-50 group-hover/new:rotate-180 transition-transform" />
                   </button>
-                  
-                  {/* Dropdown Content */}
+                  {/* Dropdown Content for New (Start Over) */}
                   <div className="absolute top-full left-0 mt-2 opacity-0 group-hover/new:opacity-100 pointer-events-none group-hover/new:pointer-events-auto transition-all duration-200 scale-95 group-hover/new:scale-100 origin-top-left z-50">
-                      <div className="bg-white dark:bg-dark-card rounded-2xl shadow-xl border border-slate-100 dark:border-dark-border p-2 min-w-[220px]">
-                          <div className="px-2.5 py-1.5 text-[9px] font-black text-slate-400 dark:text-dark-muted uppercase tracking-widest">Source Selection</div>
+                      <div className="bg-white dark:bg-[#0a0a0a] rounded-2xl shadow-xl border border-slate-100 dark:border-white/10 p-2 min-w-[240px] flex flex-col gap-1">
+                          <div className="px-2.5 py-1.5 text-[9px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest border-b border-slate-100 dark:border-white/5 mb-1">Start New Session</div>
+                          
+                          {/* Audio Recording */}
                           <button 
-                            onClick={(e) => {
-                              setIsPickerOpen(true);
-                            }}
+                             onClick={() => safeNavigation(() => { clearAll(); setActiveTab(AudioSource.MICROPHONE); })}
                             className="w-full flex items-center gap-3 px-3 py-2 text-left text-[11px] font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-white/5 rounded-xl transition-all group"
                           >
                             <div className="w-7 h-7 rounded-lg bg-red-100 dark:bg-red-900/20 flex items-center justify-center group-hover:scale-110 transition-transform">
                               <Microphone size={14} weight="duotone" className="text-red-500" />
                             </div>
-                            Record Audio
+                            <div>
+                                <div className="leading-none mb-0.5">Audio Recording</div>
+                                <div className="text-[9px] text-slate-400 font-medium">Start fresh recording</div>
+                            </div>
                           </button>
+
+                          {/* Upload Media */}
                           <button 
                              onClick={() => safeNavigation(() => { clearAll(); setActiveTab(AudioSource.FILE); })}
                             className="w-full flex items-center gap-3 px-3 py-2 text-left text-[11px] font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-white/5 rounded-xl transition-all group"
@@ -170,100 +199,226 @@ const EditorView: React.FC<EditorViewProps> = ({
                             <div className="w-7 h-7 rounded-lg bg-blue-100 dark:bg-blue-900/20 flex items-center justify-center group-hover:scale-110 transition-transform">
                               <UploadSimple size={14} weight="duotone" className="text-blue-500" />
                             </div>
-                            Upload File
+                            <div>
+                                <div className="leading-none mb-0.5">Upload Media</div>
+                                <div className="text-[9px] text-slate-400 font-medium">Import audio/video file</div>
+                            </div>
+                          </button>
+
+                          {/* From Link / Drive */}
+                          <button 
+                             onClick={() => safeNavigation(() => { clearAll(); setActiveTab(AudioSource.URL); })}
+                            className="w-full flex items-center gap-3 px-3 py-2 text-left text-[11px] font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-white/5 rounded-xl transition-all group"
+                          >
+                            <div className="w-7 h-7 rounded-lg bg-slate-100 dark:bg-white/10 flex items-center justify-center group-hover:scale-110 transition-transform">
+                              <CloudArrowDown size={14} weight="duotone" className="text-slate-600 dark:text-slate-300" />
+                            </div>
+                            <div>
+                                <div className="leading-none mb-0.5">From Link / Drive</div>
+                                <div className="text-[9px] text-slate-400 font-medium">Import from URL or Cloud</div>
+                            </div>
+                          </button>
+
+                          <div className="h-px bg-slate-100 dark:bg-white/5 my-1"></div>
+
+                          {/* Empty Project */}
+                          <button 
+                             onClick={() => safeNavigation(() => { clearAll(); setActiveTab(AudioSource.FILE); })}
+                            className="w-full flex items-center gap-3 px-3 py-2 text-left text-[11px] font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-white/5 rounded-xl transition-all group"
+                          >
+                            <div className="w-7 h-7 rounded-lg bg-indigo-100 dark:bg-indigo-900/20 flex items-center justify-center group-hover:scale-110 transition-transform">
+                              <Plus size={14} weight="bold" className="text-indigo-500" />
+                            </div>
+                            <div>
+                                <div className="leading-none mb-0.5">Empty Project</div>
+                                <div className="text-[9px] text-slate-400 font-medium">Clear current workspace</div>
+                            </div>
                           </button>
                       </div>
                   </div>
                </div>
 
-               {/* Export Dropdown */}
+               {/* Add to Document Button */}
+               <div className="relative group/add">
+                  <button 
+                    className="flex items-center gap-2 px-3.5 py-2 rounded-full border border-slate-200 dark:border-white/10 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-white/5 hover:border-slate-300 dark:hover:border-white/20 transition-all"
+                  >
+                    <PlusCircle size={14} weight="bold" className="text-emerald-500 dark:text-emerald-400" />
+                    <span className="text-[10px] font-bold uppercase tracking-widest">Add</span>
+                    <CaretDown size={10} weight="bold" className="ml-0.5 opacity-50 group-hover/add:rotate-180 transition-transform" />
+                  </button>
+                  
+                  {/* Dropdown Content */}
+                  <div className="absolute top-full left-0 mt-2 opacity-0 group-hover/add:opacity-100 pointer-events-none group-hover/add:pointer-events-auto transition-all duration-200 scale-95 group-hover/add:scale-100 origin-top-left z-50">
+                      <div className="bg-white dark:bg-[#0a0a0a] rounded-2xl shadow-xl border border-slate-100 dark:border-white/10 p-2 min-w-[220px] flex flex-col gap-1">
+                          <div className="px-2.5 py-1.5 text-[9px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest border-b border-slate-100 dark:border-white/5 mb-1">Add to Document</div>
+                          
+                          {/* Upload File */}
+                          <button 
+                             onClick={handleUploadClick}
+                            className="w-full flex items-center gap-3 px-3 py-2 text-left text-[11px] font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-white/5 rounded-xl transition-all group"
+                          >
+                            <div className="w-7 h-7 rounded-lg bg-blue-100 dark:bg-blue-900/20 flex items-center justify-center group-hover:scale-110 transition-transform">
+                              <UploadSimple size={14} weight="duotone" className="text-blue-500" />
+                            </div>
+                            <div>
+                                <div className="leading-none mb-0.5">Upload File</div>
+                                <div className="text-[9px] text-slate-400 font-medium">Add audio/video file</div>
+                            </div>
+                          </button>
+
+                          {/* Record Voicenote */}
+                          <button 
+                            onClick={() => setLiveRecordingTrigger(Date.now())}
+                            className="w-full flex items-center gap-3 px-3 py-2 text-left text-[11px] font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-white/5 rounded-xl transition-all group"
+                          >
+                            <div className="w-7 h-7 rounded-lg bg-emerald-100 dark:bg-emerald-900/20 flex items-center justify-center group-hover:scale-110 transition-transform">
+                              <Microphone size={14} weight="duotone" className="text-emerald-500" />
+                            </div>
+                            <div>
+                                <div className="flex items-center gap-1.5 leading-none mb-0.5">
+                                    <span>Record Voicenote</span>
+                                    <span className="px-1 py-0.5 rounded bg-emerald-100 dark:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 text-[8px] font-black uppercase">EXP</span>
+                                </div>
+                                <div className="text-[9px] text-slate-400 font-medium">Append real-time text</div>
+                            </div>
+                          </button>
+
+                          {/* Google Drive */}
+                          <button 
+                             onClick={() => setIsPickerOpen(true)}
+                             className="w-full flex items-center gap-3 px-3 py-2 text-left text-[11px] font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-white/5 rounded-xl transition-all group"
+                           >
+                             <div className="w-7 h-7 rounded-lg bg-slate-100 dark:bg-white/10 flex items-center justify-center group-hover:scale-110 transition-transform">
+                               <GoogleLogo size={14} weight="bold" className="text-slate-600 dark:text-slate-300" />
+                             </div>
+                             <div>
+                                <div className="leading-none mb-0.5">Google Drive</div>
+                                <div className="text-[9px] text-slate-400 font-medium">Import from Cloud</div>
+                             </div>
+                           </button>
+                      </div>
+                  </div>
+               </div>
+
+                {/* Save & Export Dropdown */}
                <div className="relative group/export">
-                   <button className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-slate-100 dark:bg-dark-card border border-slate-200 dark:border-white/5 text-slate-600 dark:text-slate-300 hover:bg-white dark:hover:bg-white/5 hover:shadow-md transition-all">
-                     <Export size={16} weight="duotone" className="text-slate-500 dark:text-slate-400" />
-                     <span className="text-[11px] font-bold uppercase tracking-wider">Export</span>
+                   <button className="flex items-center gap-2 px-3.5 py-2 rounded-full border border-slate-200 dark:border-white/10 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-white/5 hover:border-slate-300 dark:hover:border-white/20 transition-all">
+                     <Export size={14} weight="duotone" className="text-slate-500 dark:text-slate-400" />
+                     <span className="text-[10px] font-bold uppercase tracking-widest">Save & Export</span>
                      <CaretDown size={10} weight="bold" className="ml-0.5 opacity-50 group-hover/export:rotate-180 transition-transform" />
                    </button>
-                   <div className="absolute top-full text-left mt-2 opacity-0 group-hover/export:opacity-100 pointer-events-none group-hover/export:pointer-events-auto transition-all duration-200 scale-95 group-hover/export:scale-100 origin-top-left z-50">
-                       <div className="bg-white dark:bg-dark-card rounded-2xl shadow-xl border border-slate-100 dark:border-dark-border p-2 min-w-[200px]">
-                            {/* Copy Section */}
-                           <div className="px-2.5 py-1.5 text-[9px] font-black text-slate-400 dark:text-dark-muted uppercase tracking-widest">Preview & Copy</div>
-                           <button 
-                             onClick={() => {
-                               navigator.clipboard.writeText(transcription.text || '');
-                               handleCopyFeedback('text');
-                             }}
-                             className="w-full flex items-center gap-3 px-3 py-2 text-left text-[11px] font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-white/5 rounded-xl transition-all group"
-                           >
-                             <div className="w-7 h-7 rounded-lg bg-indigo-100 dark:bg-indigo-900/20 flex items-center justify-center group-hover:scale-110 transition-transform">
-                               {copiedStatus === 'text' ? <Check size={12} weight="bold" className="text-emerald-500" /> : <Checks size={12} weight="duotone" className="text-indigo-500" />}
+                   <div className="absolute top-full right-0 text-left mt-2 opacity-0 group-hover/export:opacity-100 pointer-events-none group-hover/export:pointer-events-auto transition-all duration-200 scale-95 group-hover/export:scale-100 origin-top-right z-50">
+                       <div className="bg-white dark:bg-dark-card rounded-2xl shadow-xl border border-slate-100 dark:border-dark-border p-3 min-w-[240px] flex flex-col gap-3">
+                           
+                           {/* 1. Save to Google Drive */}
+                           <div>
+                             <div className="px-2 py-1 text-[9px] font-black text-slate-400 dark:text-dark-muted uppercase tracking-widest flex items-center gap-2">
+                               <GoogleLogo size={12} weight="bold" />
+                               Save to Google Drive
                              </div>
-                             {copiedStatus === 'text' ? 'Copied!' : 'Copy Text'}
-                           </button>
-                           <button 
-                             onClick={() => {
-                               const clean = (transcription.text || '')
-                                 .replace(/\[\d{1,2}:\d{2}(?::\d{2})?\]/g, '') // Remove timestamps
-                                 .replace(/^(.*?):/gm, '') // Remove speaker labels
-                                 .replace(/\*\*/g, '').replace(/\*/g, '') // Remove asterisks
-                                 .replace(/__/g, '').replace(/_/g, '') // Remove underscores
-                                 .replace(/~~/g, '') // Remove strikethrough
-                                 .replace(/\s+/g, ' ') // Normalize spaces
-                                 .trim();
-                               navigator.clipboard.writeText(clean);
-                               handleCopyFeedback('plain');
-                             }}
-                             className="w-full flex items-center gap-3 px-3 py-2 text-left text-[11px] font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-white/5 rounded-xl transition-all group"
-                           >
-                             <div className="w-7 h-7 rounded-lg bg-blue-100 dark:bg-blue-900/20 flex items-center justify-center group-hover:scale-110 transition-transform">
-                               {copiedStatus === 'plain' ? <Check size={12} weight="bold" className="text-emerald-500" /> : <FileText size={12} weight="duotone" className="text-blue-500" />}
+                             <div className="flex flex-col gap-1 mt-1">
+                               <button onClick={() => handleSaveToDrive('doc')} className="w-full flex items-center justify-between px-3 py-1.5 rounded-lg text-xs font-medium text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/5 transition-colors">
+                                 <span>As Document (Doc)</span>
+                                 <FileText size={12} weight="duotone" className="text-blue-500" />
+                               </button>
+                               <button onClick={() => handleSaveToDrive('txt')} className="w-full flex items-center justify-between px-3 py-1.5 rounded-lg text-xs font-medium text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/5 transition-colors">
+                                 <span>As Text File (Txt)</span>
+                                 <FileText size={12} weight="duotone" className="text-slate-500" />
+                               </button>
+                               <button onClick={() => handleSaveToDrive('srt')} className="w-full flex items-center justify-between px-3 py-1.5 rounded-lg text-xs font-medium text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/5 transition-colors">
+                                 <span>As Subtitles (Srt)</span>
+                                 <FileCode size={12} weight="duotone" className="text-amber-500" />
+                               </button>
                              </div>
-                             {copiedStatus === 'plain' ? 'Copied!' : 'Copy Plain Text'}
-                           </button>
-                           <button 
-                             onClick={() => {
-                               const html = (transcription.text || '')
-                                 .replace(/\*\*(.*?)\*\*/g, '<b>$1</b>')
-                                 .replace(/__(.*?)__/g, '<b>$1</b>')
-                                 .replace(/\*(.*?)\*/g, '<i>$1</i>')
-                                 .replace(/_(.*?)_/g, '<i>$1</i>')
-                                 .replace(/\n/g, '<br>');
-                               navigator.clipboard.writeText(html);
-                               handleCopyFeedback('html');
-                             }}
-                             className="w-full flex items-center gap-3 px-3 py-2 text-left text-[11px] font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-white/5 rounded-xl transition-all group"
-                           >
-                             <div className="w-7 h-7 rounded-lg bg-orange-100 dark:bg-orange-900/20 flex items-center justify-center group-hover:scale-110 transition-transform">
-                               {copiedStatus === 'html' ? <Check size={12} weight="bold" className="text-emerald-500" /> : <FileCode size={12} weight="duotone" className="text-orange-500" />}
-                             </div>
-                             {copiedStatus === 'html' ? 'Copied!' : 'Copy HTML'}
-                           </button>
+                           </div>
 
-                           <div className="h-px bg-slate-100 dark:bg-dark-border my-2 mx-2"></div>
+                           <div className="h-px bg-slate-100 dark:bg-dark-border"></div>
 
-                           {/* Download Section */}
-                           <div className="px-2.5 py-1.5 text-[9px] font-black text-slate-400 dark:text-dark-muted uppercase tracking-widest">Download Files</div>
-                           <button 
-                             onClick={handleExportDocx}
-                             className="w-full flex items-center gap-3 px-3 py-2 text-left text-[11px] font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-white/5 rounded-xl transition-all group"
-                           >
-                             <div className="w-7 h-7 rounded-lg bg-blue-100 dark:bg-blue-900/20 flex items-center justify-center group-hover:scale-110 transition-transform">
-                               <FileIcon size={12} weight="duotone" className="text-blue-500"/>
+                           {/* 2. Save to Local */}
+                           <div>
+                             <div className="px-2 py-1 text-[9px] font-black text-slate-400 dark:text-dark-muted uppercase tracking-widest flex items-center gap-2">
+                               <CloudArrowDown size={12} weight="bold" />
+                               Save to Local
                              </div>
-                             Word (.docx)
-                           </button>
-                           <button 
-                             onClick={handleExportTxt}
-                             className="w-full flex items-center gap-3 px-3 py-2 text-left text-[11px] font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-white/5 rounded-xl transition-all group"
-                           >
-                             <div className="w-7 h-7 rounded-lg bg-slate-100 dark:bg-dark-border flex items-center justify-center group-hover:scale-110 transition-transform">
-                               <FileText size={12} weight="duotone" className="text-slate-400 group-hover:text-primary"/>
+                             <div className="flex flex-col gap-1 mt-1">
+                               <button onClick={handleExportDocx} className="w-full flex items-center justify-between px-3 py-1.5 rounded-lg text-xs font-medium text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/5 transition-colors">
+                                 <span>As Document (Docx)</span>
+                                 <FileText size={12} weight="duotone" className="text-blue-500" />
+                               </button>
+                               <button onClick={handleExportTxt} className="w-full flex items-center justify-between px-3 py-1.5 rounded-lg text-xs font-medium text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/5 transition-colors">
+                                 <span>As Text File (Txt)</span>
+                                 <FileText size={12} weight="duotone" className="text-slate-500" />
+                               </button>
+                               <button onClick={handleExportSrt} className="w-full flex items-center justify-between px-3 py-1.5 rounded-lg text-xs font-medium text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/5 transition-colors">
+                                 <span>As Subtitles (Srt)</span>
+                                 <FileCode size={12} weight="duotone" className="text-amber-500" />
+                               </button>
                              </div>
-                             Text (.txt)
-                           </button>
+                           </div>
+
+                           <div className="h-px bg-slate-100 dark:bg-dark-border"></div>
+
+                           {/* 3. Copy As */}
+                           <div>
+                             <div className="px-2 py-1 text-[9px] font-black text-slate-400 dark:text-dark-muted uppercase tracking-widest flex items-center gap-2">
+                               <Copy size={12} weight="bold" />
+                               Copy As
+                             </div>
+                             <div className="flex flex-col gap-1 mt-1">
+                               <button 
+                                 onClick={() => {
+                                   const clean = (transcription.text || '')
+                                      .replace(/\[\d{1,2}:\d{2}(?::\d{2})?\]/g, '')
+                                      .replace(/^(.*?):/gm, '')
+                                      .replace(/\*\*/g, '').replace(/\*/g, '')
+                                      .replace(/__/g, '').replace(/_/g, '') // Remove underscores
+                                      .replace(/~~/g, '') // Remove strikethrough
+                                      .replace(/\s+/g, ' ') // Normalize spaces
+                                      .trim();
+                                   navigator.clipboard.writeText(clean);
+                                   handleCopyFeedback('plain');
+                                 }}
+                                 className="w-full flex items-center justify-between px-3 py-1.5 rounded-lg text-xs font-medium text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/5 transition-colors"
+                               >
+                                 <span>Raw Text</span>
+                                 {copiedStatus === 'plain' ? <Check size={12} className="text-emerald-500" /> : <FileText size={12} className="opacity-50" />}
+                               </button>
+                               <button 
+                                 onClick={() => {
+                                    // Hacky way to copy HTML/Document formatted text to clipboard
+                                    const blob = new Blob([transcription.text || ''], { type: 'text/html' });
+                                    const item = new ClipboardItem({ "text/plain": new Blob([transcription.text || ''], { type: 'text/plain' }) });
+                                    navigator.clipboard.writeText(transcription.text || ''); 
+                                    handleCopyFeedback('text');
+                                 }} 
+                                 className="w-full flex items-center justify-between px-3 py-1.5 rounded-lg text-xs font-medium text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/5 transition-colors"
+                               >
+                                 <span>As in Document</span>
+                                 {copiedStatus === 'text' ? <Check size={12} className="text-emerald-500" /> : <Checks size={12} className="opacity-50" />}
+                               </button>
+                             </div>
+                           </div>
+
+                           <div className="h-px bg-slate-100 dark:bg-dark-border"></div>
+
+                           {/* 4. Export To */}
+                           <div>
+                              <div className="px-2 py-1 text-[9px] font-black text-slate-400 dark:text-dark-muted uppercase tracking-widest flex items-center gap-2">
+                                 <Export size={12} weight="bold" />
+                                 Export To
+                              </div>
+                              <button 
+                                onClick={() => window.print()}
+                                className="w-full flex items-center justify-between px-3 py-1.5 rounded-lg text-xs font-medium text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/5 transition-colors mt-1"
+                              >
+                                <span>PDF (Print to PDF)</span>
+                                <FileText size={12} weight="duotone" className="text-red-500" />
+                              </button>
+                           </div>
                        </div>
                    </div>
                </div>
-
                 {/* Smart Editor Trigger */}
                 <button 
                     onClick={() => setShowAiSidebar(!showAiSidebar)}
@@ -320,7 +475,7 @@ const EditorView: React.FC<EditorViewProps> = ({
                           <Clock size={14} weight="duotone" className="text-slate-500" />
                         </div>
                         <div className="flex items-center gap-2 flex-1">
-                          <span>Archive</span>
+                          <span>Sessions</span>
                           {archiveItems.length > 0 && (
                             <div className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse"></div>
                           )}
@@ -390,7 +545,7 @@ const EditorView: React.FC<EditorViewProps> = ({
                       className="w-full flex items-center gap-3 px-3 py-2.5 text-left text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-white/5 rounded-xl transition-all"
                     >
                       <Clock size={16} weight="duotone" className="text-slate-400" />
-                      Archive
+                      Sessions
                     </button>
                     <button 
                       onClick={() => setDarkMode(!darkMode)}
@@ -451,6 +606,7 @@ const EditorView: React.FC<EditorViewProps> = ({
                handleBackgroundTranscribe(file);
              }}
              onOpenInNewTab={onOpenInNewTab}
+             liveRecordingTrigger={liveRecordingTrigger}
            />
       </main>
     </div>

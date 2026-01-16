@@ -10,7 +10,7 @@ import {
   Spinner, VideoCamera, TextHOne, TextHTwo, TextHThree, Palette, 
   Eraser, DotsThree, ArrowRight, Microphone, UploadSimple, Stop, 
   Play, Pause, WarningCircle, MagicWand, Timer, Warning, CaretUp, ArrowLeft,
-  Plus, List, Repeat, ArrowsOutSimple, ArrowsInSimple, Scissors, Funnel, ChatCenteredText, DownloadSimple, DotsSixVertical, Users, ArrowSquareOut
+  Plus, List, Repeat, ArrowsOutSimple, ArrowsInSimple, Scissors, Funnel, ChatCenteredText, DownloadSimple, DotsSixVertical, Users, ArrowSquareOut, GoogleLogo
 } from '@phosphor-icons/react';
 import { detectDialect } from '../utils/transcriptionUtils';
 import PlaybackControl from './PlaybackControl';
@@ -43,6 +43,7 @@ interface TranscriptionEditorProps {
   onSeek?: (timeInSeconds: number) => void;
   useDeepThinking?: boolean;
   onOpenInNewTab?: (content: string, title?: string) => void;
+  liveRecordingTrigger?: number;
 }
 
 type ActiveMenu = 'formatting' | 'tools' | 'export' | 'search' | 'ai-features' | null;
@@ -68,7 +69,8 @@ const TranscriptionEditor: React.FC<TranscriptionEditorProps> = ({
   onSeek,
   useDeepThinking = false,
   onSaveToDrive,
-  onOpenInNewTab
+  onOpenInNewTab,
+  liveRecordingTrigger
 }) => {
   // --- State ---
   const [history, setHistory] = useState<string[]>([initialText]);
@@ -93,6 +95,14 @@ const TranscriptionEditor: React.FC<TranscriptionEditorProps> = ({
   // Search State
   const [searchMatches, setSearchMatches] = useState<{index: number, length: number}[]>([]);
   const [currentMatchIndex, setCurrentMatchIndex] = useState(-1);
+
+  // External Trigger for Live Recording
+  useEffect(() => {
+    if (liveRecordingTrigger && liveRecordingTrigger > 0) {
+       handleToggleLiveRecording();
+    }
+  }, [liveRecordingTrigger]);
+
 
   useEffect(() => {
     if (initialText) {
@@ -1145,7 +1155,7 @@ const TranscriptionEditor: React.FC<TranscriptionEditorProps> = ({
         <div className="flex-1 overflow-y-auto bg-slate-100 dark:bg-[#202124] custom-scrollbar">
           <div className="py-8 px-4">
             {/* The "Page" */}
-            <div className="max-w-[816px] mx-auto bg-white dark:bg-dark-card rounded-xl shadow-sm border border-slate-200 dark:border-dark-border min-h-[1056px] p-12 sm:p-16">
+            <div id="printable-content" className="max-w-[816px] mx-auto bg-white dark:bg-dark-card rounded-xl shadow-sm border border-slate-200 dark:border-dark-border min-h-[1056px] p-12 sm:p-16">
                
                {/* Content Type Badge */}
                {contentType && (
@@ -1179,14 +1189,14 @@ const TranscriptionEditor: React.FC<TranscriptionEditorProps> = ({
           </div>
         </div>
 
-        {/* Dynamic Media Bar - Simplified in Edit Mode */}
-        {isEditing && (
+        {/* Dynamic Media Bar - Only visible during active live recording */}
+        {isEditing && isRecordingLive && (
           <div className={`flex-none border-t border-slate-200/50 dark:border-dark-border/50 bg-white/80 dark:bg-dark-card/80 backdrop-blur-sm transition-all duration-300 p-4`}>
             <div className="max-w-[816px] mx-auto">
                 <div className="flex flex-col gap-3">
                   
                   {/* Interim Transcript Display */}
-                  {isRecordingLive && interimTranscript && (
+                  {interimTranscript && (
                     <div className="px-4 py-2.5 rounded-xl bg-primary/5 border border-primary/10 text-slate-600 dark:text-dark-muted text-sm italic animate-in fade-in slide-in-from-bottom-2">
                       <span className="text-primary dark:text-accent font-bold mr-2">Listening:</span>
                       {interimTranscript}...
@@ -1194,47 +1204,19 @@ const TranscriptionEditor: React.FC<TranscriptionEditorProps> = ({
                   )}
 
                   <div className="flex items-center justify-center gap-3">
-                    {/* Record Button - More subtle */}
-                    <button 
-                      onClick={handleToggleLiveRecording}
-                      className={`group flex items-center gap-2.5 px-5 py-2.5 rounded-xl font-bold text-sm transition-all active:scale-[0.98] ${
-                        isRecordingLive 
-                          ? 'bg-red-500 text-white shadow-lg shadow-red-500/20' 
-                          : 'bg-emerald-500 hover:bg-emerald-600 text-white shadow-md shadow-emerald-500/20'
-                      }`}
-                    >
-                      {isRecordingLive ? (
-                        <>
-                          <div className="flex items-center gap-1 mr-1">
+                    {/* Active Recording Stop Button */}
+                      <button 
+                        onClick={handleToggleLiveRecording}
+                        className="group flex items-center gap-2.5 px-5 py-2.5 rounded-full font-bold text-sm bg-red-500 text-white shadow-lg shadow-red-500/20 hover:bg-red-600 transition-all animate-in fade-in zoom-in duration-300"
+                      >
+                         <div className="flex items-center gap-1 mr-1">
                             <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse"></span>
                             <span className="w-1.5 h-3 rounded-full bg-white/60 animate-bounce [animation-delay:-0.2s]"></span>
                             <span className="w-1.5 h-1.5 rounded-full bg-white/40 animate-pulse [animation-delay:0.4s]"></span>
                           </div>
                           <Stop size={14} weight="fill" className="fill-current"/>
-                          <span>Stop</span>
-                        </>
-                      ) : (
-                        <>
-                          <Microphone size={16} weight="duotone" />
-                          <span>Record Voice Note</span>
-                        </>
-                      )}
-                    </button>
-                    
-                    {!isRecordingLive && (
-                      <>
-                        <span className="text-slate-300 dark:text-dark-border text-[10px] font-bold uppercase tracking-widest">or</span>
-                        
-                        {/* Upload Button - More subtle */}
-                        <button 
-                          onClick={() => fileInputRef.current?.click()}
-                          className="group flex items-center gap-2 px-5 py-2.5 rounded-xl bg-slate-100 dark:bg-dark-bg text-slate-600 dark:text-slate-300 font-bold text-sm hover:bg-slate-200 dark:hover:bg-dark-border transition-all border border-slate-200/50 dark:border-white/5"
-                        >
-                          <UploadSimple size={16} weight="bold" className="text-primary dark:text-accent"/>
-                          <span>Upload File</span>
-                        </button>
-                      </>
-                    )}
+                          <span>Stop Recording</span>
+                      </button>
                 </div>
               </div>
             </div>
