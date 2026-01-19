@@ -257,8 +257,8 @@ const uploadFileToGemini = async (
       };
 
       xhr.onerror = () => reject(new Error("Network error during upload (XHR)."));
-      xhr.ontimeout = () => reject(new Error("File upload timed out (10 minutes)."));
-      xhr.timeout = 600000; // 10 minutes for upload
+      xhr.ontimeout = () => reject(new Error("File upload timed out (30 minutes)."));
+      xhr.timeout = 1800000; // 30 minutes for upload (support up to 2GB)
       xhr.send(mediaFile);
     });
 

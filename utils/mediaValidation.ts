@@ -33,7 +33,7 @@ export const validateMediaFile = (
   mimeType?: string | null,
   options: { maxSizeMB?: number } = {}
 ) => {
-  const maxSizeMB = options.maxSizeMB ?? 500;
+  const maxSizeMB = options.maxSizeMB ?? 2000; // Increased to 2GB to support large high-quality video/audio
   const sizeMB = (file.size || 0) / (1024 * 1024);
   if (sizeMB > maxSizeMB) {
     return {
