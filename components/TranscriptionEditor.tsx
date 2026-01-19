@@ -69,9 +69,12 @@ const TranscriptionEditor: React.FC<TranscriptionEditorProps> = ({
   onSeek,
   useDeepThinking = false,
   onSaveToDrive,
+  isSaving = false,
+  driveSaved = false,
   onOpenInNewTab,
   liveRecordingTrigger
 }) => {
+
   // --- State ---
   const [history, setHistory] = useState<string[]>([initialText]);
   const [historyIndex, setHistoryIndex] = useState(0);
@@ -96,12 +99,27 @@ const TranscriptionEditor: React.FC<TranscriptionEditorProps> = ({
   const [searchMatches, setSearchMatches] = useState<{index: number, length: number}[]>([]);
   const [currentMatchIndex, setCurrentMatchIndex] = useState(-1);
 
+  const showDriveStatus = Boolean(isSaving || driveSaved);
+
+
   // External Trigger for Live Recording
   useEffect(() => {
     if (liveRecordingTrigger && liveRecordingTrigger > 0) {
        handleToggleLiveRecording();
     }
   }, [liveRecordingTrigger]);
+
+  useEffect(() => {
+    const updateViewport = () => {
+      if (typeof window === 'undefined') return;
+      setIsDesktop(window.innerWidth >= 768);
+    };
+
+    updateViewport();
+    window.addEventListener('resize', updateViewport);
+    return () => window.removeEventListener('resize', updateViewport);
+  }, []);
+
 
 
   useEffect(() => {
@@ -126,6 +144,9 @@ const TranscriptionEditor: React.FC<TranscriptionEditorProps> = ({
   // Search State
   const [searchTerm, setSearchTerm] = useState('');
   const [replaceTerm, setReplaceTerm] = useState('');
+
+  const [isDesktop, setIsDesktop] = useState(true);
+
 
   // Playback State
   const [playbackTime, setPlaybackTime] = useState(0);
@@ -979,16 +1000,32 @@ const TranscriptionEditor: React.FC<TranscriptionEditorProps> = ({
 
   return (
     <div className="flex h-full relative overflow-hidden">
+      {showDriveStatus && (
+        <div className="absolute top-4 right-4 z-40" aria-live="polite">
+          <div
+            className={`flex items-center gap-2 rounded-full px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest shadow-sm border ${
+              isSaving
+                ? 'bg-blue-50 text-blue-600 border-blue-200'
+                : 'bg-emerald-50 text-emerald-600 border-emerald-200'
+            }`}
+          >
+            {isSaving ? <Spinner size={14} weight="bold" className="animate-spin" /> : <Checks size={14} weight="bold" />}
+            {isSaving ? 'Saving to Drive' : 'Saved to Drive'}
+          </div>
+        </div>
+      )}
       
       {/* Main Content Area */}
       <div className="flex-1 flex flex-col overflow-hidden">
+
         
         {/* Floating Editor Toolbar (Only shown in Edit Mode) - DRAGGABLE */}
         {isEditing && (
           <motion.div 
-            drag
+            drag={isDesktop}
             dragMomentum={false}
             className="absolute z-50 cursor-grab active:cursor-grabbing"
+
             initial={{ opacity: 0, y: -20, x: "-50%" }}
             animate={{ opacity: 1, y: 0, x: "-50%" }}
             style={{ 
@@ -1004,7 +1041,17 @@ const TranscriptionEditor: React.FC<TranscriptionEditorProps> = ({
               ref={toolbarRef} 
               className={`flex items-center gap-1 bg-white/95 dark:bg-dark-card/95 backdrop-blur-xl rounded-2xl px-2 py-1.5 border border-slate-200/80 dark:border-white/10 shadow-xl shadow-slate-900/[0.08] ${isDragging ? 'cursor-grabbing' : ''}`}
             >
+                <button
+                  type="button"
+                  onClick={() => setToolbarPosition(null)}
+                  className="flex items-center gap-1 px-2 text-[9px] font-bold uppercase tracking-widest text-slate-400 hover:text-slate-600"
+                  title="Reset toolbar position"
+                >
+                  <DotsSixVertical size={14} weight="bold" />
+                  Drag
+                </button>
                 <div className="w-px h-5 bg-slate-200 dark:bg-dark-border"></div>
+
                 
                 {/* Undo/Redo */}
                 <button onClick={handleUndo} disabled={historyIndex === 0} className="w-8 h-8 rounded-2xl flex items-center justify-center text-slate-400 hover:text-primary hover:bg-slate-100 dark:hover:bg-dark-bg disabled:opacity-30 disabled:hover:text-slate-400 disabled:hover:bg-transparent transition-all" title="Undo"><ArrowArcLeft size={16} weight="bold"/></button>
@@ -1157,7 +1204,7 @@ const TranscriptionEditor: React.FC<TranscriptionEditorProps> = ({
                                 </button>
                                 <button 
                                   onClick={() => { handleSearchReplace(); setActiveMenu(null); }} 
-                                  className="flex-[1.5] bg-primary hover:bg-primary/90 text-white text-xs font-semibold py-2 rounded-lg transition-all shadow-lg shadow-primary/20"
+                                  className="flex-[1.5] bg-primary hover:bg-primary/90 text-white text-xs font-semibold py-2 rounded-lg transition-all "
                                 >
                                   Replace All
                                 </button>
@@ -1247,8 +1294,9 @@ const TranscriptionEditor: React.FC<TranscriptionEditorProps> = ({
 
       {/* AI Sidebar */}
       {showAiSidebar && (
-          <div className={`flex-none bg-white dark:bg-slate-900 border-l border-slate-200 dark:border-slate-800 flex flex-col overflow-hidden animate-in slide-in-from-right-10 duration-200 shadow-2xl transition-all duration-300 ${isAiSidebarExpanded ? 'w-[600px]' : 'w-[340px]'}`}>
-              <div className="flex items-center justify-between p-4 border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50">
+          <div className={`flex-none bg-white dark:bg-dark-card border-l border-slate-200 dark:border-dark-border flex flex-col overflow-hidden animate-in slide-in-from-right-10 duration-200  transition-all duration-300 ${isAiSidebarExpanded ? 'w-[600px]' : 'w-[340px]'}`}>
+              <div className="flex items-center justify-between p-4 border-b border-slate-100 dark:border-dark-border bg-slate-50/50 dark:bg-dark-bg/40">
+
                   <div className="flex items-center gap-2.5">
                       <div className="bg-primary/10 dark:bg-accent/10 p-2 rounded-xl">
                           <Sparkle size={18} weight="duotone" className="text-primary dark:text-accent" />
@@ -1264,7 +1312,7 @@ const TranscriptionEditor: React.FC<TranscriptionEditorProps> = ({
                   <div className="flex items-center gap-1">
                       <button 
                         onClick={() => setIsToolsExpanded(!isToolsExpanded)} 
-                        className="p-2 rounded-xl hover:bg-slate-200 dark:hover:bg-dark-border text-slate-400 dark:hover:text-white transition-colors"
+                        className="p-2 rounded-xl hover:bg-slate-200 dark:hover:bg-dark-bg text-slate-400 dark:hover:text-white transition-colors"
                         title={isToolsExpanded ? "Collapse Tools" : "Expand Tools"}
                       >
                         {isToolsExpanded ? <CaretUp size={18} weight="bold" /> : <CaretDown size={18} weight="bold" />}
@@ -1276,7 +1324,7 @@ const TranscriptionEditor: React.FC<TranscriptionEditorProps> = ({
                       >
                         {isAiSidebarExpanded ? <ArrowsInSimple size={18} weight="bold" /> : <ArrowsOutSimple size={18} weight="bold" />}
                       </button>
-                      <button onClick={onAiSidebarToggle} className="p-2 rounded-xl hover:bg-slate-200 dark:hover:bg-dark-border text-slate-400 dark:hover:text-white transition-colors">
+                      <button onClick={onAiSidebarToggle} className="p-2 rounded-xl hover:bg-slate-200 dark:hover:bg-dark-bg text-slate-400 dark:hover:text-white transition-colors">
                           <X size={18} weight="bold" />
                       </button>
                   </div>
@@ -1284,32 +1332,79 @@ const TranscriptionEditor: React.FC<TranscriptionEditorProps> = ({
               
               {/* AI Actions Tabs/Sections (Collapsible) */}
               {isToolsExpanded && (
-              <div className="p-4 border-b border-slate-100 dark:border-dark-border bg-white dark:bg-dark-card space-y-4 animate-in slide-in-from-top-2 duration-300">
+              <div className="p-4 border-b border-slate-100 dark:border-dark-border bg-white dark:bg-dark-bg space-y-4 animate-in slide-in-from-top-2 duration-300">
                 {(() => {
                   const context = analyzeDocumentContext();
                   const canShowSummary = context.wordCount > 200 || context.hasMultipleParagraphs;
                   const canShowKeyMoments = context.hasTimestamps && context.wordCount > 300;
                   const canShowSmartFix = context.wordCount > 50 && !context.isEmpty;
                   const canShowPleasantries = context.hasPleasantries;
-                  
-                  // Show empty state if document is too short
+
                   if (context.isEmpty) {
                     return (
-                      <div className="text-center py-12 px-4">
+                      <div className="text-center py-10 px-4">
                         <div className="w-16 h-16 bg-slate-50 dark:bg-white/5 rounded-2xl flex items-center justify-center mb-4 mx-auto border border-slate-100 dark:border-white/10">
                           <Sparkle size={28} className="text-slate-300 dark:text-slate-500" />
                         </div>
                         <h4 className="text-sm font-bold text-slate-700 dark:text-slate-200 mb-2">Add Content to Unlock AI</h4>
-                        <p className="text-xs text-slate-400 dark:text-slate-500 leading-relaxed max-w-[200px] mx-auto">
-                          Write or transcribe to unlock AI features
+                        <p className="text-xs text-slate-400 dark:text-slate-500 leading-relaxed max-w-[220px] mx-auto">
+                          Write, record, or upload to activate smart features.
                         </p>
+                        <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
+                          {onStartRecording && (
+                            <button
+                              type="button"
+                              onClick={onStartRecording}
+                              className="flex items-center gap-2 px-3 py-2 rounded-full text-[10px] font-bold uppercase tracking-widest bg-white dark:bg-dark-card border border-slate-200 dark:border-white/10 text-slate-600 dark:text-slate-300"
+                            >
+                              <Microphone size={12} weight="duotone" className="text-amber-500" />
+                              Record
+                            </button>
+                          )}
+                          {onUploadClick && (
+                            <button
+                              type="button"
+                              onClick={onUploadClick}
+                              className="flex items-center gap-2 px-3 py-2 rounded-full text-[10px] font-bold uppercase tracking-widest bg-white dark:bg-dark-card border border-slate-200 dark:border-white/10 text-slate-600 dark:text-slate-300"
+                            >
+                              <UploadSimple size={12} weight="duotone" className="text-accent" />
+                              Upload
+                            </button>
+                          )}
+                          {onAttachDrive && (
+                            <button
+                              type="button"
+                              onClick={onAttachDrive}
+                              className="flex items-center gap-2 px-3 py-2 rounded-full text-[10px] font-bold uppercase tracking-widest bg-white dark:bg-dark-card border border-slate-200 dark:border-white/10 text-slate-600 dark:text-slate-300"
+                            >
+                              <GoogleLogo size={12} weight="bold" className="text-slate-500" />
+                              Drive
+                            </button>
+                          )}
+                        </div>
                       </div>
                     );
                   }
                   
                   return (
-                    <>
-                {/* Synthesis Section */}
+                    <React.Fragment>
+                      <div className="flex flex-wrap items-center gap-2 text-[9px] font-black uppercase tracking-widest text-slate-400">
+                        <span className="rounded-full border border-slate-200 dark:border-white/10 bg-white/70 dark:bg-dark-card px-2 py-1">
+                          {context.wordCount} words
+                        </span>
+                        {context.hasTimestamps && (
+                          <span className="rounded-full border border-slate-200 dark:border-white/10 bg-white/70 dark:bg-dark-card px-2 py-1">
+                            timestamps
+                          </span>
+                        )}
+                        {context.hasSpeakers && (
+                          <span className="rounded-full border border-slate-200 dark:border-white/10 bg-white/70 dark:bg-dark-card px-2 py-1">
+                            speakers
+                          </span>
+                        )}
+                      </div>
+                      {/* Synthesis Section */}
+
                 {(canShowSummary || canShowKeyMoments) && (
                 <div>
                   <p className="px-1 text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-2">Synthesis & Insights</p>
@@ -1317,11 +1412,12 @@ const TranscriptionEditor: React.FC<TranscriptionEditorProps> = ({
                     <button 
                       onClick={handleSummarize} 
                       disabled={isSummarizing} 
-                      className={`flex items-center gap-2 p-2.5 rounded-xl border transition-all ${
+className={`flex items-center gap-2 p-2.5 rounded-xl border transition-all ${
                         summaryTitle === "Summary" 
                           ? "bg-emerald-500 text-white border-emerald-500 shadow-lg shadow-emerald-500/20" 
-                          : "bg-slate-50 dark:bg-dark-bg border-slate-100 dark:border-white/10 text-slate-600 dark:text-slate-400 hover:border-emerald-500/30 hover:bg-white dark:hover:bg-dark-card"
+                          : "bg-slate-50 dark:bg-dark-bg border-slate-100 dark:border-dark-border text-slate-600 dark:text-slate-400 hover:border-emerald-500/30 hover:bg-white dark:hover:bg-dark-card"
                       }`}
+
                     >
                       <BookOpen size={16} weight="duotone" />
                       <div className="flex flex-col items-start gap-0.5">
@@ -1332,11 +1428,12 @@ const TranscriptionEditor: React.FC<TranscriptionEditorProps> = ({
                     <button 
                       onClick={handleKeyMoments} 
                       disabled={isSummarizing} 
-                      className={`flex items-center gap-2 p-2.5 rounded-xl border transition-all ${
+className={`flex items-center gap-2 p-2.5 rounded-xl border transition-all ${
                         summaryTitle === "Key Moments" 
                           ? "bg-amber-500 text-white border-amber-500 shadow-lg shadow-amber-500/20" 
-                          : "bg-slate-50 dark:bg-dark-bg border-slate-100 dark:border-white/10 text-slate-600 dark:text-slate-400 hover:border-amber-500/30 hover:bg-white dark:hover:bg-dark-card"
+                          : "bg-slate-50 dark:bg-dark-bg border-slate-100 dark:border-dark-border text-slate-600 dark:text-slate-400 hover:border-amber-500/30 hover:bg-white dark:hover:bg-dark-card"
                       }`}
+
                     >
                       <Timer size={16} weight="duotone" />
                       <div className="flex flex-col items-start gap-0.5">
@@ -1359,8 +1456,8 @@ const TranscriptionEditor: React.FC<TranscriptionEditorProps> = ({
                       disabled={isSummarizing} 
                       className={`flex items-center gap-2 p-2.5 rounded-xl border transition-all ${
                         summaryTitle === "Smart Fix" 
-                          ? "bg-primary text-white border-primary shadow-lg shadow-primary/20" 
-                          : "bg-slate-50 dark:bg-dark-bg border-slate-100 dark:border-white/10 text-slate-600 dark:text-slate-400 hover:border-primary/30 dark:hover:border-accent/40 hover:bg-white dark:hover:bg-dark-card"
+                          ? "bg-primary text-white border-primary " 
+                          : "bg-slate-50 dark:bg-dark-bg border-slate-100 dark:border-dark-border text-slate-600 dark:text-slate-400 hover:border-primary/30 dark:hover:border-accent/40 hover:bg-white dark:hover:bg-dark-card"
                       }`}
                     >
                       <MagicWand size={16} weight="duotone" />
@@ -1440,9 +1537,10 @@ const TranscriptionEditor: React.FC<TranscriptionEditorProps> = ({
                      </button>
                    </div>
                 </div>
-              </>
+              </React.Fragment>
             );
           })()}
+
               </div>
               )}
               
@@ -1540,7 +1638,7 @@ const TranscriptionEditor: React.FC<TranscriptionEditorProps> = ({
                                 </button>
                                 
                                 {activeMenu === 'export' && (
-                                    <div className="absolute bottom-full right-0 mb-3 bg-white dark:bg-dark-card rounded-2xl shadow-2xl border border-slate-100 dark:border-dark-border z-50 p-2 min-w-[200px] animate-in fade-in slide-in-from-bottom-2">
+                                    <div className="absolute bottom-full right-0 mb-3 bg-white dark:bg-dark-card rounded-2xl  border border-slate-100 dark:border-dark-border z-50 p-2 min-w-[200px] animate-in fade-in slide-in-from-bottom-2">
                                         <div className="px-2.5 py-1.5 text-[9px] font-black text-slate-400 dark:text-dark-muted uppercase tracking-widest">Preview & Copy</div>
                                         <button 
                                             onClick={() => {
@@ -1621,11 +1719,19 @@ const TranscriptionEditor: React.FC<TranscriptionEditorProps> = ({
                               <Sparkle size={32} weight="duotone" className="text-primary/30 dark:text-accent/30 group-hover:scale-110 transition-transform duration-500" />
                           </div>
                           <h4 className="text-sm font-bold text-slate-800 dark:text-white mb-2">Ready to Assist</h4>
-                          <p className="text-xs text-slate-400 dark:text-slate-300 leading-relaxed max-w-[180px]">
+                          <p className="text-xs text-slate-400 dark:text-slate-300 leading-relaxed max-w-[200px]">
                               Select an AI action above to summarize or enhance your transcription.
                           </p>
+                          <div className="mt-4 flex flex-wrap items-center justify-center gap-2 text-[10px] font-bold uppercase tracking-widest text-slate-400 dark:text-slate-500">
+                            <span className="rounded-full border border-slate-200 dark:border-white/10 bg-white/70 dark:bg-dark-card px-2 py-1">⌘ + E</span>
+                            <span>Edit</span>
+                            <span className="text-slate-300 dark:text-slate-600">•</span>
+                            <span className="rounded-full border border-slate-200 dark:border-white/10 bg-white/70 dark:bg-dark-card px-2 py-1">⌘ + S</span>
+                            <span>Save</span>
+                          </div>
                       </div>
                   )}
+
               </div>
           </div>
       )}
@@ -1634,9 +1740,10 @@ const TranscriptionEditor: React.FC<TranscriptionEditorProps> = ({
       <AnimatePresence>
         {showSummarySidebar && !showAiSidebar && (
             <motion.div 
-              drag
+              drag={isDesktop}
               dragMomentum={false}
               layout
+
               initial={{ opacity: 0, scale: 0.9, x: 20 }}
               animate={{ opacity: 1, scale: 1, x: 0 }}
               exit={{ opacity: 0, scale: 0.9, x: 20 }}
@@ -1644,7 +1751,7 @@ const TranscriptionEditor: React.FC<TranscriptionEditorProps> = ({
                 fixed md:absolute inset-0 md:inset-auto
                 w-full md:w-96 md:min-w-[320px] md:min-h-[300px] h-full md:h-auto
                 bg-white dark:bg-dark-card md:bg-white/95 md:dark:bg-dark-card/95 
-                md:backdrop-blur-xl shadow-2xl border-0 md:border border-slate-200 dark:border-dark-border 
+                md:backdrop-blur-xl  border-0 md:border border-slate-200 dark:border-dark-border 
                 rounded-none md:rounded-2xl p-5 flex flex-col 
                 z-[60] md:z-50 md:resize overflow-hidden 
                 group cursor-grab active:cursor-grabbing
@@ -1661,12 +1768,23 @@ const TranscriptionEditor: React.FC<TranscriptionEditorProps> = ({
             >
                 {/* Header */}
                 <div className="flex items-center justify-between mb-4 pointer-events-none">
-                    <h3 className="text-sm font-bold text-slate-800 dark:text-dark-text flex items-center gap-2">
-                        {summaryTitle === "Visual Analysis" ? <VideoCamera className="text-primary dark:text-accent" size={16} weight="duotone" /> : 
-                         summaryTitle === "Smart Suggestions" ? <MagicWand className="text-primary dark:text-accent" size={16} weight="duotone" /> :
-                         <BookOpen className="text-primary dark:text-accent" size={16} weight="duotone" />}
-                        {summaryTitle}
-                    </h3>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setSummaryPosition(null)}
+                        className="pointer-events-auto flex items-center gap-1 text-[9px] font-bold uppercase tracking-widest text-slate-400 hover:text-slate-600"
+                        title="Reset card position"
+                      >
+                        <DotsSixVertical size={14} weight="bold" />
+                        Drag
+                      </button>
+                      <h3 className="text-sm font-bold text-slate-800 dark:text-dark-text flex items-center gap-2">
+                          {summaryTitle === "Visual Analysis" ? <VideoCamera className="text-primary dark:text-accent" size={16} weight="duotone" /> : 
+                           summaryTitle === "Smart Suggestions" ? <MagicWand className="text-primary dark:text-accent" size={16} weight="duotone" /> :
+                           <BookOpen className="text-primary dark:text-accent" size={16} weight="duotone" />}
+                          {summaryTitle}
+                      </h3>
+                    </div>
                     <div className="flex items-center gap-2 pointer-events-auto">
                       <button 
                         onClick={() => setIsPreviewMode(!isPreviewMode)} 
@@ -1679,6 +1797,7 @@ const TranscriptionEditor: React.FC<TranscriptionEditorProps> = ({
                       </button>
                     </div>
                 </div>
+
                 
                 <div className="flex-1 overflow-y-auto custom-scrollbar pointer-events-auto">
                     {isSummarizing ? (
@@ -1705,7 +1824,7 @@ const TranscriptionEditor: React.FC<TranscriptionEditorProps> = ({
                           {summaryTitle === "Smart Fix" && (
                               <button 
                                   onClick={handleApplyEnhancement}
-                                  className="w-full mt-4 bg-gradient-to-r from-primary to-purple-600 hover:from-primary/90 hover:to-purple-600/90 text-white font-bold py-3 rounded-xl text-sm flex items-center justify-center gap-2 shadow-lg shadow-primary/20 transition-all active:scale-[0.98] flex-shrink-0"
+                                  className="w-full mt-4 bg-gradient-to-r from-primary to-purple-600 hover:from-primary/90 hover:to-purple-600/90 text-white font-bold py-3 rounded-xl text-sm flex items-center justify-center gap-2  transition-all active:scale-[0.98] flex-shrink-0"
                               >
                                   <Sparkle size={16} weight="fill" />
                                   Apply to Document
@@ -1721,7 +1840,7 @@ const TranscriptionEditor: React.FC<TranscriptionEditorProps> = ({
       {/* Toast Notification */}
       {toast && (
         <div className="fixed top-24 left-1/2 -translate-x-1/2 z-[9999] animate-in fade-in slide-in-from-top-4 duration-300">
-          <div className={`flex items-center gap-3 px-5 py-3.5 rounded-2xl shadow-2xl backdrop-blur-xl border ${
+          <div className={`flex items-center gap-3 px-5 py-3.5 rounded-2xl  backdrop-blur-xl border ${
             toast.type === 'error' 
               ? 'bg-red-500/90 text-white border-red-400/20' 
               : toast.type === 'warning'
@@ -1746,7 +1865,7 @@ const TranscriptionEditor: React.FC<TranscriptionEditorProps> = ({
       {/* Floating Audio Player (Only in Read Mode) */}
       {!isEditing && audioUrl && (
         <div className="fixed bottom-8 left-1/2 -translate-x-1/2 z-[100] w-full max-w-[500px] px-4 animate-in slide-in-from-bottom-8 duration-500">
-           <div className="bg-[#121212]/90 backdrop-blur-2xl border border-white/10 rounded-full p-2 shadow-2xl">
+           <div className="bg-[#121212]/90 backdrop-blur-2xl border border-white/10 rounded-full p-2 ">
               <PlaybackControl 
                 audioUrl={audioUrl} 
                 onTimeUpdate={setPlaybackTime} 

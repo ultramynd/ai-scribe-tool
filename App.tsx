@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useCallback, lazy, Suspense } from 'react';
 
 import { Spinner } from '@phosphor-icons/react';
-import { AudioSource, AudioFile, TranscriptionState, EditorTab, ArchiveItem } from './types';
-import { transcribeAudio, classifyContent } from './services/geminiService';
+import { AudioSource, AudioFile, TranscriptionState } from './types';
 // import { transcribeWithGroq } from './services/groqService'; 
-import { transcribeWithWebSpeech, isWebSpeechSupported } from './services/webSpeechService';
+import { isWebSpeechSupported } from './services/webSpeechService';
+import { validateMediaFile } from './utils/mediaValidation';
+
 import ArchiveSidebar from './components/ArchiveSidebar';
 import GoogleFilePicker from './components/GoogleFilePicker';
 import LoadingView from './src/views/LoadingView';
@@ -14,11 +15,14 @@ const EditorView = lazy(() => import('./src/views/EditorView'));
 import TabBar from './components/TabBar';
 import ErrorBoundary from './components/ErrorBoundary';
 
-import { generateDocx, generateTxt, generateSrt, createSrtString } from './utils/exportUtils';
 import { ThemeProvider } from './src/contexts/ThemeContext';
 import { useArchive } from './src/hooks/useArchive';
+import { useDraftPersistence } from './src/hooks/useDraftPersistence';
 import { useGoogleDriveAuth } from './src/hooks/useGoogleDriveAuth';
+import { useExports } from './src/hooks/useExports';
+import { useSessionUi } from './src/hooks/useSessionUi';
 import { useTabs } from './src/hooks/useTabs';
+import { useTranscriptionFlow } from './src/hooks/useTranscriptionFlow';
 
 
 
@@ -52,9 +56,14 @@ const App: React.FC = () => {
     }
   });
 
-  const [showExitConfirm, setShowExitConfirm] = useState(false);
-  const [pendingAction, setPendingAction] = useState<(() => void) | null>(null);
-
+  useDraftPersistence({
+    tabs,
+    setTabs,
+    activeTabId,
+    setActiveTabId,
+    activeTab,
+    setActiveTab
+  });
 
   // Data States
   const [recordedBlob, setRecordedBlob] = useState<Blob | null>(null);
@@ -77,12 +86,8 @@ const App: React.FC = () => {
     handleGoogleLogout,
     setGoogleAccessToken
   } = useGoogleDriveAuth(googleClientId);
-  const [isSavingToDrive, setIsSavingToDrive] = useState(false);
-  const [driveSaved, setDriveSaved] = useState(false);
 
   // UI States
-  const [progress, setProgress] = useState(0);
-  const [logLines, setLogLines] = useState<string[]>([]);
   const [showAiSidebar, setShowAiSidebar] = useState(false); // AI features sidebar
   const { archiveItems, setArchiveItems } = useArchive();
   const [showArchiveSidebar, setShowArchiveSidebar] = useState(false);
@@ -90,6 +95,43 @@ const App: React.FC = () => {
   const [pickerCallback, setPickerCallback] = useState<((file: AudioFile) => void) | null>(null);
   const [isFetchingDrive, setIsFetchingDrive] = useState(false);
 
+  const {
+    progress,
+    logLines,
+    handleTranscribe,
+    handleBackgroundTranscribe,
+    isReadyToTranscribe
+  } = useTranscriptionFlow({
+    activeTab,
+    recordedBlob,
+    micUrl,
+    uploadedFile,
+    transcription,
+    transcriptionMode,
+    isSpeakerDetectEnabled,
+    isDeepThinking,
+    createTab,
+    setTabs,
+    setArchiveItems,
+    setShowArchiveSidebar,
+    setContentType,
+    setTranscription
+  });
+
+  const {
+    handleSaveToDrive,
+    handleExportTxt,
+    handleExportDocx,
+    handleExportSrt,
+    isSavingToDrive,
+    driveSaved
+  } = useExports({
+    transcription,
+    activeTabText: activeTabObj?.transcription.text,
+    googleAccessToken,
+    onRequireLogin: handleGoogleLogin,
+    onTokenInvalid: () => setGoogleAccessToken(null)
+  });
 
   // --- Effects & Handlers ---
 
@@ -106,42 +148,6 @@ const App: React.FC = () => {
     return () => window.removeEventListener('beforeunload', handleBeforeUnload);
   }, [transcription.text]);
 
-  useEffect(() => {
-    if (transcription.isLoading) {
-      setProgress(0);
-      setLogLines(['➜ Initializing AI session...']);
-    } else if (transcription.text) {
-      setProgress(100);
-    }
-  }, [transcription.isLoading, transcription.text]);
-
-
-  const [hasPeeked, setHasPeeked] = useState(false);
-
-  // Drawer Peek Animation (Swipe In/Out) when entering Editor
-  useEffect(() => {
-    if (activeTabId && !activeTabObj?.transcription.isLoading && activeTabObj?.transcription.text && !hasPeeked) {
-      // Sequence: Show -> Hide -> Show -> Hide
-      const sequence = async () => {
-        // Initial Delay
-        await new Promise(r => setTimeout(r, 800)); 
-        
-        setIsTabsVisible(true); // Swipe In 1
-        await new Promise(r => setTimeout(r, 600)); 
-        
-        setIsTabsVisible(false); // Swipe Out 1
-        await new Promise(r => setTimeout(r, 300));
-        
-        setIsTabsVisible(true); // Swipe In 2
-        await new Promise(r => setTimeout(r, 600));
-
-        setIsTabsVisible(false); // Swipe Out 2 (Final)
-        setHasPeeked(true);
-      };
-
-      sequence();
-    }
-  }, [activeTabId, activeTabObj?.transcription.isLoading, activeTabObj?.transcription.text, hasPeeked]);
 
   useEffect(() => {
     return () => { if (micUrl) URL.revokeObjectURL(micUrl); };
@@ -159,376 +165,31 @@ const App: React.FC = () => {
     setMicUrl(null);
     setUploadedFile(null);
     setTranscription({ isLoading: false, text: null, error: null });
-    setProgress(0);
     setActiveTab(null);
     setContentType(null);
-    setShowExitConfirm(false);
-    setPendingAction(null);
     setActiveTabId(null); // Deselect active tab to return to Home
     setIsEditorMode(false);
   }, [micUrl, uploadedFile]);
-  const handleSaveToDrive = async (format: 'doc' | 'txt' | 'srt' = 'doc') => {
-    // FIX: Check active tab's text, not global transcription
-    const currentText = activeTabObj?.transcription.text || transcription.text;
-    
-    if (!googleAccessToken || !currentText) {
-      if (!currentText) alert("No text to save.");
-      else handleGoogleLogin();
-      return;
-    }
 
-    
-    setIsSavingToDrive(true);
-    
-    try {
-      const timestamp = new Date().toLocaleString('en-US', { 
-        month: 'short', 
-        day: 'numeric', 
-        year: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit'
-      });
-      
-      const fileName = `ScribeAI Transcription - ${timestamp}`;
-      
-      let mimeType = 'application/vnd.google-apps.document';
-      if (format === 'txt') mimeType = 'text/plain';
-      else if (format === 'srt') mimeType = 'text/plain'; // Drive treats SRT as text usually
-
-      // Prepare metadata
-      const metadata = {
-        name: fileName,
-        mimeType: mimeType,
-        description: `Transcription created with ScribeAI on ${timestamp}`
-      };
-      
-      // Create form data
-      const form = new FormData();
-      form.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
-      
-      // Content preparation
-      let content = currentText || '';
-      
-      if (format === 'doc') {
-        // HTML conversion for Google Docs
-        content = content
-          .replace(/^### (.*$)/gim, '<h3>$1</h3>')
-          .replace(/^## (.*$)/gim, '<h2>$1</h2>')
-          .replace(/^# (.*$)/gim, '<h1>$1</h1>')
-          .replace(/\*\*(.*?)\*\*/g, '<b>$1</b>')
-          .replace(/\*(.*?)\*/g, '<i>$1</i>')
-          .replace(/__(.*?)__/g, '<u>$1</u>')
-          .replace(/~~(.*?)~~/g, '<s>$1</s>')
-          .replace(/\n/g, '<br>');
-      } else if (format === 'srt') {
-        const srtContent = createSrtString(content);
-        content = srtContent || content; // Fallback if no timestamps
-      }
-
-
-      
-      form.append('file', new Blob([content], { 
-        type: format === 'doc' ? 'text/html' : 'text/plain' 
-      }));
-      
-      const response = await fetch(
-        'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,name,webViewLink', 
-        {
-          method: 'POST',
-          headers: { 'Authorization': `Bearer ${googleAccessToken}` },
-          body: form
-        }
-      );
-      
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        
-        // Handle token expiration
-        if (response.status === 401) {
-          setGoogleAccessToken(null);
-          throw new Error('Session expired. Please sign in again.');
-        }
-
-        
-        // Handle quota/permission errors
-        if (response.status === 403) {
-          throw new Error('Permission denied. Check your Google Drive access.');
-        }
-        
-        if (response.status === 429) {
-          throw new Error('Too many requests. Please try again in a moment.');
-        }
-        
-        throw new Error(errorData.error?.message || `Failed to save (${response.status})`);
-      }
-      
-      const fileData = await response.json();
-      
-      // Show success with link to file
-      setDriveSaved(true);
-      setTimeout(() => setDriveSaved(false), 5000);
-      
-      // Optional: Open the file in a new tab
-      if (fileData.webViewLink) {
-        const shouldOpen = confirm(`File saved successfully!\n\nWould you like to open "${fileData.name}" in Google Drive?`);
-        if (shouldOpen) {
-          window.open(fileData.webViewLink, '_blank');
-        }
-      }
-      
-    } catch (err: any) {
-      console.error('Save to Drive error:', err);
-      const errorMessage = err.message || 'Failed to save to Google Drive';
-      alert(`❌ ${errorMessage}\n\nPlease try again or check your connection.`);
-    } finally {
-      setIsSavingToDrive(false);
-    }
-  };
-
-  const handleExportTxt = () => {
-    try {
-      if (!transcription.text) {
-        alert("No text available to export.");
-        return;
-      }
-      const fileName = `ScribeAI_Export_${new Date().toISOString().slice(0,10)}.txt`;
-      const blob = new Blob([transcription.text], { type: 'text/plain' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = fileName;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-    } catch (err: any) {
-      console.error("Export Error:", err);
-      alert(`Export failed: ${err.message || 'Unknown error'}`);
-    }
-  };
-
-  const handleExportDocx = async () => {
-    if (!transcription.text) return;
-    try {
-      await generateDocx(transcription.text, `Smart_Editor_Export_${new Date().toISOString().slice(0,10)}`);
-    } catch (err) {
-      alert('Failed to generate Word document');
-    }
-  };
-
-
-  const handleTranscribe = async () => {
-    const statusLog = (msg: string, prg?: number) => {
-      if (prg !== undefined) setProgress(prg);
-      
-      setLogLines(prev => {
-        const lastLine = prev[prev.length - 1];
-        // Prevents spamming for progress updates like "Uploading media: 12%"
-        if (lastLine && msg.startsWith("Uploading media:") && lastLine.startsWith("Uploading media:")) {
-             return [...prev.slice(0, -1), msg];
-        }
-        return [...prev.slice(-4), msg];
-      });
-
-      // Update tab if it exists
-      if (currentLoadingTabId) {
-        setTabs(prev => prev.map(t => t.id === currentLoadingTabId ? { 
-          ...t, 
-          transcription: { ...t.transcription, isLoading: true } 
-        } : t));
-      }
-    };
-
-    let currentLoadingTabId: string | null = null;
-
-    try {
-      let mediaBlob: Blob | File | null = null;
-      let mimeType = '';
-
-      if (activeTab === AudioSource.MICROPHONE) {
-        if (!recordedBlob) throw new Error("No recording found.");
-        mediaBlob = recordedBlob;
-        mimeType = recordedBlob.type;
-      } else if (activeTab === AudioSource.FILE || activeTab === AudioSource.URL) {
-        if (!uploadedFile?.file) throw new Error("No file selected.");
-        mediaBlob = uploadedFile.file;
-        mimeType = uploadedFile.file.type || ''; 
-      }
-      
-      // Create the tab immediately
-      const initialTitle = uploadedFile?.file?.name || (activeTab === AudioSource.MICROPHONE ? 'Voice Recording' : 'Untitled');
-      currentLoadingTabId = createTab({
-        title: initialTitle,
-        transcription: { isLoading: true, text: null, error: null },
-        recordedBlob,
-        micUrl,
-        uploadedFile,
-        isEditorMode: false,
-      });
-
-      const text = await executeTranscription(mediaBlob!, mimeType, statusLog);
-      
-      // Update tab with result
-      setTabs(prev => prev.map(t => t.id === currentLoadingTabId ? { 
-        ...t, 
-        transcription: { isLoading: false, text, error: null } 
-      } : t));
-
-      // Auto-save to archive
-      const archiveId = Math.random().toString(36).substring(7);
-      setArchiveItems(prev => [{
-        id: archiveId,
-        name: initialTitle,
-        text,
-        date: new Date().toLocaleString(),
-        status: 'complete',
-        progress: 100
-      }, ...prev]);
-
-    } catch (err: any) {
-      const errorMsg = err.message || "An unexpected error occurred.";
-      if (currentLoadingTabId) {
-        setTabs(prev => prev.map(t => t.id === currentLoadingTabId ? { 
-          ...t, 
-          transcription: { isLoading: false, text: null, error: errorMsg } 
-        } : t));
-      } else {
-        setTranscription({ isLoading: false, text: null, error: errorMsg });
-      }
-    }
-  };
-
-  const executeTranscription = async (mediaBlob: Blob | File, mimeType: string, onStatus?: (msg: string, prg?: number) => void): Promise<string> => {
-    let text: string;
-    
-    let finalUseSmartModel = isDeepThinking;
-    
-    // Smart detection logic: Auto-use Pro for complex media (video or large files)
-    const isVideo = mimeType.startsWith('video/');
-    const isLarge = (mediaBlob?.size || 0) > 15 * 1024 * 1024;
-    
-    if ((isVideo || isLarge) && !isDeepThinking) {
-      onStatus?.("⚠️ High-complexity detected. Boosting to Deep Inference (Pro)...");
-      finalUseSmartModel = true;
-    }
-
-    if (transcriptionMode === 'verbatim') {
-       text = await transcribeAudio(
-         mediaBlob!, 
-         mimeType, 
-         false, // autoEdit = false (Strict Verbatim)
-         isSpeakerDetectEnabled, 
-         finalUseSmartModel, 
-         onStatus
-       );
-    } 
-    else {
-      text = await transcribeAudio(
-        mediaBlob!, 
-        mimeType, 
-        true, // autoEdit = true (Polish Mode)
-        isSpeakerDetectEnabled, 
-        finalUseSmartModel, 
-        onStatus
-      );
-      
-      // Background classification
-      classifyContent(text).then(type => setContentType(type));
-    }
-    return text;
-  };
-
-  const handleBackgroundTranscribe = async (file: AudioFile) => {
-    const id = Math.random().toString(36).substring(7);
-    const newItem: ArchiveItem = {
-      id,
-      name: file.file?.name || 'Untitled Transcription',
-      text: '',
-      date: new Date().toLocaleString(),
-      status: 'loading',
-      progress: 0,
-      audioUrl: file.previewUrl
-    };
-
-    setArchiveItems(prev => [newItem, ...prev]);
-    setShowArchiveSidebar(true);
-
-    try {
-      const text = await executeTranscription(file.file!, file.file?.type || '', (msg, prg) => {
-        setArchiveItems(prev => prev.map(item => 
-          item.id === id ? { ...item, progress: prg !== undefined ? prg : Math.min(item.progress + 5, 95) } : item
-        ));
-      });
-
-      setArchiveItems(prev => prev.map(item => 
-        item.id === id ? { ...item, text, status: 'complete', progress: 100 } : item
-      ));
-    } catch (err: any) {
-      setArchiveItems(prev => prev.map(item => 
-        item.id === id ? { ...item, status: 'error', error: err.message } : item
-      ));
-    }
-  };
-
-  const isReadyToTranscribe = () => {
-    if (transcription.isLoading) return false;
-    if (activeTab === AudioSource.MICROPHONE) return !!recordedBlob;
-    if (activeTab === AudioSource.FILE || activeTab === AudioSource.URL) return !!uploadedFile;
-    return false;
-  };
-
-
-
-  const safeNavigation = (action: () => void) => {
-    // FIX: Check active tab state if available
-    const hasUnsavedContent = activeTabObj ? !!activeTabObj.transcription.text : !!transcription.text;
-    
-    if (hasUnsavedContent) {
-      setPendingAction(() => action);
-      setShowExitConfirm(true);
-    } else {
-      action();
-    }
-  };
-
-  const confirmExit = () => {
-    if (pendingAction) pendingAction();
-    else clearAll(); // Default if logic fails
-    setShowExitConfirm(false);
-    setPendingAction(null);
-  };
-
-  const handleArchiveSelect = (item: ArchiveItem) => {
-    safeNavigation(() => {
-        setTranscription({ isLoading: false, text: item.text, error: null });
-        setIsEditorMode(true);
-        setShowArchiveSidebar(false);
-    });
-  };
-
-  const handleArchiveDelete = (id: string) => {
-    setArchiveItems(prev => prev.filter(item => item.id !== id));
-  };
-
-  const handleArchiveUpload = (file: File) => {
-    const audioFile: AudioFile = {
-      file,
-      previewUrl: URL.createObjectURL(file),
-      base64: null,
-      mimeType: file.type
-    };
-    handleBackgroundTranscribe(audioFile);
-  };
-
-  // --- NEW SESSION HANDLER ---
-  const handleNewSession = (source: AudioSource) => {
-      safeNavigation(() => {
-          clearAll();
-          setActiveTab(source);
-      });
-  };
+  const {
+    showExitConfirm,
+    setShowExitConfirm,
+    safeNavigation,
+    confirmExit,
+    handleNewSession,
+    isTabsVisible,
+    setIsTabsVisible
+  } = useSessionUi({
+    activeTabId,
+    activeTabObj,
+    transcription,
+    setActiveTab,
+    clearAll
+  });
 
   const handlePickDriveFile = async (file: { id: string; name: string; mimeType: string }) => {
+
+
     setIsPickerOpen(false);
     if (!googleAccessToken) return;
     
@@ -549,8 +210,15 @@ const App: React.FC = () => {
         xhr.onerror = () => reject(new Error('Drive network error'));
         xhr.send();
       });
+      const fileBlob = new File([blob], file.name, { type: file.mimeType });
+      const validation = validateMediaFile(fileBlob, file.mimeType);
+      if (!validation.valid) {
+        alert(validation.message || 'Unsupported media file.');
+        return;
+      }
+
       const audioFile: AudioFile = {
-        file: new File([blob], file.name, { type: file.mimeType }),
+        file: fileBlob,
         previewUrl: URL.createObjectURL(blob),
         base64: null,
         mimeType: file.mimeType
@@ -562,8 +230,8 @@ const App: React.FC = () => {
         // Default: Load into main session
         setUploadedFile(audioFile);
         setActiveTab(AudioSource.URL);
-        setTimeout(handleTranscribe, 100);
       }
+
     } catch (err: any) {
       console.error("Drive Fetch Error:", err);
       // More specific error message
@@ -603,7 +271,7 @@ const App: React.FC = () => {
 
   const handleOpenInNewTab = (content: string, title?: string) => {
     const newTabId = Date.now().toString();
-    const newTab: EditorTab = {
+    const newTab = {
       id: newTabId,
       title: title || 'New Transcription',
       transcription: {
@@ -622,8 +290,14 @@ const App: React.FC = () => {
     setActiveTabId(newTabId);
   };
 
-  // Zen Mode State (Tabs Visibility)
-  const [isTabsVisible, setIsTabsVisible] = useState(true);
+  const hasDrafts = tabs.length > 0;
+  const handleResumeDraft = () => {
+    const lastTab = tabs[tabs.length - 1];
+    if (!lastTab) return;
+    setActiveTab(null);
+    setActiveTabId(lastTab.id);
+  };
+
 
   // --- Main Layout Rendering ---
 
@@ -720,9 +394,9 @@ const App: React.FC = () => {
                 return null;
               }}
               getOriginalFile={() => activeTabObj?.uploadedFile || null}
-              handleExportDocx={() => generateDocx(transcription.text || '', "Transcription")}
-              handleExportTxt={() => generateTxt(transcription.text || '', "Transcription")}
-              handleExportSrt={() => generateSrt(transcription.text || '', "Transcription")}
+              handleExportDocx={handleExportDocx}
+              handleExportTxt={handleExportTxt}
+              handleExportSrt={handleExportSrt}
               googleAccessToken={googleAccessToken}
               googleClientId={googleClientId}
               driveScriptsLoaded={driveScriptsLoaded}
@@ -796,8 +470,11 @@ const App: React.FC = () => {
             setEditorMode={setIsEditorMode}
             onStartSmartEditor={() => handleOpenInNewTab('', 'New Document')}
             onNewSession={handleNewSession}
+            hasDrafts={hasDrafts}
+            onResumeDraft={handleResumeDraft}
             driveScriptsLoaded={driveScriptsLoaded}
             googleClientId={googleClientId}
+
           />
         )}
       </div>

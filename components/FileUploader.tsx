@@ -50,7 +50,7 @@ const FileUploader: React.FC<FileUploaderProps> = ({ onFileSelected, selectedFil
             <div className="w-14 h-14 sm:w-16 sm:h-16 bg-primary/10 text-primary dark:text-accent rounded-full flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
               <CloudArrowUp size={28} weight="duotone" className="sm:w-8 sm:h-8" />
             </div>
-            <h3 className="text-base sm:text-lg font-semibold text-gray-700 dark:text-dark-text mb-1">Click to upload</h3>
+            <h3 className="text-base sm:text-lg font-semibold text-gray-700 dark:text-dark-text mb-1">Drag & drop or click to upload</h3>
             <p className="text-xs sm:text-sm text-gray-500 dark:text-dark-muted">Audio (MP3, WAV) or Video (MP4, WebM)</p>
             <p className="text-[10px] sm:text-xs text-gray-400 dark:text-dark-muted mt-3 sm:mt-4">Max file size: 2GB (Files API)</p>
           </div>

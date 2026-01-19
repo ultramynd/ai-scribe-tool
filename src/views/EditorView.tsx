@@ -105,6 +105,26 @@ const EditorView: React.FC<EditorViewProps> = ({
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, [showExitConfirm, setShowExitConfirm]);
 
+  useEffect(() => {
+    const handleShortcut = (event: KeyboardEvent) => {
+      const isMeta = event.metaKey || event.ctrlKey;
+      if (!isMeta) return;
+
+      if (event.key.toLowerCase() === 's') {
+        event.preventDefault();
+        handleSaveToDrive('doc');
+      }
+
+      if (event.key.toLowerCase() === 'e') {
+        event.preventDefault();
+        setIsEditorMode(!isEditorMode);
+      }
+    };
+
+    document.addEventListener('keydown', handleShortcut);
+    return () => document.removeEventListener('keydown', handleShortcut);
+  }, [handleSaveToDrive, isEditorMode, setIsEditorMode]);
+
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -207,13 +227,13 @@ const EditorView: React.FC<EditorViewProps> = ({
                   </button>
                   {/* Dropdown Content for New (Start Over) */}
                   <div className="absolute top-full left-0 pt-2 opacity-0 group-hover/new:opacity-100 pointer-events-none group-hover/new:pointer-events-auto transition-all duration-200 scale-95 group-hover/new:scale-100 origin-top-left z-50">
-                      <div className="bg-white dark:bg-[#0a0a0a] rounded-2xl shadow-xl border border-slate-100 dark:border-white/10 p-2 min-w-[240px] flex flex-col gap-1">
+                      <div className="bg-white dark:bg-dark-card rounded-2xl shadow-xl border border-slate-200 dark:border-dark-border p-3 min-w-[240px] flex flex-col gap-2">
                           <div className="px-2.5 py-1.5 text-[9px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest border-b border-slate-100 dark:border-white/5 mb-1">Start New Session</div>
                           
                           {/* Audio Recording */}
                           <button 
                              onClick={() => onNewSession(AudioSource.MICROPHONE)}
-                            className="w-full flex items-center gap-3 px-3 py-2 text-left text-[11px] font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-white/5 rounded-xl transition-all group"
+                            className="w-full flex items-center gap-3 px-3.5 py-2.5 text-left text-[11px] font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-dark-bg rounded-xl transition-all group"
                           >
                             <div className="w-7 h-7 rounded-lg bg-red-100 dark:bg-red-900/20 flex items-center justify-center group-hover:scale-110 transition-transform">
                               <Microphone size={14} weight="duotone" className="text-red-500" />
@@ -227,7 +247,7 @@ const EditorView: React.FC<EditorViewProps> = ({
                           {/* Upload Media */}
                           <button 
                              onClick={() => onNewSession(AudioSource.FILE)}
-                            className="w-full flex items-center gap-3 px-3 py-2 text-left text-[11px] font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-white/5 rounded-xl transition-all group"
+                            className="w-full flex items-center gap-3 px-3.5 py-2.5 text-left text-[11px] font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-dark-bg rounded-xl transition-all group"
                           >
                             <div className="w-7 h-7 rounded-lg bg-blue-100 dark:bg-blue-900/20 flex items-center justify-center group-hover:scale-110 transition-transform">
                               <UploadSimple size={14} weight="duotone" className="text-blue-500" />
@@ -241,7 +261,7 @@ const EditorView: React.FC<EditorViewProps> = ({
                           {/* From Link / Drive */}
                           <button 
                              onClick={() => onNewSession(AudioSource.URL)}
-                            className="w-full flex items-center gap-3 px-3 py-2 text-left text-[11px] font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-white/5 rounded-xl transition-all group"
+                            className="w-full flex items-center gap-3 px-3.5 py-2.5 text-left text-[11px] font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-dark-bg rounded-xl transition-all group"
                           >
                             <div className="w-7 h-7 rounded-lg bg-slate-100 dark:bg-white/10 flex items-center justify-center group-hover:scale-110 transition-transform">
                               <CloudArrowDown size={14} weight="duotone" className="text-slate-600 dark:text-slate-300" />
@@ -257,7 +277,7 @@ const EditorView: React.FC<EditorViewProps> = ({
                           {/* Empty Project */}
                           <button 
                              onClick={() => onNewSession(AudioSource.FILE)}
-                            className="w-full flex items-center gap-3 px-3 py-2 text-left text-[11px] font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-white/5 rounded-xl transition-all group"
+                            className="w-full flex items-center gap-3 px-3.5 py-2.5 text-left text-[11px] font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-dark-bg rounded-xl transition-all group"
                           >
                             <div className="w-7 h-7 rounded-lg bg-indigo-100 dark:bg-indigo-900/20 flex items-center justify-center group-hover:scale-110 transition-transform">
                               <Plus size={14} weight="bold" className="text-indigo-500" />
@@ -283,13 +303,13 @@ const EditorView: React.FC<EditorViewProps> = ({
                   
                   {/* Dropdown Content */}
                   <div className="absolute top-full left-0 pt-2 opacity-0 group-hover/add:opacity-100 pointer-events-none group-hover/add:pointer-events-auto transition-all duration-200 scale-95 group-hover/add:scale-100 origin-top-left z-50">
-                      <div className="bg-white dark:bg-[#0a0a0a] rounded-2xl shadow-xl border border-slate-100 dark:border-white/10 p-2 min-w-[220px] flex flex-col gap-1">
+                      <div className="bg-white dark:bg-dark-card rounded-2xl shadow-xl border border-slate-200 dark:border-dark-border p-3 min-w-[220px] flex flex-col gap-2">
                           <div className="px-2.5 py-1.5 text-[9px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest border-b border-slate-100 dark:border-white/5 mb-1">Add to Document</div>
                           
                           {/* Upload File */}
                           <button 
                              onClick={handleUploadClick}
-                            className="w-full flex items-center gap-3 px-3 py-2 text-left text-[11px] font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-white/5 rounded-xl transition-all group"
+                            className="w-full flex items-center gap-3 px-3.5 py-2.5 text-left text-[11px] font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-dark-bg rounded-xl transition-all group"
                           >
                             <div className="w-7 h-7 rounded-lg bg-blue-100 dark:bg-blue-900/20 flex items-center justify-center group-hover:scale-110 transition-transform">
                               <UploadSimple size={14} weight="duotone" className="text-blue-500" />
@@ -303,7 +323,7 @@ const EditorView: React.FC<EditorViewProps> = ({
                           {/* Record Voicenote */}
                           <button 
                             onClick={() => setLiveRecordingTrigger(Date.now())}
-                            className="w-full flex items-center gap-3 px-3 py-2 text-left text-[11px] font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-white/5 rounded-xl transition-all group"
+                            className="w-full flex items-center gap-3 px-3.5 py-2.5 text-left text-[11px] font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-dark-bg rounded-xl transition-all group"
                           >
                             <div className="w-7 h-7 rounded-lg bg-emerald-100 dark:bg-emerald-900/20 flex items-center justify-center group-hover:scale-110 transition-transform">
                               <Microphone size={14} weight="duotone" className="text-emerald-500" />
@@ -320,7 +340,7 @@ const EditorView: React.FC<EditorViewProps> = ({
                           {/* Google Drive */}
                           <button 
                              onClick={() => setIsPickerOpen(true)}
-                             className="w-full flex items-center gap-3 px-3 py-2 text-left text-[11px] font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-white/5 rounded-xl transition-all group"
+                             className="w-full flex items-center gap-3 px-3.5 py-2.5 text-left text-[11px] font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-dark-bg rounded-xl transition-all group"
                            >
                              <div className="w-7 h-7 rounded-lg bg-slate-100 dark:bg-white/10 flex items-center justify-center group-hover:scale-110 transition-transform">
                                <GoogleLogo size={14} weight="bold" className="text-slate-600 dark:text-slate-300" />
@@ -503,6 +523,8 @@ const EditorView: React.FC<EditorViewProps> = ({
                 <div className="w-px h-5 bg-slate-200 dark:bg-dark-border mx-1"></div>
 
                 {/* User Menu */}
+
+
                 <div className="relative group/user">
                   <button className="flex items-center gap-2 px-1 focus:outline-none">
                     <div className="w-8 h-8 rounded-full bg-slate-100 dark:bg-white/10 border border-slate-200 dark:border-white/5 flex items-center justify-center text-slate-500 dark:text-slate-300">
@@ -520,7 +542,7 @@ const EditorView: React.FC<EditorViewProps> = ({
                         googleAccessToken ? (
                           <button 
                             onClick={handleGoogleLogout}
-                            className="w-full flex items-center gap-3 px-3 py-2 text-left text-[11px] font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-white/5 rounded-xl transition-all group"
+                            className="w-full flex items-center gap-3 px-3.5 py-2.5 text-left text-[11px] font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-dark-bg rounded-xl transition-all group"
                           >
                             <div className="w-7 h-7 rounded-lg bg-emerald-50 dark:bg-emerald-900/20 flex items-center justify-center group-hover:scale-110 transition-transform">
                               <SignOut size={14} weight="duotone" className="text-emerald-500" />

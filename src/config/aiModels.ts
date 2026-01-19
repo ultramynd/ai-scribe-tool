@@ -1,14 +1,14 @@
 export const AI_MODELS = {
   // Primary reasoning model (Deep Thinking / High Quality)
-  // Options: 'gemini-3-pro-preview', 'gemini-2.0-pro-exp'
-  PRIMARY: import.meta.env.VITE_AI_MODEL_PRIMARY || "gemini-3-pro-preview",
+  // Use gemini-1.5-pro for best transcription quality
+  PRIMARY: import.meta.env.VITE_AI_MODEL_PRIMARY || "gemini-1.5-pro-latest",
 
   // Fallback/Fast model (Balanced Speed & Quality)
-  // Options: 'gemini-2.0-flash', 'gemini-flash-latest'
-  FAST: import.meta.env.VITE_AI_MODEL_FAST || "gemini-2.0-flash",
+  // Use gemini-1.5-flash for speed
+  FAST: import.meta.env.VITE_AI_MODEL_FAST || "gemini-1.5-flash-latest",
 
   // Vision model
-  VISION: "gemini-2.0-flash" 
+  VISION: "gemini-1.5-flash-latest" 
 };
 
 export const FALLBACK_CONFIG = {
