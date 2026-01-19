@@ -1,14 +1,12 @@
 export const AI_MODELS = {
-  // Primary reasoning model (Deep Thinking / High Quality)
-  // Use gemini-1.5-pro for best transcription quality
-  PRIMARY: import.meta.env.VITE_AI_MODEL_PRIMARY || "gemini-1.5-pro-latest",
+  // Primary reasoning model - using gemini-2.5-flash since it's confirmed available
+  PRIMARY: import.meta.env.VITE_AI_MODEL_PRIMARY || "gemini-2.5-flash",
 
-  // Fallback/Fast model (Balanced Speed & Quality)
-  // Use gemini-1.5-flash for speed
-  FAST: import.meta.env.VITE_AI_MODEL_FAST || "gemini-1.5-flash-latest",
+  // Fallback/Fast model - same model as primary for reliability
+  FAST: import.meta.env.VITE_AI_MODEL_FAST || "gemini-2.5-flash",
 
   // Vision model
-  VISION: "gemini-1.5-flash-latest" 
+  VISION: "gemini-2.0-flash" 
 };
 
 export const FALLBACK_CONFIG = {
