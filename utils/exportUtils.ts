@@ -17,7 +17,7 @@ export const downloadBlob = (blob: Blob, filename: string) => {
 /**
  * Strips markdown formatting from text for plain text export.
  */
-const stripMarkdown = (text: string): string => {
+export const stripMarkdown = (text: string): string => {
   return text
     // Remove bold: **text** or __text__
     .replace(/\*\*(.*?)\*\*/g, '$1')

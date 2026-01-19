@@ -1,6 +1,6 @@
 import { useCallback, useState } from 'react';
 import { TranscriptionState } from '../../types';
-import { createSrtString, generateDocx, generateSrt, generateTxt } from '../../utils/exportUtils';
+import { createSrtString, generateDocx, generateSrt, generateTxt, stripMarkdown } from '../../utils/exportUtils';
 
 interface UseExportsOptions {
   transcription: TranscriptionState;
@@ -70,6 +70,8 @@ export const useExports = ({
             .replace(/__(.*?)__/g, '<u>$1</u>')
             .replace(/~~(.*?)~~/g, '<s>$1</s>')
             .replace(/\n/g, '<br>');
+        } else if (format === 'txt') {
+          content = stripMarkdown(content);
         } else if (format === 'srt') {
           const srtContent = createSrtString(content);
           content = srtContent || content;
