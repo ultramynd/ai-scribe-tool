@@ -23,7 +23,10 @@ const MIME_TYPE_MAP: Record<string, string> = {
   'mkv': 'video/x-matroska'
 };
 
+const USE_SERVER_PROXY = import.meta.env.VITE_GEMINI_USE_PROXY === 'true';
+
 const getMimeTypeFromExtension = (filename: string): string | null => {
+
   const ext = filename.split('.').pop()?.toLowerCase();
   return ext ? MIME_TYPE_MAP[ext] || null : null;
 };
@@ -50,17 +53,46 @@ async function executeGaiRequest(
   payload: any,
   model: string,
   onStatus?: StatusCallback,
-  attempt: number = 0
+  attempt: number = 0,
+  timeoutMs: number = 300000
 ): Promise<any> {
   const apiKey = getActiveApiKey(attempt);
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
-  
+
   try {
+      if (USE_SERVER_PROXY) {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+
+        try {
+          const response = await fetch('/api/gemini', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ model, payload }),
+            signal: controller.signal
+          });
+
+          const text = await response.text();
+          if (!response.ok) {
+            throw new Error(`AI Error (${response.status}): ${text}`);
+          }
+
+          const data = JSON.parse(text);
+          if (data.candidates && data.candidates[0] && data.candidates[0].content && data.candidates[0].content.parts) {
+            return { text: data.candidates[0].content.parts[0].text };
+          }
+          return data;
+        } finally {
+          clearTimeout(timeoutId);
+        }
+      }
+
+
     return await new Promise((resolve, reject) => {
       const xhr = new XMLHttpRequest();
       xhr.open('POST', url);
       xhr.setRequestHeader('Content-Type', 'application/json');
-      
+
       xhr.onload = () => {
         if (xhr.status >= 200 && xhr.status < 300) {
           try {
@@ -78,7 +110,7 @@ async function executeGaiRequest(
           reject(new Error(msg));
         }
       };
-      
+
       xhr.onerror = () => reject(new Error("Network connection lost during AI generation."));
       xhr.ontimeout = () => reject(new Error("AI generation timed out (5 minutes). Please try again."));
       xhr.timeout = 300000; // 5 minutes for generation
@@ -86,25 +118,34 @@ async function executeGaiRequest(
     });
   } catch (error: any) {
     logger.error(`AI Request Attempt ${attempt + 1} Failed`, { model, error: error.message });
-    
+
     const msg = error.message?.toLowerCase() || "";
     const isRateLimited = msg.includes('429') || msg.includes('quota');
     const isServerErr = msg.includes('500') || msg.includes('503');
-    
+
     if (attempt < FALLBACK_CONFIG.MAX_RETRIES && (isRateLimited || isServerErr)) {
       const isLastDitch = attempt + 1 >= FALLBACK_CONFIG.SWITCH_TO_BACKUP_KEY_ATTEMPT;
       if (onStatus) {
         if (isRateLimited) onStatus(isLastDitch ? "Switching to backup engine..." : "Rate limit reached, retrying...");
         else onStatus("Connection lost, reconnecting...");
       }
-      
-      const delay = Math.pow(2, attempt) * 1000;
-      await new Promise(r => setTimeout(r, delay));
-      return executeGaiRequest(payload, model, onStatus, attempt + 1);
+
+      if (isRateLimited && import.meta.env.VITE_GEMINI_USE_PROXY === 'true') {
+        const minutes = isLastDitch ? 3 : 2;
+        onStatus?.(`Cooling down for ${minutes} minutes...`, 60);
+        await new Promise(r => setTimeout(r, minutes * 60 * 1000));
+      } else {
+        const delay = Math.pow(2, attempt) * 1000;
+        await new Promise(r => setTimeout(r, delay));
+      }
+
+      return executeGaiRequest(payload, model, onStatus, attempt + 1, timeoutMs);
     }
     throw error;
+
   }
 }
+
 
 export type StatusCallback = (message: string, progress?: number) => void;
 
@@ -120,44 +161,72 @@ const uploadFileToGemini = async (
   const apiKey = getActiveApiKey(attempt);
   const uploadUrl = `https://generativelanguage.googleapis.com/upload/v1beta/files?key=${apiKey}`;
   const displayName = mediaFile instanceof File ? mediaFile.name : 'uploaded_media';
-  
+
   onStatus?.(`${attempt > 0 ? 'Retrying' : 'Initializing'} resumable upload (${Math.round(mediaFile.size / 1024 / 1024)}MB)...`, 5);
 
   try {
     // 1. Initial request to get the resumable session URL using XHR for maximum stability
     let sessionUrl: string;
     try {
-      sessionUrl = await new Promise<string>((resolve, reject) => {
-        const xhr = new XMLHttpRequest();
-        xhr.open('POST', uploadUrl);
-        xhr.setRequestHeader('X-Goog-Upload-Protocol', 'resumable');
-        xhr.setRequestHeader('X-Goog-Upload-Command', 'start');
-        xhr.setRequestHeader('X-Goog-Upload-Header-Content-Length', mediaFile.size.toString());
-        xhr.setRequestHeader('X-Goog-Upload-Header-Content-Type', mimeType);
-        xhr.setRequestHeader('Content-Type', 'application/json');
-        
-        xhr.onload = () => {
-          if (xhr.status >= 200 && xhr.status < 300) {
-            const url = xhr.getResponseHeader('x-goog-upload-url');
-            if (url) resolve(url);
-            else reject(new Error("No upload session URL in response"));
-          } else {
-             if (xhr.status === 429 && attempt < 1 && import.meta.env.VITE_GEMINI_API_KEY_FALLBACK) {
-                reject({ isRateLimit: true });
-             } else {
-                reject(new Error(`Upload Session Init Failed (${xhr.status}): ${xhr.responseText}`));
-             }
-          }
-        };
-        xhr.onerror = () => reject(new Error("Network connection failed during upload initialization."));
-        xhr.ontimeout = () => reject(new Error("Upload initialization timed out (30 seconds)."));
-        xhr.timeout = 30000; // 30 seconds for init
-        xhr.send(JSON.stringify({ file: { display_name: displayName, mime_type: mimeType } }));
-      });
+      if (USE_SERVER_PROXY) {
+        const response = await fetch('/api/gemini-upload-init', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            displayName,
+            mimeType,
+            size: mediaFile.size
+          })
+        });
+
+        if (response.status === 429) {
+          return uploadFileToGemini(mediaFile, mimeType, onStatus, attempt + 1);
+        }
+
+        if (!response.ok) {
+          const text = await response.text();
+          throw new Error(`Upload Session Init Failed (${response.status}): ${text}`);
+        }
+
+        const data = await response.json();
+        if (!data?.uploadUrl) {
+          throw new Error('No upload session URL in response');
+        }
+        sessionUrl = data.uploadUrl;
+      } else {
+        sessionUrl = await new Promise<string>((resolve, reject) => {
+          const xhr = new XMLHttpRequest();
+          xhr.open('POST', uploadUrl);
+          xhr.setRequestHeader('X-Goog-Upload-Protocol', 'resumable');
+          xhr.setRequestHeader('X-Goog-Upload-Command', 'start');
+          xhr.setRequestHeader('X-Goog-Upload-Header-Content-Length', mediaFile.size.toString());
+          xhr.setRequestHeader('X-Goog-Upload-Header-Content-Type', mimeType);
+          xhr.setRequestHeader('Content-Type', 'application/json');
+
+          xhr.onload = () => {
+            if (xhr.status >= 200 && xhr.status < 300) {
+              const url = xhr.getResponseHeader('x-goog-upload-url');
+              if (url) resolve(url);
+              else reject(new Error("No upload session URL in response"));
+            } else {
+               if (xhr.status === 429 && attempt < 1 && import.meta.env.VITE_GEMINI_API_KEY_FALLBACK) {
+                  reject({ isRateLimit: true });
+               } else {
+                  reject(new Error(`Upload Session Init Failed (${xhr.status}): ${xhr.responseText}`));
+               }
+            }
+          };
+          xhr.onerror = () => reject(new Error("Network connection failed during upload initialization."));
+          xhr.ontimeout = () => reject(new Error("Upload initialization timed out (30 seconds)."));
+          xhr.timeout = 30000; // 30 seconds for init
+          xhr.send(JSON.stringify({ file: { display_name: displayName, mime_type: mimeType } }));
+        });
+      }
     } catch (e: any) {
       if (e.isRateLimit) return uploadFileToGemini(mediaFile, mimeType, onStatus, attempt + 1);
       throw e;
     }
+
 
 
     // 2. Perform the actual upload using XHR for better progress and reliability
@@ -212,23 +281,39 @@ const uploadFileToGemini = async (
     
     while (retries < MAX_POLL_RETRIES) {
       try {
-        const pollUrl = `https://generativelanguage.googleapis.com/v1beta/${pollPath}?key=${getActiveApiKey(attempt)}`;
-        const pollData = await new Promise<any>((resolve, reject) => {
-          const xhr = new XMLHttpRequest();
-          xhr.open('GET', pollUrl);
-          xhr.onload = () => {
-            if (xhr.status >= 200 && xhr.status < 300) {
-              try { resolve(JSON.parse(xhr.responseText)); }
-              catch (e) { reject(new Error("Failed to parse server status.")); }
-            } else {
-              reject(new Error(`Polling failed with status: ${xhr.status}`));
-            }
-          };
-          xhr.onerror = () => reject(new Error("Network link lost during server processing..."));
-          xhr.ontimeout = () => reject(new Error("Status polling timed out (30 seconds)."));
-          xhr.timeout = 30000; // 30 seconds for polling
-          xhr.send();
-        });
+        const pollData = USE_SERVER_PROXY
+          ? await (async () => {
+              const response = await fetch('/api/gemini-poll', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ fileName: pollPath })
+              });
+
+              if (!response.ok) {
+                const text = await response.text();
+                throw new Error(`Polling failed with status: ${response.status} ${text}`);
+              }
+
+              return response.json();
+            })()
+          : await new Promise<any>((resolve, reject) => {
+              const pollUrl = `https://generativelanguage.googleapis.com/v1beta/${pollPath}?key=${getActiveApiKey(attempt)}`;
+              const xhr = new XMLHttpRequest();
+              xhr.open('GET', pollUrl);
+              xhr.onload = () => {
+                if (xhr.status >= 200 && xhr.status < 300) {
+                  try { resolve(JSON.parse(xhr.responseText)); }
+                  catch (e) { reject(new Error("Failed to parse server status.")); }
+                } else {
+                  reject(new Error(`Polling failed with status: ${xhr.status}`));
+                }
+              };
+              xhr.onerror = () => reject(new Error("Network link lost during server processing..."));
+              xhr.ontimeout = () => reject(new Error("Status polling timed out (30 seconds)."));
+              xhr.timeout = 30000; // 30 seconds for polling
+              xhr.send();
+            });
+
         
         if (pollData.state === 'ACTIVE') return fileUri;
         if (pollData.state === 'FAILED') throw new Error("File processing failed on server.");
@@ -391,15 +476,17 @@ export const transcribeAudio = async (
         }]
       };
  
-      const response = await executeGaiRequest(payload, modelName, onStatus, attempt);
+       const response = await executeGaiRequest(payload, modelName, onStatus, attempt, 600000);
+
       
       clearInterval(fakeProgressTimer);
 
-      if (response.text) {
-          onStatus?.("Transcription complete.", 100);
-          return response.text;
-      }
-      throw new Error("No transcription generated (Empty response).");
+       if (response.text) {
+           onStatus?.("Transcription complete.", 100);
+           return response.text;
+       }
+       throw new Error("No transcription generated (Empty response). Gemini returned no text.");
+
     } catch (error: any) {
       logger.error(`Transcription Attempt ${attempt + 1} Failed`, { model: currentModel, error: error.message });
       
@@ -408,9 +495,12 @@ export const transcribeAudio = async (
       const isNetwork = errorMsg.includes('network') || errorMsg.includes('fetch');
       const isServer = errorMsg.includes('503') || errorMsg.includes('500');
 
-      const maxRetries = FALLBACK_CONFIG.MAX_RETRIES + 2; // Allow a few extra steps for fallback strategies
+      const maxRetries = FALLBACK_CONFIG.MAX_RETRIES; // Hard cap: 3 retries
 
-      if (attempt >= maxRetries) throw error;
+      if (attempt >= maxRetries) {
+        logger.error(`All ${maxRetries} retry attempts exhausted.`, { model: currentModel, error: error.message });
+        throw error;
+      }
 
       // FALLBACK STRATEGY
 
@@ -436,7 +526,7 @@ export const transcribeAudio = async (
 
       // 3. Last Resort -> Switch Key + Flash (Explicit Strategy)
       if (attempt >= FALLBACK_CONFIG.SWITCH_TO_BACKUP_KEY_ATTEMPT) {
-         onStatus?.("Optimizing connection path for stability...", 60);
+         onStatus?.(`Switching to backup engine... (Attempt ${attempt + 1}/${maxRetries})`, 60);
          await new Promise(r => setTimeout(r, 2000));
          return executeGeneration(attempt + 1, FALLBACK_MODEL);
       }
@@ -484,7 +574,8 @@ export const classifyContent = async (text: string): Promise<string> => {
  
   try {
     const payload = { contents: [{ parts: [{ text: prompt }] }] };
-    const response = await executeGaiRequest(payload, model);
+      const response = await executeGaiRequest(payload, model, undefined, 0, 120000);
+
     return String(response.text || "").trim() || "Unknown";
   } catch (e) {
     logger.warn("Classification failed", e);
@@ -517,7 +608,8 @@ export const summarizeText = async (text: string, useSmartModel: boolean = false
   `;
   try {
     const payload = { contents: [{ parts: [{ text: prompt }] }] };
-    const response = await executeGaiRequest(payload, model);
+      const response = await executeGaiRequest(payload, model, undefined, 0, 120000);
+
     return String(response.text || "Could not generate summary.");
   } catch (e) {
     logger.error("Summarization error", e);
@@ -555,7 +647,8 @@ export const enhanceFormatting = async (text: string, contextType: string = "Gen
   
   try {
     const payload = { contents: [{ parts: [{ text: prompt }] }] };
-    const response = await executeGaiRequest(payload, model);
+      const response = await executeGaiRequest(payload, model, undefined, 0, 120000);
+
     return String(response.text || text);
   } catch (e) {
     logger.error("Enhance Formatting error", e);
@@ -581,7 +674,8 @@ export const extractKeyMoments = async (text: string, useSmartModel: boolean = f
   
   try {
     const payload = { contents: [{ parts: [{ text: prompt }] }] };
-    const response = await executeGaiRequest(payload, model);
+      const response = await executeGaiRequest(payload, model, undefined, 0, 120000);
+
     return String(response.text || "No key moments identified.");
   } catch (e) {
     logger.error("Key Moments error", e);
@@ -609,7 +703,8 @@ export const findDiscussionBounds = async (text: string, useSmartModel: boolean 
    
    try {
      const payload = { contents: [{ parts: [{ text: prompt }] }] };
-     const response = await executeGaiRequest(payload, model);
+       const response = await executeGaiRequest(payload, model, undefined, 0, 120000);
+
      return String(response.text || "Could not identify discussion bounds.");
    } catch (e) {
      logger.error("Discussion Bounds error", e);
@@ -635,7 +730,8 @@ export const findDiscussionBounds = async (text: string, useSmartModel: boolean 
    
    try {
      const payload = { contents: [{ parts: [{ text: prompt }] }] };
-     const response = await executeGaiRequest(payload, model);
+       const response = await executeGaiRequest(payload, model, undefined, 0, 120000);
+
      return String(response.text || text);
    } catch (e) {
      logger.error("Strip Pleasantries error", e);
@@ -709,7 +805,8 @@ export const analyzeVideoContent = async (mediaFile: File | Blob): Promise<strin
         contents: [{ parts: [contentPart, { text: prompt }] }]
       };
       
-      const response = await executeGaiRequest(payload, model);
+        const response = await executeGaiRequest(payload, model, undefined, 0, 120000);
+
   
       return String(response.text || "No analysis could be generated.");
     } catch (error: any) {
