@@ -112,8 +112,9 @@ async function executeGaiRequest(
       };
 
       xhr.onerror = () => reject(new Error("Network connection lost during AI generation."));
-      xhr.ontimeout = () => reject(new Error("AI generation timed out (5 minutes). Please try again."));
-      xhr.timeout = 300000; // 5 minutes for generation
+      xhr.ontimeout = () => reject(new Error(`AI generation timed out (${Math.round(timeoutMs / 60000)} minutes). Please try again.`));
+      xhr.timeout = timeoutMs;
+
       xhr.send(JSON.stringify(payload));
     });
   } catch (error: any) {
@@ -403,7 +404,9 @@ export const transcribeAudio = async (
 
   // We define the generation logic as a separate function that DOES NOT include the upload
   const executeGeneration = async (attempt: number = 0, currentModel: string = useSmartModel ? PRIMARY_MODEL : FALLBACK_MODEL): Promise<string> => {
+    const modelName = attempt >= FALLBACK_CONFIG.SWITCH_TO_FAST_MODEL_ATTEMPT ? FALLBACK_MODEL : currentModel;
     try {
+
       // Use fallback config thresholds
       const useFallbackKey = attempt >= FALLBACK_CONFIG.SWITCH_TO_BACKUP_KEY_ATTEMPT; 
       const primaryKey = import.meta.env.VITE_GEMINI_API_KEY;
@@ -416,9 +419,8 @@ export const transcribeAudio = async (
       }
       
       // manual construction of part object
-      const modelName = currentModel;
-      
       onStatus?.(`Engine initialized: ${modelName} ${useFallbackKey ? '(Backup Key)' : '(Primary)'} (Attempt ${attempt + 1})`, 8);
+
 
       // STRICT PROMPTING
       const speakerInstruction = detectSpeakers 

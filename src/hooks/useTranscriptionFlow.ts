@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { AudioFile, AudioSource, ArchiveItem, EditorTab, TranscriptionState } from '../../types';
-import { transcribeAudio, classifyContent } from '../../services/geminiService';
+import { transcribeAudio } from '../../services/geminiService';
+import { splitAudioToWavChunks, offsetTranscriptTimestamps } from '../../utils/audioChunking';
 import { validateMediaFile } from '../../utils/mediaValidation';
 
 interface UseTranscriptionFlowOptions {
@@ -76,13 +77,58 @@ export const useTranscriptionFlow = ({
         finalUseSmartModel = true;
       }
 
-      let text: string;
-      if (transcriptionMode === 'verbatim') {
-        text = await transcribeAudio(mediaBlob, mimeType, false, isSpeakerDetectEnabled, finalUseSmartModel, onStatus);
-      } else {
-        text = await transcribeAudio(mediaBlob, mimeType, true, isSpeakerDetectEnabled, finalUseSmartModel, onStatus);
+      const autoEdit = transcriptionMode !== 'verbatim';
+
+      // Chunking strategy for large media or long videos.
+      // Keep it invisible to the user; show progress as a single job.
+      const chunkSeconds = 12 * 60;
+
+      const shouldChunk =
+        mimeType.startsWith('video/') ||
+        (mediaBlob?.size || 0) > 35 * 1024 * 1024 ||
+        finalUseSmartModel;
+
+      if (shouldChunk && !mimeType.startsWith('audio/')) {
+        onStatus?.('Chunking is currently supported for audio only. Tip: export audio-only for long videos.', 10);
       }
 
+      if (shouldChunk && mimeType.startsWith('audio/')) {
+        onStatus?.('Preparing audio chunks...', 8);
+        const { chunks, totalSeconds } = await splitAudioToWavChunks(mediaBlob as Blob, chunkSeconds);
+
+        let combined = '';
+        for (let i = 0; i < chunks.length; i += 1) {
+          const chunk = chunks[i];
+          const base = 10;
+          const span = 85;
+          const prg = base + Math.round((i / Math.max(1, chunks.length)) * span);
+          onStatus?.(`Transcribing segment ${i + 1}/${chunks.length}...`, prg);
+
+          const partial = await transcribeAudio(
+            chunk.blob,
+            chunk.blob.type,
+            autoEdit,
+            isSpeakerDetectEnabled,
+            false,
+            (msg, p) => {
+              if (p !== undefined) {
+                const chunkP = base + Math.round(((i + p / 100) / chunks.length) * span);
+                onStatus?.(msg, chunkP);
+              } else {
+                onStatus?.(msg);
+              }
+            }
+          );
+
+          combined += offsetTranscriptTimestamps(partial, Math.floor(chunk.startSeconds)) + '\n\n';
+        }
+
+        onStatus?.('Finalizing transcript...', 98);
+        return combined.trim();
+      }
+
+      // Default single-shot path
+      const text = await transcribeAudio(mediaBlob, mimeType, autoEdit, isSpeakerDetectEnabled, finalUseSmartModel, onStatus);
       return text;
     },
     [isDeepThinking, isSpeakerDetectEnabled, transcriptionMode]
