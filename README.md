@@ -26,40 +26,6 @@
 
 ---
 
-## 🛠️ Installation & Setup
-
-### Prerequisites
-- Node.js v18+
-- A Google Cloud API Key (Gemini API)
-
-### 1. Clone the Repository
-```bash
-git clone https://github.com/your-username/ai-scribe-tool.git
-cd ai-scribe-tool
-```
-
-### 2. Install Dependencies
-```bash
-npm install
-```
-
-### 3. Environment Variables
-Create a `.env.local` file in the root directory:
-
-Create a `.env.local` file in the root directory and add your API keys. You will need:
-
-- `VITE_GEMINI_API_KEY`: Your primary Google Gemini API key.
-- `VITE_GEMINI_API_KEY_FALLBACK`: (Optional) A backup key for resilience.
-- `VITE_GOOGLE_CLIENT_ID`: (Optional) For Google Drive integration.
-- `VITE_GOOGLE_API_KEY`: (Optional) For Google Picker API.
-
-### 4. Run Locally
-```bash
-npm run dev
-```
-
----
-
 ## 🔒 Security
 ScribeAI operates with a **Local-First** philosophy.
 - Audio buffering is handled locally.
@@ -68,4 +34,4 @@ ScribeAI operates with a **Local-First** philosophy.
 
 ---
 
-**Developed by Clasier Publishing**
+**Developed by [Dosu Jr](https://github.com/kfdos)**
