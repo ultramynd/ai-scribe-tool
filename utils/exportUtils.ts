@@ -15,10 +15,32 @@ export const downloadBlob = (blob: Blob, filename: string) => {
 };
 
 /**
- * Generates a plain text file.
+ * Strips markdown formatting from text for plain text export.
+ */
+const stripMarkdown = (text: string): string => {
+  return text
+    // Remove bold: **text** or __text__
+    .replace(/\*\*(.*?)\*\*/g, '$1')
+    .replace(/__(.*?)__/g, '$1')
+    // Remove italic: *text* or _text_ (but not inside words)
+    .replace(/(?<!\w)\*([^*]+)\*(?!\w)/g, '$1')
+    .replace(/(?<!\w)_([^_]+)_(?!\w)/g, '$1')
+    // Remove strikethrough: ~~text~~
+    .replace(/~~(.*?)~~/g, '$1')
+    // Remove inline code: `text`
+    .replace(/`([^`]+)`/g, '$1')
+    // Remove headers: # ## ### etc
+    .replace(/^#{1,6}\s+/gm, '')
+    // Normalize whitespace
+    .replace(/\n{3,}/g, '\n\n');
+};
+
+/**
+ * Generates a plain text file with markdown stripped.
  */
 export const generateTxt = (text: string, filename: string) => {
-  const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
+  const cleanText = stripMarkdown(text);
+  const blob = new Blob([cleanText], { type: 'text/plain;charset=utf-8' });
   downloadBlob(blob, `${filename}.txt`);
 };
 
@@ -152,8 +174,8 @@ export const createSrtString = (text: string) => {
       const endS = endDate.getSeconds().toString().padStart(2, '0');
       const endTime = `${endH}:${endM}:${endS},000`;
 
-      // Clean text (remove timestamp from content)
-      const content = line.replace(timeRegex, '').trim();
+      // Clean text (remove timestamp and markdown from content)
+      const content = stripMarkdown(line.replace(timeRegex, '').trim());
 
       srtContent += `${counter}\n${startTime} --> ${endTime}\n${content}\n\n`;
       counter++;
