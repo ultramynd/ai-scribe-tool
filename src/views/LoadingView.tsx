@@ -1,18 +1,20 @@
 import React from 'react';
-import { Sparkle, Cpu, Clock, Lightning } from '@phosphor-icons/react';
+import { Sparkle, Cpu, Clock, Lightning, X } from '@phosphor-icons/react';
 
 interface LoadingViewProps {
   progress: number;
   logLines: string[];
   transcriptionMode: 'verbatim' | 'polish';
   isDeepThinking: boolean;
+  onCancel?: () => void;
 }
 
 const LoadingView: React.FC<LoadingViewProps> = ({ 
   progress, 
   logLines, 
   transcriptionMode, 
-  isDeepThinking 
+  isDeepThinking,
+  onCancel
 }) => {
   return (
     <div className="min-h-screen bg-dark-bg flex flex-col items-center justify-center p-6 relative overflow-hidden text-dark-text font-sans">
@@ -129,6 +131,17 @@ const LoadingView: React.FC<LoadingViewProps> = ({
              <span className="animate-pulse">00:00</span>
              <span className="tabular-nums transition-all duration-300">{Math.round(progress)}%</span>
           </div>
+
+          {/* Cancel Button */}
+          {onCancel && (
+             <button
+                onClick={onCancel}
+                className="mt-8 mx-auto flex items-center gap-2 px-5 py-2.5 rounded-full bg-white/5 border border-white/10 text-dark-muted hover:text-white hover:bg-red-500/20 hover:border-red-500/30 transition-all duration-300 text-sm font-medium group"
+             >
+                <X size={16} weight="bold" className="group-hover:text-red-400 transition-colors" />
+                Cancel Transcription
+             </button>
+          )}
       </div>
     </div>
   );

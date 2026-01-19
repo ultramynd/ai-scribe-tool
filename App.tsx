@@ -346,6 +346,11 @@ const App: React.FC = () => {
             logLines={logLines}
             transcriptionMode={transcriptionMode}
             isDeepThinking={isDeepThinking}
+            onCancel={() => {
+              if (activeTabId) {
+                closeTab(activeTabId);
+              }
+            }}
           />
         )}
 
