@@ -1,35 +1,9 @@
 import { blobToBase64 } from "../utils/audioUtils";
 import { logger } from "../utils/logger";
 import { AI_MODELS, FALLBACK_CONFIG } from "../src/config/aiModels";
-
-// Explicit MIME type mapping to ensure API compatibility
-const MIME_TYPE_MAP: Record<string, string> = {
-  'mp3': 'audio/mp3',
-  'wav': 'audio/wav',
-  'aiff': 'audio/aiff',
-  'aac': 'audio/aac',
-  'ogg': 'audio/ogg',
-  'flac': 'audio/flac',
-  'm4a': 'audio/mp4',
-  'mp4': 'video/mp4',
-  'mov': 'video/mov',
-  'avi': 'video/avi',
-  'wmv': 'video/wmv',
-  'mpeg': 'video/mpeg',
-  'mpg': 'video/mpeg',
-  'webm': 'video/webm',
-  '3gp': 'video/3gpp',
-  'flv': 'video/x-flv',
-  'mkv': 'video/x-matroska'
-};
+import { getMimeTypeFromExtension } from "../utils/mimeTypes";
 
 const USE_SERVER_PROXY = import.meta.env.VITE_GEMINI_USE_PROXY === 'true';
-
-const getMimeTypeFromExtension = (filename: string): string | null => {
-
-  const ext = filename.split('.').pop()?.toLowerCase();
-  return ext ? MIME_TYPE_MAP[ext] || null : null;
-};
 
 /**
  * Returns the appropriate API key based on the attempt count.
@@ -37,7 +11,7 @@ const getMimeTypeFromExtension = (filename: string): string | null => {
 const getActiveApiKey = (attempt: number): string => {
   const primaryKey = import.meta.env.VITE_GEMINI_API_KEY;
   const fallbackKey = import.meta.env.VITE_GEMINI_API_KEY_FALLBACK;
-  
+
   // Switch to backup key if we've reached the threshold defined in config
   if (attempt >= FALLBACK_CONFIG.SWITCH_TO_BACKUP_KEY_ATTEMPT && fallbackKey) {
     return fallbackKey;
@@ -60,32 +34,32 @@ async function executeGaiRequest(
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
 
   try {
-      if (USE_SERVER_PROXY) {
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+    if (USE_SERVER_PROXY) {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
-        try {
-          const response = await fetch('/api/gemini', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ model, payload }),
-            signal: controller.signal
-          });
+      try {
+        const response = await fetch('/api/gemini', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ model, payload }),
+          signal: controller.signal
+        });
 
-          const text = await response.text();
-          if (!response.ok) {
-            throw new Error(`AI Error (${response.status}): ${text}`);
-          }
-
-          const data = JSON.parse(text);
-          if (data.candidates && data.candidates[0] && data.candidates[0].content && data.candidates[0].content.parts) {
-            return { text: data.candidates[0].content.parts[0].text };
-          }
-          return data;
-        } finally {
-          clearTimeout(timeoutId);
+        const text = await response.text();
+        if (!response.ok) {
+          throw new Error(`AI Error (${response.status}): ${text}`);
         }
+
+        const data = JSON.parse(text);
+        if (data.candidates && data.candidates[0] && data.candidates[0].content && data.candidates[0].content.parts) {
+          return { text: data.candidates[0].content.parts[0].text };
+        }
+        return data;
+      } finally {
+        clearTimeout(timeoutId);
       }
+    }
 
 
     return await new Promise((resolve, reject) => {
@@ -98,9 +72,9 @@ async function executeGaiRequest(
           try {
             const data = JSON.parse(xhr.responseText);
             if (data.candidates && data.candidates[0] && data.candidates[0].content && data.candidates[0].content.parts) {
-               resolve({ text: data.candidates[0].content.parts[0].text });
+              resolve({ text: data.candidates[0].content.parts[0].text });
             } else {
-               resolve(data);
+              resolve(data);
             }
           } catch (e) {
             reject(new Error("Failed to parse AI response."));
@@ -154,8 +128,8 @@ export type StatusCallback = (message: string, progress?: number) => void;
  * Helper to upload large files to Gemini API with XHR for better stability and progress tracking.
  */
 const uploadFileToGemini = async (
-  mediaFile: File | Blob, 
-  mimeType: string, 
+  mediaFile: File | Blob,
+  mimeType: string,
   onStatus?: StatusCallback,
   attempt: number = 0
 ): Promise<string> => {
@@ -180,7 +154,7 @@ const uploadFileToGemini = async (
           })
         });
 
-        if (response.status === 429) {
+        if (response.status === 429 && attempt < 3) {
           return uploadFileToGemini(mediaFile, mimeType, onStatus, attempt + 1);
         }
 
@@ -210,11 +184,11 @@ const uploadFileToGemini = async (
               if (url) resolve(url);
               else reject(new Error("No upload session URL in response"));
             } else {
-               if (xhr.status === 429 && attempt < 1 && import.meta.env.VITE_GEMINI_API_KEY_FALLBACK) {
-                  reject({ isRateLimit: true });
-               } else {
-                  reject(new Error(`Upload Session Init Failed (${xhr.status}): ${xhr.responseText}`));
-               }
+              if (xhr.status === 429 && attempt < 1 && import.meta.env.VITE_GEMINI_API_KEY_FALLBACK) {
+                reject({ isRateLimit: true });
+              } else {
+                reject(new Error(`Upload Session Init Failed (${xhr.status}): ${xhr.responseText}`));
+              }
             }
           };
           xhr.onerror = () => reject(new Error("Network connection failed during upload initialization."));
@@ -236,7 +210,7 @@ const uploadFileToGemini = async (
       xhr.open('POST', sessionUrl);
       xhr.setRequestHeader('X-Goog-Upload-Offset', '0');
       xhr.setRequestHeader('X-Goog-Upload-Command', 'upload, finalize');
-      
+
       xhr.upload.onprogress = (event) => {
         if (event.lengthComputable) {
           const percent = Math.round((event.loaded / event.total) * 100);
@@ -266,7 +240,7 @@ const uploadFileToGemini = async (
     // Extract metadata robustly (API returns File object, but SDK wraps it)
     const fileName = fileInfo.file?.name || fileInfo.name;
     const fileUri = fileInfo.file?.uri || fileInfo.uri;
-    
+
     if (!fileName) {
       console.error("Upload response missing name:", fileInfo);
       throw new Error("Server did not return a valid resource name.");
@@ -276,59 +250,59 @@ const uploadFileToGemini = async (
     onStatus?.("Server-side processing...", 50);
     let retries = 0;
     const MAX_POLL_RETRIES = 300; // ~15 minutes
-    
+
     // Ensure we don't duplicate 'files/' prefix in the path
     const pollPath = fileName.startsWith('files/') ? fileName : `files/${fileName}`;
-    
+
     while (retries < MAX_POLL_RETRIES) {
       try {
         const pollData = USE_SERVER_PROXY
           ? await (async () => {
-              const response = await fetch('/api/gemini-poll', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ fileName: pollPath })
-              });
-
-              if (!response.ok) {
-                const text = await response.text();
-                throw new Error(`Polling failed with status: ${response.status} ${text}`);
-              }
-
-              return response.json();
-            })()
-          : await new Promise<any>((resolve, reject) => {
-              const pollUrl = `https://generativelanguage.googleapis.com/v1beta/${pollPath}?key=${getActiveApiKey(attempt)}`;
-              const xhr = new XMLHttpRequest();
-              xhr.open('GET', pollUrl);
-              xhr.onload = () => {
-                if (xhr.status >= 200 && xhr.status < 300) {
-                  try { resolve(JSON.parse(xhr.responseText)); }
-                  catch (e) { reject(new Error("Failed to parse server status.")); }
-                } else {
-                  reject(new Error(`Polling failed with status: ${xhr.status}`));
-                }
-              };
-              xhr.onerror = () => reject(new Error("Network link lost during server processing..."));
-              xhr.ontimeout = () => reject(new Error("Status polling timed out (30 seconds)."));
-              xhr.timeout = 30000; // 30 seconds for polling
-              xhr.send();
+            const response = await fetch('/api/gemini-poll', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ fileName: pollPath })
             });
 
-        
+            if (!response.ok) {
+              const text = await response.text();
+              throw new Error(`Polling failed with status: ${response.status} ${text}`);
+            }
+
+            return response.json();
+          })()
+          : await new Promise<any>((resolve, reject) => {
+            const pollUrl = `https://generativelanguage.googleapis.com/v1beta/${pollPath}?key=${getActiveApiKey(attempt)}`;
+            const xhr = new XMLHttpRequest();
+            xhr.open('GET', pollUrl);
+            xhr.onload = () => {
+              if (xhr.status >= 200 && xhr.status < 300) {
+                try { resolve(JSON.parse(xhr.responseText)); }
+                catch (e) { reject(new Error("Failed to parse server status.")); }
+              } else {
+                reject(new Error(`Polling failed with status: ${xhr.status}`));
+              }
+            };
+            xhr.onerror = () => reject(new Error("Network link lost during server processing..."));
+            xhr.ontimeout = () => reject(new Error("Status polling timed out (30 seconds)."));
+            xhr.timeout = 30000; // 30 seconds for polling
+            xhr.send();
+          });
+
+
         if (pollData.state === 'ACTIVE') return fileUri;
         if (pollData.state === 'FAILED') throw new Error("File processing failed on server.");
       } catch (pollErr: any) {
         // If it's a network error or timeout during polling, we don't want to crash. 
         // We just log it and let the loop retry.
         logger.warn(`Polling attempt ${retries + 1} encountered an issue: ${pollErr.message}. Retrying...`);
-        if (pollErr.message.includes("failed on server")) throw pollErr; 
+        if (pollErr.message.includes("failed on server")) throw pollErr;
       }
-      
+
       // Dynamic delay: Start fast, slow down to 4s for long-running processes
       const delay = retries < 10 ? 2000 : 4000;
       await new Promise(r => setTimeout(r, delay));
-      
+
       retries++;
       // Visual progress capped at 99% for polling
       const pollProgress = Math.min(99, 50 + Math.floor((retries / MAX_POLL_RETRIES) * 45));
@@ -348,9 +322,9 @@ const uploadFileToGemini = async (
  * Transcribes audio or video using Gemini models.
  */
 export const transcribeAudio = async (
-  mediaFile: File | Blob, 
-  mimeType: string, 
-  autoEdit: boolean = false, 
+  mediaFile: File | Blob,
+  mimeType: string,
+  autoEdit: boolean = false,
   detectSpeakers: boolean = true,
   useSmartModel: boolean = true,
   onStatus?: StatusCallback
@@ -360,11 +334,11 @@ export const transcribeAudio = async (
   // --- 1. PREPARE CONTENT (Upload ONCE) ---
   let finalMimeType = mimeType;
   if (mediaFile instanceof File && mediaFile.name) {
-      const detectedMime = getMimeTypeFromExtension(mediaFile.name);
-      if (detectedMime) finalMimeType = detectedMime;
+    const detectedMime = getMimeTypeFromExtension(mediaFile.name);
+    if (detectedMime) finalMimeType = detectedMime;
   }
   if (!finalMimeType || finalMimeType === 'application/octet-stream') {
-      finalMimeType = 'audio/mp3';
+    finalMimeType = 'audio/mp3';
   }
 
   let contentPart: any;
@@ -397,7 +371,7 @@ export const transcribeAudio = async (
   }
 
   // --- 2. EXECUTE WITH RETRY (Generation Only) ---
-  
+
   // Model Configuration from Central Config
   const PRIMARY_MODEL = AI_MODELS.PRIMARY;
   const FALLBACK_MODEL = AI_MODELS.FAST;
@@ -408,22 +382,22 @@ export const transcribeAudio = async (
     try {
 
       // Use fallback config thresholds
-      const useFallbackKey = attempt >= FALLBACK_CONFIG.SWITCH_TO_BACKUP_KEY_ATTEMPT; 
+      const useFallbackKey = attempt >= FALLBACK_CONFIG.SWITCH_TO_BACKUP_KEY_ATTEMPT;
       const primaryKey = import.meta.env.VITE_GEMINI_API_KEY;
       const fallbackKey = import.meta.env.VITE_GEMINI_API_KEY_FALLBACK;
-      
+
       const activeApiKey = useFallbackKey && fallbackKey ? fallbackKey : primaryKey;
 
       if (!activeApiKey) {
         throw new Error("API Key is missing. Please check your environment configuration.");
       }
-      
+
       // manual construction of part object
       onStatus?.(`Engine initialized: ${modelName} ${useFallbackKey ? '(Backup Key)' : '(Primary)'} (Attempt ${attempt + 1})`, 8);
 
 
       // STRICT PROMPTING
-      const speakerInstruction = detectSpeakers 
+      const speakerInstruction = detectSpeakers
         ? `**Speaker Diarization (Strict)**: Identify distinct speakers. Listen for names (e.g., "Hi John") and use them. If names are unknown, assign specific labels like "Speaker 1", "Speaker 2". Consistency is key.`
         : `**No Speaker Labels**: Do not use "Speaker 1" etc. simply output the text continuously, breaking paragraphs by voice change.`;
 
@@ -465,8 +439,8 @@ export const transcribeAudio = async (
       onStatus?.(`Generating transcription with ${modelName}...`, 60);
 
       const fakeProgressTimer = setInterval(() => {
-         const msgs = ["Decoding audio structure...", "Aligning timestamps...", "Transcribing speech segments...", "Verifying speaker identity..."];
-         onStatus?.(msgs[Math.floor(Math.random() * msgs.length)]);
+        const msgs = ["Decoding audio structure...", "Aligning timestamps...", "Transcribing speech segments...", "Verifying speaker identity..."];
+        onStatus?.(msgs[Math.floor(Math.random() * msgs.length)]);
       }, 3000);
 
       const payload = {
@@ -477,21 +451,22 @@ export const transcribeAudio = async (
           ]
         }]
       };
- 
-       const response = await executeGaiRequest(payload, modelName, onStatus, attempt, 600000);
 
-      
-      clearInterval(fakeProgressTimer);
+      try {
+        const response = await executeGaiRequest(payload, modelName, onStatus, attempt, 600000);
 
-       if (response.text) {
-           onStatus?.("Transcription complete.", 100);
-           return response.text;
-       }
-       throw new Error("No transcription generated (Empty response). Gemini returned no text.");
+        if (response.text) {
+          onStatus?.("Transcription complete.", 100);
+          return response.text;
+        }
+        throw new Error("No transcription generated (Empty response). Gemini returned no text.");
+      } finally {
+        clearInterval(fakeProgressTimer);
+      }
 
     } catch (error: any) {
       logger.error(`Transcription Attempt ${attempt + 1} Failed`, { model: currentModel, error: error.message });
-      
+
       const errorMsg = error.message?.toLowerCase() || "";
       const isRateLimited = errorMsg.includes('429') || errorMsg.includes('quota') || errorMsg.includes('resource');
       const isNetwork = errorMsg.includes('network') || errorMsg.includes('fetch');
@@ -508,31 +483,31 @@ export const transcribeAudio = async (
 
       // 1. High Demand / Rate Limit -> Switch to High-Availability Model (Fast)
       if (isRateLimited) {
-         onStatus?.("High demand detected. Rerouting to high-availability engine...", 70);
-         await new Promise(r => setTimeout(r, 2000));
-         return executeGeneration(attempt + 1, FALLBACK_MODEL);
+        onStatus?.("High demand detected. Rerouting to high-availability engine...", 70);
+        await new Promise(r => setTimeout(r, 2000));
+        return executeGeneration(attempt + 1, FALLBACK_MODEL);
       }
 
       // 2. Network/Server error -> Retry same model (backoff)
       if ((isNetwork || isServer)) {
-         const delay = (attempt + 1) * FALLBACK_CONFIG.RETRY_DELAY_MS;
-         onStatus?.(`Re-establishing secure connection (Attempt ${attempt + 1})...`, 60);
-         await new Promise(r => setTimeout(r, delay));
-         
-         // If we've retried the same model too many times, switch to fast model
-         if (attempt > FALLBACK_CONFIG.SWITCH_TO_FAST_MODEL_ATTEMPT) {
-             return executeGeneration(attempt + 1, FALLBACK_MODEL);
-         }
-         return executeGeneration(attempt + 1, currentModel);
+        const delay = (attempt + 1) * FALLBACK_CONFIG.RETRY_DELAY_MS;
+        onStatus?.(`Re-establishing secure connection (Attempt ${attempt + 1})...`, 60);
+        await new Promise(r => setTimeout(r, delay));
+
+        // If we've retried the same model too many times, switch to fast model
+        if (attempt > FALLBACK_CONFIG.SWITCH_TO_FAST_MODEL_ATTEMPT) {
+          return executeGeneration(attempt + 1, FALLBACK_MODEL);
+        }
+        return executeGeneration(attempt + 1, currentModel);
       }
 
       // 3. Last Resort -> Switch Key + Flash (Explicit Strategy)
       if (attempt >= FALLBACK_CONFIG.SWITCH_TO_BACKUP_KEY_ATTEMPT) {
-         onStatus?.(`Switching to backup engine... (Attempt ${attempt + 1}/${maxRetries})`, 60);
-         await new Promise(r => setTimeout(r, 2000));
-         return executeGeneration(attempt + 1, FALLBACK_MODEL);
+        onStatus?.(`Switching to backup engine... (Attempt ${attempt + 1}/${maxRetries})`, 60);
+        await new Promise(r => setTimeout(r, 2000));
+        return executeGeneration(attempt + 1, FALLBACK_MODEL);
       }
-      
+
       // Default retry
       await new Promise(r => setTimeout(r, 2000));
       return executeGeneration(attempt + 1, FALLBACK_MODEL);
@@ -543,7 +518,7 @@ export const transcribeAudio = async (
     return await executeGeneration();
   } catch (error: any) {
     logger.error("Final Transcription Failure", error);
-    
+
     let userMessage = "An unexpected error occurred during transcription.";
     const msg = error.message?.toLowerCase() || "";
 
@@ -552,8 +527,8 @@ export const transcribeAudio = async (
       const now = new Date();
       // Gemini free-tier quotas typically reset every 60 seconds. 
       // We estimate 65 seconds from now to be safe.
-      const resetTime = new Date(now.getTime() + 65 * 1000).toLocaleTimeString([], { 
-        hour: '2-digit', minute: '2-digit', second: '2-digit' 
+      const resetTime = new Date(now.getTime() + 65 * 1000).toLocaleTimeString([], {
+        hour: '2-digit', minute: '2-digit', second: '2-digit'
       });
       userMessage = `Daily/Per-Minute Quota Exceeded. You can try again at approximately ${resetTime}.`;
     }
@@ -561,7 +536,7 @@ export const transcribeAudio = async (
     else if (msg.includes('safety') || msg.includes('blocked')) userMessage = "Content Blocked by AI Safety Filters.";
     else if (msg.includes('media upload failed')) userMessage = error.message; // Pass through upload errors
     else userMessage = `Transcription Failed: ${error.message}`; // Fallback: Show actual error
-    
+
     throw new Error(userMessage);
   }
 };
@@ -570,13 +545,13 @@ export const transcribeAudio = async (
  * Classifies the content type based on the text.
  */
 export const classifyContent = async (text: string): Promise<string> => {
-  const model = AI_MODELS.FAST; 
+  const model = AI_MODELS.FAST;
   const sample = text.substring(0, 2000);
   const prompt = `Classify this text into one category: Song, Podcast, Interview, Meeting, Lecture, Video, Voice Note, News. Return ONLY the category name.\n\nText:\n${sample}`;
- 
+
   try {
     const payload = { contents: [{ parts: [{ text: prompt }] }] };
-      const response = await executeGaiRequest(payload, model, undefined, 0, 120000);
+    const response = await executeGaiRequest(payload, model, undefined, 0, 120000);
 
     return String(response.text || "").trim() || "Unknown";
   } catch (e) {
@@ -584,9 +559,9 @@ export const classifyContent = async (text: string): Promise<string> => {
     return "Media";
   }
 };
- 
+
 export const summarizeText = async (text: string, useSmartModel: boolean = false): Promise<string> => {
-  const model = useSmartModel ? AI_MODELS.PRIMARY : AI_MODELS.FAST; 
+  const model = useSmartModel ? AI_MODELS.PRIMARY : AI_MODELS.FAST;
   const prompt = `
     You are ScribeAI Intelligence, a premium transcription analysis engine. Provide a deep, structured analysis of the provided transcript.
     
@@ -610,7 +585,7 @@ export const summarizeText = async (text: string, useSmartModel: boolean = false
   `;
   try {
     const payload = { contents: [{ parts: [{ text: prompt }] }] };
-      const response = await executeGaiRequest(payload, model, undefined, 0, 120000);
+    const response = await executeGaiRequest(payload, model, undefined, 0, 120000);
 
     return String(response.text || "Could not generate summary.");
   } catch (e) {
@@ -621,7 +596,7 @@ export const summarizeText = async (text: string, useSmartModel: boolean = false
 
 export const enhanceFormatting = async (text: string, contextType: string = "General", useSmartModel: boolean = false): Promise<string> => {
   const model = useSmartModel ? AI_MODELS.PRIMARY : AI_MODELS.FAST;
-  
+
   const prompt = `
     You are ScribeAI Smart Editor. Your task is to transform a raw transcript into a polished, professional document while preserving the original meaning and nuances.
     
@@ -646,10 +621,10 @@ export const enhanceFormatting = async (text: string, contextType: string = "Gen
     Transcript:
     ${text}
   `;
-  
+
   try {
     const payload = { contents: [{ parts: [{ text: prompt }] }] };
-      const response = await executeGaiRequest(payload, model, undefined, 0, 120000);
+    const response = await executeGaiRequest(payload, model, undefined, 0, 120000);
 
     return String(response.text || text);
   } catch (e) {
@@ -660,7 +635,7 @@ export const enhanceFormatting = async (text: string, contextType: string = "Gen
 
 export const extractKeyMoments = async (text: string, useSmartModel: boolean = false): Promise<string> => {
   const model = useSmartModel ? AI_MODELS.PRIMARY : AI_MODELS.FAST;
-  
+
   const prompt = `
     Analyze this transcript and extract the most important "Key Moments". 
     For each moment:
@@ -673,10 +648,10 @@ export const extractKeyMoments = async (text: string, useSmartModel: boolean = f
     Transcript:
     ${text}
   `;
-  
+
   try {
     const payload = { contents: [{ parts: [{ text: prompt }] }] };
-      const response = await executeGaiRequest(payload, model, undefined, 0, 120000);
+    const response = await executeGaiRequest(payload, model, undefined, 0, 120000);
 
     return String(response.text || "No key moments identified.");
   } catch (e) {
@@ -689,9 +664,9 @@ export const extractKeyMoments = async (text: string, useSmartModel: boolean = f
  * Identifies the start and end of the main discussion.
  */
 export const findDiscussionBounds = async (text: string, useSmartModel: boolean = false): Promise<string> => {
-   const model = useSmartModel ? AI_MODELS.PRIMARY : AI_MODELS.FAST;
-   
-   const prompt = `
+  const model = useSmartModel ? AI_MODELS.PRIMARY : AI_MODELS.FAST;
+
+  const prompt = `
      Look at this transcript and identify exactly where the main discussion starts and ends. 
      Ignore the introductory pleasantries, setup, or closing small talk.
      
@@ -702,25 +677,25 @@ export const findDiscussionBounds = async (text: string, useSmartModel: boolean 
      Transcript Snippet:
      ${text.substring(0, 5000)} ... ${text.substring(text.length - 2000)}
    `;
-   
-   try {
-     const payload = { contents: [{ parts: [{ text: prompt }] }] };
-       const response = await executeGaiRequest(payload, model, undefined, 0, 120000);
 
-     return String(response.text || "Could not identify discussion bounds.");
-   } catch (e) {
-     logger.error("Discussion Bounds error", e);
-     return "Analysis failed.";
-   }
- };
- 
- /**
-  * Removes pleasantries and fluff, keeping only the core interview/discussion content.
-  */
- export const stripPleasantries = async (text: string, useSmartModel: boolean = false): Promise<string> => {
-   const model = useSmartModel ? AI_MODELS.PRIMARY : AI_MODELS.FAST;
-   
-   const prompt = `
+  try {
+    const payload = { contents: [{ parts: [{ text: prompt }] }] };
+    const response = await executeGaiRequest(payload, model, undefined, 0, 120000);
+
+    return String(response.text || "Could not identify discussion bounds.");
+  } catch (e) {
+    logger.error("Discussion Bounds error", e);
+    return "Analysis failed.";
+  }
+};
+
+/**
+ * Removes pleasantries and fluff, keeping only the core interview/discussion content.
+ */
+export const stripPleasantries = async (text: string, useSmartModel: boolean = false): Promise<string> => {
+  const model = useSmartModel ? AI_MODELS.PRIMARY : AI_MODELS.FAST;
+
+  const prompt = `
      You are a professional editor. Rewrite this transcript to remove all pleasantries, "small talk", filler intros (like "how are you today", "thank you for having me"), and outros that don't contribute to the core subject matter.
      
      Keep the speaker labels and timestamps exactly as they are. 
@@ -729,18 +704,18 @@ export const findDiscussionBounds = async (text: string, useSmartModel: boolean 
      Transcript:
      ${text}
    `;
-   
-   try {
-     const payload = { contents: [{ parts: [{ text: prompt }] }] };
-       const response = await executeGaiRequest(payload, model, undefined, 0, 120000);
 
-     return String(response.text || text);
-   } catch (e) {
-     logger.error("Strip Pleasantries error", e);
-     return text;
-   }
- };
- 
+  try {
+    const payload = { contents: [{ parts: [{ text: prompt }] }] };
+    const response = await executeGaiRequest(payload, model, undefined, 0, 120000);
+
+    return String(response.text || text);
+  } catch (e) {
+    logger.error("Strip Pleasantries error", e);
+    return text;
+  }
+};
+
 export const refineSpeakers = async (text: string, useSmartModel: boolean = true): Promise<string> => {
   const model = useSmartModel ? AI_MODELS.PRIMARY : AI_MODELS.FAST;
   const prompt = `
@@ -756,64 +731,64 @@ export const refineSpeakers = async (text: string, useSmartModel: boolean = true
     - Do NOT include any introductory text, notes, or concluding summaries.
     - If you cannot identify any names, return the transcript exactly as is.
   `;
-  
+
   try {
-   const payload = {
-     contents: [{ parts: [{ text: prompt }, { text: text }] }]
-   };
-   const response = await executeGaiRequest(payload, model);
-   const output = String(response.text || text).trim();
-   return output.replace(/^```markdown\n/, '').replace(/^```\n/, '').replace(/\n```$/, '');
- } catch (e) {
-   logger.error("Refine Speakers error", e);
-   return text;
- }
+    const payload = {
+      contents: [{ parts: [{ text: prompt }, { text: text }] }]
+    };
+    const response = await executeGaiRequest(payload, model);
+    const output = String(response.text || text).trim();
+    return output.replace(/^```markdown\n/, '').replace(/^```\n/, '').replace(/\n```$/, '');
+  } catch (e) {
+    logger.error("Refine Speakers error", e);
+    return text;
+  }
 };
- 
+
 export const analyzeVideoContent = async (mediaFile: File | Blob): Promise<string> => {
-    const model = AI_MODELS.VISION; // Video understanding is great on Vision/Flash
-  
-    let finalMimeType = mediaFile.type;
-    if (mediaFile instanceof File && mediaFile.name) {
-      const detectedMime = getMimeTypeFromExtension(mediaFile.name);
-      if (detectedMime) finalMimeType = detectedMime;
+  const model = AI_MODELS.VISION; // Video understanding is great on Vision/Flash
+
+  let finalMimeType = mediaFile.type;
+  if (mediaFile instanceof File && mediaFile.name) {
+    const detectedMime = getMimeTypeFromExtension(mediaFile.name);
+    if (detectedMime) finalMimeType = detectedMime;
+  }
+
+  if (!finalMimeType.startsWith('video/')) {
+    return "This feature is only available for video files.";
+  }
+
+  try {
+    let contentPart: any;
+    const MAX_INLINE_SIZE = 0; // Force binary
+
+    if (mediaFile.size < MAX_INLINE_SIZE) {
+      const base64Data = await blobToBase64(mediaFile);
+      contentPart = { inlineData: { mimeType: finalMimeType, data: base64Data } };
+    } else {
+      const fileUri = await uploadFileToGemini(mediaFile, finalMimeType);
+      contentPart = { fileData: { mimeType: finalMimeType, fileUri: fileUri } };
     }
-    
-    if (!finalMimeType.startsWith('video/')) {
-      return "This feature is only available for video files.";
-    }
-  
-    try {
-      let contentPart: any;
-      const MAX_INLINE_SIZE = 0; // Force binary
-  
-      if (mediaFile.size < MAX_INLINE_SIZE) {
-        const base64Data = await blobToBase64(mediaFile);
-        contentPart = { inlineData: { mimeType: finalMimeType, data: base64Data } };
-      } else {
-        const fileUri = await uploadFileToGemini(mediaFile, finalMimeType);
-        contentPart = { fileData: { mimeType: finalMimeType, fileUri: fileUri } };
-      }
-  
-      const prompt = `
+
+    const prompt = `
         Analyze this video and provide a comprehensive report containing:
         1. **Visual Summary**: Setting, people, and actions.
         2. **Key Events**: Important moments.
         3. **Text on Screen**: Extract visible text/graphics.
         4. **Context**: Infer context (e.g. formal meeting, vlog, tutorial).
       `;
-  
-      const payload = {
-        contents: [{ parts: [contentPart, { text: prompt }] }]
-      };
-      
-        const response = await executeGaiRequest(payload, model, undefined, 0, 120000);
 
-  
-      return String(response.text || "No analysis could be generated.");
-    } catch (error: any) {
-      logger.error("Video analysis error:", error);
-      return `Error analyzing video: ${error.message}`;
-    }
-  };
+    const payload = {
+      contents: [{ parts: [contentPart, { text: prompt }] }]
+    };
+
+    const response = await executeGaiRequest(payload, model, undefined, 0, 120000);
+
+
+    return String(response.text || "No analysis could be generated.");
+  } catch (error: any) {
+    logger.error("Video analysis error:", error);
+    return `Error analyzing video: ${error.message}`;
+  }
+};
 

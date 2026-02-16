@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { AudioFile, AudioSource, ArchiveItem, EditorTab, TranscriptionState } from '../../types';
 import { transcribeAudio } from '../../services/geminiService';
 import { splitAudioToWavChunks, offsetTranscriptTimestamps } from '../../utils/audioChunking';
@@ -39,6 +39,7 @@ export const useTranscriptionFlow = ({
 }: UseTranscriptionFlowOptions) => {
   const [progress, setProgress] = useState(0);
   const [logLines, setLogLines] = useState<string[]>([]);
+  const abortRef = useRef<AbortController | null>(null);
 
   useEffect(() => {
     if (transcription.isLoading) {
@@ -66,7 +67,7 @@ export const useTranscriptionFlow = ({
   }, [setTabs]);
 
   const executeTranscription = useCallback(
-    async (mediaBlob: Blob | File, mimeType: string, onStatus?: (msg: string, prg?: number) => void) => {
+    async (mediaBlob: Blob | File, mimeType: string, onStatus?: (msg: string, prg?: number) => void, signal?: AbortSignal) => {
       let finalUseSmartModel = isDeepThinking;
 
       const isVideo = mimeType.startsWith('video/');
@@ -79,25 +80,31 @@ export const useTranscriptionFlow = ({
 
       const autoEdit = transcriptionMode !== 'verbatim';
 
-      // Chunking strategy for large media or long videos.
+      // Chunking strategy for large audio files.
       // Keep it invisible to the user; show progress as a single job.
-      const chunkSeconds = 12 * 60;
+      // 3-minute chunks keep WAV blobs under 20MB inline limit (~5.5MB/min at 48kHz stereo)
+      const chunkSeconds = 3 * 60;
 
+      // Only chunk large audio files (>35MB). Video is NOT chunked.
       const shouldChunk =
-        mimeType.startsWith('video/') ||
-        (mediaBlob?.size || 0) > 35 * 1024 * 1024 ||
-        finalUseSmartModel;
+        mimeType.startsWith('audio/') &&
+        (mediaBlob?.size || 0) > 35 * 1024 * 1024;
 
-      if (shouldChunk && !mimeType.startsWith('audio/')) {
-        onStatus?.('Chunking is currently supported for audio only. Tip: export audio-only for long videos.', 10);
+      if (!shouldChunk && mimeType.startsWith('video/') && (mediaBlob?.size || 0) > 35 * 1024 * 1024) {
+        onStatus?.('Large video detected. Tip: export audio-only for faster, chunked processing.', 10);
       }
 
-      if (shouldChunk && mimeType.startsWith('audio/')) {
+      if (shouldChunk) {
         onStatus?.('Preparing audio chunks...', 8);
         const { chunks, totalSeconds } = await splitAudioToWavChunks(mediaBlob as Blob, chunkSeconds);
 
         let combined = '';
         for (let i = 0; i < chunks.length; i += 1) {
+          // Check for cancellation before each chunk
+          if (signal?.aborted) {
+            throw new Error('Transcription cancelled.');
+          }
+
           const chunk = chunks[i];
           const base = 10;
           const span = 85;
@@ -109,7 +116,7 @@ export const useTranscriptionFlow = ({
             chunk.blob.type,
             autoEdit,
             isSpeakerDetectEnabled,
-            false,
+            finalUseSmartModel,
             (msg, p) => {
               if (p !== undefined) {
                 const chunkP = base + Math.round(((i + p / 100) / chunks.length) * span);
@@ -142,6 +149,13 @@ export const useTranscriptionFlow = ({
     title?: string;
   }) => {
     let currentLoadingTabId: string | null = null;
+
+    // Abort any previous in-flight transcription
+    if (abortRef.current) {
+      abortRef.current.abort();
+    }
+    const controller = new AbortController();
+    abortRef.current = controller;
 
     try {
       const resolvedSource = overrides?.source ?? activeTab;
@@ -179,7 +193,7 @@ export const useTranscriptionFlow = ({
         isEditorMode: false
       });
 
-      const text = await executeTranscription(mediaBlob, mimeType, (msg, prg) => updateStatusLog(msg, prg, currentLoadingTabId));
+      const text = await executeTranscription(mediaBlob, mimeType, (msg, prg) => updateStatusLog(msg, prg, currentLoadingTabId), controller.signal);
 
       setTabs(prev => prev.map(tab => (tab.id === currentLoadingTabId ? { ...tab, transcription: { isLoading: false, text, error: null } } : tab)));
 
@@ -196,6 +210,13 @@ export const useTranscriptionFlow = ({
         ...prev
       ]);
     } catch (err: any) {
+      // Don't show error for intentional cancellations
+      if (err.message === 'Transcription cancelled.') {
+        if (currentLoadingTabId) {
+          setTabs(prev => prev.filter(tab => tab.id !== currentLoadingTabId));
+        }
+        return;
+      }
       const errorMsg = err.message || 'An unexpected error occurred.';
       if (currentLoadingTabId) {
         setTabs(prev => prev.map(tab => (tab.id === currentLoadingTabId ? { ...tab, transcription: { isLoading: false, text: null, error: errorMsg } } : tab)));
@@ -285,12 +306,20 @@ export const useTranscriptionFlow = ({
     return false;
   }, [activeTab, recordedBlob, transcription.isLoading, uploadedFile]);
 
+  const cancelTranscription = useCallback(() => {
+    if (abortRef.current) {
+      abortRef.current.abort();
+      abortRef.current = null;
+    }
+  }, []);
+
   return {
     progress,
     logLines,
     handleTranscribe,
     handleBackgroundTranscribe,
     handleArchiveUpload,
-    isReadyToTranscribe
+    isReadyToTranscribe,
+    cancelTranscription
   };
 };

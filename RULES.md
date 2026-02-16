@@ -3,15 +3,15 @@
 These rules must be followed strictly for all development on the AI Scribe Tool.
 
 ## 1. AI Model Configuration
--   **Primary Model**: ALWAYS use `gemini-2.0-flash-exp`.
-    -   *Reason*: Superior audio understanding and speed compared to 1.5 Pro.
+-   **Primary Model**: ALWAYS use `gemini-2.5-flash`.
+    -   *Reason*: Latest model with superior audio understanding and speed.
     -   *Configuration*: Defined in `src/config/aiModels.ts`.
--   **Fallback**: `gemini-1.5-flash-latest` (or similar high-availability model).
+-   **Fallback**: `gemini-2.0-flash` (or similar high-availability model).
 
 ## 2. Upload Logic
 -   **Upload Once**: Files must NEVER be re-uploaded during AI retry loops.
 -   **Decoupled Logic**: The upload phase (getting `fileUri`) must be separate from the generation phase.
--   **Inline Limit**: Files < 10MB should be processed inline (Base64) for speed.
+-   **Inline Limit**: Files < 20MB should be processed inline (Base64) for speed.
 
 ## 3. UI/UX Standards
 -   **Buttons**: Ensure all buttons are functional. Do not create placeholder UI.
