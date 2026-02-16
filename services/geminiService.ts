@@ -227,12 +227,13 @@ const uploadFileToGemini = async (
             reject(new Error("Failed to parse server response after upload."));
           }
         } else {
+          // If we get an error status, reject with details so we can decide to retry
           reject(new Error(`Upload failed with status: ${xhr.status} ${xhr.responseText}`));
         }
       };
 
-      xhr.onerror = () => reject(new Error("Network error during upload (XHR)."));
-      xhr.ontimeout = () => reject(new Error("File upload timed out (30 minutes)."));
+      xhr.onerror = () => reject(new Error("Network error during upload (XHR). Check your internet connection or proxy settings."));
+      xhr.ontimeout = () => reject(new Error("File upload timed out (30 minutes). Try a faster connection or smaller file."));
       xhr.timeout = 1800000; // 30 minutes for upload (support up to 2GB)
       xhr.send(mediaFile);
     });
@@ -311,7 +312,21 @@ const uploadFileToGemini = async (
     throw new Error("Polling timeout: File took too long to process on server. (Max 15 minutes reached)");
   } catch (error: any) {
     logger.error("Upload process failed", error);
-    if ((error.message.includes('429') || error.message.includes('fetch')) && attempt < 1) {
+    
+    // RETRY LOGIC: Handle 429 (Quota), Network Errors, and Timeouts
+    const msg = error.message.toLowerCase();
+    const isRetryable = msg.includes('429') || 
+                        msg.includes('network') || 
+                        msg.includes('xhr') || 
+                        msg.includes('timeout') || 
+                        msg.includes('fetch') ||
+                        msg.includes('503') ||
+                        msg.includes('500');
+
+    if (isRetryable && attempt < 3) {
+      const waitTime = Math.pow(2, attempt) * 2000; // 2s, 4s, 8s backoff
+      onStatus?.(`Connection issue. Retrying upload in ${waitTime/1000}s... (Attempt ${attempt + 1}/3)`, 8);
+      await new Promise(r => setTimeout(r, waitTime));
       return uploadFileToGemini(mediaFile, mimeType, onStatus, attempt + 1);
     }
     throw error;
