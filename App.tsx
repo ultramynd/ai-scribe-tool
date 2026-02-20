@@ -2,9 +2,9 @@ import React, { useState, useEffect, useCallback, lazy, Suspense } from 'react';
 
 import { Spinner } from '@phosphor-icons/react';
 import { AudioSource, AudioFile, TranscriptionState } from './types';
-// import { transcribeWithGroq } from './services/groqService'; 
 import { isWebSpeechSupported } from './services/webSpeechService';
 import { validateMediaFile } from './utils/mediaValidation';
+import type { DriveFileRef } from './services/geminiService';
 
 import ArchiveSidebar from './components/ArchiveSidebar';
 import GoogleFilePicker from './components/GoogleFilePicker';
@@ -94,6 +94,8 @@ const App: React.FC = () => {
   const [isPickerOpen, setIsPickerOpen] = useState(false);
   const [pickerCallback, setPickerCallback] = useState<((file: AudioFile) => void) | null>(null);
   const [isFetchingDrive, setIsFetchingDrive] = useState(false);
+  const [driveProgress, setDriveProgress] = useState(0);
+  const [driveFileMeta, setDriveFileMeta] = useState<DriveFileRef | null>(null);
 
   const {
     progress,
@@ -110,6 +112,8 @@ const App: React.FC = () => {
     transcriptionMode,
     isSpeakerDetectEnabled,
     isDeepThinking,
+    driveFileMeta,
+    googleAccessToken,
     createTab,
     setTabs,
     setArchiveItems,
@@ -187,61 +191,54 @@ const App: React.FC = () => {
     clearAll
   });
 
-  const handlePickDriveFile = async (file: { id: string; name: string; mimeType: string }) => {
-
-
+  const handlePickDriveFile = (file: { id: string; name: string; mimeType: string; size?: string }) => {
     setIsPickerOpen(false);
     if (!googleAccessToken) return;
 
-    setIsFetchingDrive(true);
-    try {
-      // Reuse logic from UrlLoader - we should move this to a utility if possible
-      // For now, I'll implement a basic version or call handleBackgroundTranscribe with a placeholder
-      // Actually, I'll implement fetchDriveFile here too
-      const blob = await new Promise<Blob>((resolve, reject) => {
-        const xhr = new XMLHttpRequest();
-        xhr.open('GET', `https://www.googleapis.com/drive/v3/files/${file.id}?alt=media`);
-        xhr.setRequestHeader('Authorization', `Bearer ${googleAccessToken}`);
-        xhr.responseType = 'blob';
-        xhr.onload = () => {
-          if (xhr.status >= 200 && xhr.status < 300) resolve(xhr.response);
-          else reject(new Error(`Drive fetch failed: ${xhr.status}`));
-        };
-        xhr.onerror = () => reject(new Error('Drive network error'));
-        xhr.send();
-      });
-      const fileBlob = new File([blob], file.name, { type: file.mimeType });
-      const validation = validateMediaFile(fileBlob, file.mimeType);
-      if (!validation.valid) {
-        alert(validation.message || 'Unsupported media file.');
-        return;
-      }
+    const meta: DriveFileRef = {
+      id: file.id,
+      name: file.name,
+      mimeType: file.mimeType || 'audio/mp3',
+      size: Number(file.size) || 0
+    };
 
-      const audioFile: AudioFile = {
-        file: fileBlob,
-        previewUrl: URL.createObjectURL(blob),
-        base64: null,
-        mimeType: file.mimeType
+    if (pickerCallback) {
+      // UrlLoader background-transcription path: still needs a real file blob
+      // Trigger a background download for the callback case only
+      setIsFetchingDrive(true);
+      setDriveProgress(0);
+      const xhr = new XMLHttpRequest();
+      xhr.open('GET', `https://www.googleapis.com/drive/v3/files/${file.id}?alt=media`);
+      xhr.setRequestHeader('Authorization', `Bearer ${googleAccessToken}`);
+      xhr.responseType = 'blob';
+      xhr.onprogress = (e) => {
+        if (e.lengthComputable) setDriveProgress(Math.round((e.loaded / e.total) * 100));
       };
-
-      if (pickerCallback) {
-        pickerCallback(audioFile);
-      } else {
-        // Default: Load into main session
-        setUploadedFile(audioFile);
-        setActiveTab(AudioSource.DRIVE);
-      }
-
-    } catch (err: any) {
-      console.error("Drive Fetch Error:", err);
-      // More specific error message
-      let msg = "Failed to download from Drive.";
-      if (err.message) msg += ` (${err.message})`;
-      alert(msg + " Please ensure the file is shared or you have permission.");
-    } finally {
-      setIsFetchingDrive(false);
-      setPickerCallback(null);
+      xhr.onload = () => {
+        setIsFetchingDrive(false);
+        setDriveProgress(0);
+        if (xhr.status < 300) {
+          const blob = xhr.response as Blob;
+          const audioFile: AudioFile = {
+            file: new File([blob], file.name, { type: file.mimeType }),
+            previewUrl: URL.createObjectURL(blob),
+            base64: null,
+            mimeType: file.mimeType
+          };
+          pickerCallback(audioFile);
+        }
+        setPickerCallback(null);
+      };
+      xhr.onerror = () => { setIsFetchingDrive(false); setPickerCallback(null); };
+      xhr.send();
+      return;
     }
+
+    // Main wizard path: store metadata, create stub AudioFile (no blob download)
+    setDriveFileMeta(meta);
+    const stub: AudioFile = { file: null, previewUrl: null, base64: null, mimeType: file.mimeType };
+    setUploadedFile(stub);
+    setActiveTab(AudioSource.DRIVE);
   };
 
   const getAudioUrl = () => {
@@ -457,6 +454,8 @@ const App: React.FC = () => {
                 setIsPickerOpen={setIsPickerOpen}
                 isPickerOpen={isPickerOpen}
                 handlePickDriveFile={handlePickDriveFile}
+                isFetchingDrive={isFetchingDrive}
+                driveProgress={driveProgress}
                 setTranscription={(val: React.SetStateAction<TranscriptionState>) => {
                   if (activeTabId) {
                     if (typeof val === 'function') {

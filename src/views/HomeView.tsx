@@ -2,7 +2,7 @@ import React, { useEffect } from 'react';
 
 import {
   Lightning, SignIn, SignOut, Spinner, Moon, Sun, Microphone, UploadSimple,
-  Link, ArrowLeft, ArrowRight, FileText, Sparkle, Users, User, Check, WarningCircle, Brain, Info, Clock, X, GoogleLogo, FileAudio, FileVideo
+  Link, ArrowLeft, ArrowRight, FileText, Sparkle, Users, User, Check, WarningCircle, Brain, Info, Clock, X, GoogleLogo, FileAudio, FileVideo, HardDrive
 
 } from '@phosphor-icons/react';
 import { AudioSource, AudioFile, TranscriptionState } from '../../types';
@@ -58,6 +58,8 @@ interface HomeViewProps {
   setIsPickerOpen: (val: boolean) => void;
   isPickerOpen: boolean;
   handlePickDriveFile: (file: { id: string; name: string; mimeType: string }) => void;
+  isFetchingDrive: boolean;
+  driveProgress: number;
   onStartSmartEditor: () => void;
   onNewSession: (source: AudioSource) => void;
   hasDrafts: boolean;
@@ -79,6 +81,7 @@ const HomeView: React.FC<HomeViewProps> = ({
   setShowArchiveSidebar, archiveItems, setEditorMode,
   isAutoEditEnabled, setIsAutoEditEnabled, isWebSpeechSupported,
   handleBackgroundTranscribe, setPickerCallback, setIsPickerOpen, isPickerOpen, handlePickDriveFile,
+  isFetchingDrive, driveProgress,
   onStartSmartEditor, onNewSession, hasDrafts, onResumeDraft
 }) => {
 
@@ -247,15 +250,15 @@ const HomeView: React.FC<HomeViewProps> = ({
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8 max-w-5xl mx-auto">
 
               {[
-                { id: AudioSource.MICROPHONE, icon: <Microphone size={28} weight="duotone" />, title: "Record Node", desc: "Capture voice notes or meetings with optional Live AI.", color: "text-amber-500", bg: "bg-amber-500/5", accent: "amber-500" },
-                { id: AudioSource.FILE, icon: <UploadSimple size={28} weight="duotone" />, title: "Upload Media", desc: "Transcribe MP3, WAV, or MP4 files.", color: "text-accent", bg: "bg-accent/5", accent: "accent" },
-                { id: AudioSource.DRIVE, icon: <svg className="w-7 h-7" viewBox="0 0 87.3 78" xmlns="http://www.w3.org/2000/svg"><path d="m6.6 66.85 3.85 6.65c.8 1.4 1.95 2.5 3.3 3.3l13.75-23.8h-27.5c0 1.55.4 3.1 1.2 4.5z" fill="#0066da" /><path d="m43.65 25-13.75-23.8c-1.35.8-2.5 1.9-3.3 3.3l-25.4 44a9.06 9.06 0 0 0 -1.2 4.5h27.5z" fill="#00ac47" /><path d="m73.55 76.8c1.35-.8 2.5-1.9 3.3-3.3l1.6-2.75 7.65-13.25c.8-1.4 1.2-2.95 1.2-4.5h-27.502l5.852 11.5z" fill="#ea4335" /><path d="m43.65 25 13.75-23.8c-1.35-.8-2.9-1.2-4.5-1.2h-18.5c-1.6 0-3.15.4-4.5 1.2z" fill="#00832d" /><path d="m59.8 53h-27.5l-13.75 23.8c1.35.8 2.9 1.2 4.5 1.2h50.5c1.6 0 3.15-.4 4.5-1.2z" fill="#2684fc" /><path d="m73.4 26.5-12.7-22c-.8-1.4-1.95-2.5-3.3-3.3l-13.75 23.8 29.75 51.5c.8-1.4 1.2-2.95 1.2-4.5v-28.5c0-1.55-.4-3.1-1.2-4.5z" fill="#ffba00" /></svg>, title: "Google Drive", desc: "Access your cloud storage directly.", color: "text-blue-500", bg: "bg-blue-500/5", accent: "blue-500" },
-                { id: AudioSource.URL, icon: <Link size={28} weight="duotone" />, title: "Public Link", desc: "Transcribe from public web URLs.", color: "text-emerald-500", bg: "bg-emerald-500/5", accent: "emerald-500" },
+                { id: AudioSource.MICROPHONE, icon: <Microphone size={28} weight="duotone" />, title: "Record Node", desc: "Capture voice notes or meetings with optional Live AI.", color: "text-amber-500", bg: "bg-amber-500/5", accent: "amber-500", action: () => onNewSession(AudioSource.MICROPHONE) },
+                { id: AudioSource.FILE, icon: <UploadSimple size={28} weight="duotone" />, title: "Upload Media", desc: "Transcribe MP3, WAV, MP4 files — up to 2 GB.", color: "text-accent", bg: "bg-accent/5", accent: "accent", action: () => onNewSession(AudioSource.FILE) },
+                { id: AudioSource.DRIVE, icon: <svg className="w-7 h-7" viewBox="0 0 87.3 78" xmlns="http://www.w3.org/2000/svg"><path d="m6.6 66.85 3.85 6.65c.8 1.4 1.95 2.5 3.3 3.3l13.75-23.8h-27.5c0 1.55.4 3.1 1.2 4.5z" fill="#0066da" /><path d="m43.65 25-13.75-23.8c-1.35.8-2.5 1.9-3.3 3.3l-25.4 44a9.06 9.06 0 0 0 -1.2 4.5h27.5z" fill="#00ac47" /><path d="m73.55 76.8c1.35-.8 2.5-1.9 3.3-3.3l1.6-2.75 7.65-13.25c.8-1.4 1.2-2.95 1.2-4.5h-27.502l5.852 11.5z" fill="#ea4335" /><path d="m43.65 25 13.75-23.8c-1.35-.8-2.9-1.2-4.5-1.2h-18.5c-1.6 0-3.15.4-4.5 1.2z" fill="#00832d" /><path d="m59.8 53h-27.5l-13.75 23.8c1.35.8 2.9 1.2 4.5 1.2h50.5c1.6 0 3.15-.4 4.5-1.2z" fill="#2684fc" /><path d="m73.4 26.5-12.7-22c-.8-1.4-1.95-2.5-3.3-3.3l-13.75 23.8 29.75 51.5c.8-1.4 1.2-2.95 1.2-4.5v-28.5c0-1.55-.4-3.1-1.2-4.5z" fill="#ffba00" /></svg>, title: "Google Drive", desc: "Stream audio & video directly from Drive — no download.", color: "text-blue-500", bg: "bg-blue-500/5", accent: "blue-500", action: () => onNewSession(AudioSource.DRIVE) },
+                { id: AudioSource.URL, icon: <Link size={28} weight="duotone" />, title: "Public Link", desc: "Transcribe from public web URLs.", color: "text-emerald-500", bg: "bg-emerald-500/5", accent: "emerald-500", action: () => onNewSession(AudioSource.URL) },
+                { id: 'EDITOR', icon: <FileText size={28} weight="duotone" />, title: "Smart Editor", desc: "Write, edit, and format documents with inline AI.", color: "text-primary", bg: "bg-primary/5", accent: "primary", action: () => onStartSmartEditor() },
               ].map((card) => (
                 <button
                   key={card.id}
-                  onClick={() => onNewSession(card.id as AudioSource)}
-
+                  onClick={card.action}
                   className="group relative flex flex-col items-start p-8 bg-white/90 dark:bg-dark-card/80 backdrop-blur-xl rounded-3xl transition-all duration-300 ease-out border border-slate-100 dark:border-white/[0.08] shadow-lg shadow-slate-900/[0.03] dark:shadow-none hover:shadow-xl hover:shadow-slate-900/[0.06] hover:-translate-y-1 text-left"
                 >
                   <div className={`w-14 h-14 ${card.bg} ${card.color} rounded-2xl flex items-center justify-center mb-6 group-hover:scale-105 group-hover:rotate-3 transition-all duration-300 ease-out`}>
@@ -272,47 +275,17 @@ const HomeView: React.FC<HomeViewProps> = ({
               ))}
             </div>
 
-            {/* Premium Editor Access */}
-            <div className="mt-16 flex flex-col items-center gap-4">
-              <div className="flex flex-col sm:flex-row items-center gap-3">
+            {hasDrafts && (
+              <div className="mt-10 flex justify-center">
                 <button
-                  onClick={() => {
-                    onStartSmartEditor();
-                  }}
-                  className="group flex items-center gap-4 px-4 py-2.5 rounded-full bg-white/90 dark:bg-dark-card/80 backdrop-blur-xl border border-slate-200/80 dark:border-white/10   hover:-translate-y-0.5 transition-all duration-300 ease-out"
+                  onClick={() => safeNavigation(onResumeDraft)}
+                  className="group flex items-center gap-3 px-4 py-2.5 rounded-full border border-emerald-200/70 dark:border-emerald-500/20 bg-emerald-50/80 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 text-xs font-bold uppercase tracking-widest hover:shadow-md transition-all"
                 >
-                  <div className="w-10 h-10 bg-gradient-to-br from-primary to-purple-600 rounded-full flex items-center justify-center text-white shadow-md shadow-primary/25">
-                    <FileText size={18} weight="duotone" />
-                  </div>
-                  <div className="flex flex-col items-start">
-                    <span className="text-sm font-semibold text-slate-800 dark:text-white">Open Smart Editor</span>
-                    <span className="text-[10px] text-slate-400 dark:text-dark-muted font-medium">Advanced Workspace</span>
-                  </div>
-                  <div className="ml-2 w-8 h-8 rounded-full bg-slate-100 dark:bg-dark-bg flex items-center justify-center text-slate-400 group-hover:bg-primary group-hover:text-white transition-all duration-200">
-                    <ArrowRight size={16} weight="bold" />
-                  </div>
+                  <Clock size={14} weight="duotone" className="text-emerald-500" />
+                  Resume Draft
                 </button>
-
-                {hasDrafts && (
-                  <button
-                    onClick={() => safeNavigation(onResumeDraft)}
-                    className="group flex items-center gap-3 px-4 py-2.5 rounded-full border border-emerald-200/70 dark:border-emerald-500/20 bg-emerald-50/80 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 text-xs font-bold uppercase tracking-widest  hover:shadow-md transition-all"
-                  >
-                    <Clock size={14} weight="duotone" className="text-emerald-500" />
-                    Resume Draft
-                  </button>
-                )}
               </div>
-
-              <div className="flex items-center justify-center gap-6">
-                <div className="flex items-center gap-1.5 text-xs text-slate-400 dark:text-dark-muted">
-                  <Sparkle size={11} weight="duotone" className="text-amber-500" /> Multi-Language
-                </div>
-                <div className="flex items-center gap-1.5 text-xs text-slate-400 dark:text-dark-muted">
-                  <Sparkle size={11} weight="duotone" className="text-primary" /> Auto-Save
-                </div>
-              </div>
-            </div>
+            )}
 
           </div>
         ) : (
@@ -338,8 +311,8 @@ const HomeView: React.FC<HomeViewProps> = ({
                   onClick={() => onNewSession(AudioSource.MICROPHONE)}
 
                   className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all ${activeTab === AudioSource.MICROPHONE
-                      ? 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20'
-                      : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 hover:bg-white/50 dark:hover:bg-dark-card/50'
+                    ? 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20'
+                    : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 hover:bg-white/50 dark:hover:bg-dark-card/50'
                     }`}
                 >
                   <Microphone size={14} weight="duotone" />
@@ -349,8 +322,8 @@ const HomeView: React.FC<HomeViewProps> = ({
                   onClick={() => onNewSession(AudioSource.FILE)}
 
                   className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all ${activeTab === AudioSource.FILE
-                      ? 'bg-accent/10 text-accent border border-accent/20'
-                      : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 hover:bg-white/50 dark:hover:bg-dark-card/50'
+                    ? 'bg-accent/10 text-accent border border-accent/20'
+                    : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 hover:bg-white/50 dark:hover:bg-dark-card/50'
                     }`}
                 >
                   <UploadSimple size={14} weight="duotone" />
@@ -359,8 +332,8 @@ const HomeView: React.FC<HomeViewProps> = ({
                 <button
                   onClick={() => onNewSession(AudioSource.DRIVE)}
                   className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all ${activeTab === AudioSource.DRIVE
-                      ? 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20'
-                      : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 hover:bg-white/50 dark:hover:bg-dark-card/50'
+                    ? 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20'
+                    : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 hover:bg-white/50 dark:hover:bg-dark-card/50'
                     }`}
                 >
                   <HardDrive size={14} weight="duotone" />
@@ -369,8 +342,8 @@ const HomeView: React.FC<HomeViewProps> = ({
                 <button
                   onClick={() => onNewSession(AudioSource.URL)}
                   className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all ${activeTab === AudioSource.URL
-                      ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20'
-                      : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 hover:bg-white/50 dark:hover:bg-dark-card/50'
+                    ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20'
+                    : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 hover:bg-white/50 dark:hover:bg-dark-card/50'
                     }`}
                 >
                   <Link size={14} weight="duotone" />
@@ -476,6 +449,32 @@ const HomeView: React.FC<HomeViewProps> = ({
                             <span>{isLoggingIn ? 'Connecting...' : 'Continue with Google'}</span>
                           </button>
                         </div>
+                      ) : isFetchingDrive ? (
+                        /* ── Drive loading overlay ── */
+                        <div className="w-full max-w-sm flex flex-col items-center gap-6 animate-in fade-in duration-300">
+                          <div className="w-20 h-20 rounded-[2rem] bg-blue-500/10 flex items-center justify-center">
+                            <HardDrive size={36} weight="duotone" className="text-blue-500 animate-pulse" />
+                          </div>
+                          <div className="w-full">
+                            <div className="flex justify-between items-center mb-2">
+                              <span className="text-xs font-black uppercase tracking-widest text-slate-500 dark:text-dark-muted">
+                                Importing from Drive
+                              </span>
+                              <span className="text-xs font-bold text-blue-500">
+                                {driveProgress < 100 ? `${driveProgress}%` : 'Ready'}
+                              </span>
+                            </div>
+                            <div className="h-2 w-full rounded-full bg-slate-200 dark:bg-white/10 overflow-hidden">
+                              <div
+                                className="h-full rounded-full bg-gradient-to-r from-blue-500 to-blue-400 transition-all duration-300 ease-out"
+                                style={{ width: `${Math.max(driveProgress, 4)}%` }}
+                              />
+                            </div>
+                            <p className="text-[11px] text-slate-400 dark:text-dark-muted mt-3 text-center">
+                              Bringing your file into the workspace...
+                            </p>
+                          </div>
+                        </div>
                       ) : (
                         <div className="w-full flex flex-col items-center">
                           <button
@@ -486,7 +485,7 @@ const HomeView: React.FC<HomeViewProps> = ({
                               <HardDrive size={32} weight="duotone" />
                             </div>
                             <div className="text-center">
-                              <div className="text-xl font-black uppercase tracking-widest">Open Picker</div>
+                              <div className="text-xl font-black uppercase tracking-widest">Browse Drive</div>
                               <p className="text-blue-100 text-xs mt-1 font-medium italic">Select audio or video from your Drive</p>
                             </div>
                           </button>

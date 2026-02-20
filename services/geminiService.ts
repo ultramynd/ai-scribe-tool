@@ -598,6 +598,351 @@ export const transcribeAudio = async (
   }
 };
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Drive → Gemini streaming transcription
+// Pipes the Drive file stream directly into a Gemini resumable upload so the
+// full file never lands in a browser Blob / RAM.
+// ─────────────────────────────────────────────────────────────────────────────
+
+export interface DriveFileRef {
+  id: string;
+  name: string;
+  mimeType: string;
+  /** Known byte size (from Drive Files API `size` field). Pass 0 if unknown. */
+  size: number;
+}
+
+/**
+ * Fetches Drive file metadata to resolve name/mimeType/size when not already
+ * known.
+ */
+async function fetchDriveMeta(
+  fileId: string,
+  accessToken: string
+): Promise<{ name: string; mimeType: string; size: number }> {
+  const res = await fetch(
+    `https://www.googleapis.com/drive/v3/files/${fileId}?fields=name,mimeType,size`,
+    { headers: { Authorization: `Bearer ${accessToken}` } }
+  );
+  if (!res.ok) throw new Error(`Drive metadata fetch failed (${res.status})`);
+  const d = await res.json();
+  return { name: d.name || 'drive_file', mimeType: d.mimeType || 'audio/mp3', size: Number(d.size) || 0 };
+}
+
+/**
+ * Opens a Gemini resumable upload session and returns the session URL.
+ * Supports both direct (key) and proxy modes.
+ */
+async function initGeminiUploadSession(
+  mimeType: string,
+  size: number,
+  displayName: string,
+  attempt: number = 0
+): Promise<string> {
+  const apiKey = getActiveApiKey(attempt);
+
+  if (USE_SERVER_PROXY) {
+    const res = await fetch('/api/gemini-upload-init', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Request-Id': `drive-stream-${Date.now()}` },
+      body: JSON.stringify({ displayName, mimeType, size })
+    });
+    if (!res.ok) {
+      const text = await res.text();
+      const requestId = res.headers.get('x-request-id');
+      throw new Error(getProxyErrorMessage(res.status, text, requestId));
+    }
+    const data = await res.json();
+    if (!data?.uploadUrl) throw new Error('No upload session URL from proxy.');
+    return data.uploadUrl;
+  }
+
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open('POST', `https://generativelanguage.googleapis.com/upload/v1beta/files?key=${apiKey}`);
+    xhr.setRequestHeader('X-Goog-Upload-Protocol', 'resumable');
+    xhr.setRequestHeader('X-Goog-Upload-Command', 'start');
+    xhr.setRequestHeader('X-Goog-Upload-Header-Content-Length', String(size));
+    xhr.setRequestHeader('X-Goog-Upload-Header-Content-Type', mimeType);
+    xhr.setRequestHeader('Content-Type', 'application/json');
+    xhr.timeout = 30_000;
+    xhr.onload = () => {
+      if (xhr.status >= 200 && xhr.status < 300) {
+        const url = xhr.getResponseHeader('x-goog-upload-url');
+        url ? resolve(url) : reject(new Error('No upload session URL returned.'));
+      } else {
+        reject(new Error(`Upload init failed (${xhr.status}): ${xhr.responseText}`));
+      }
+    };
+    xhr.onerror = () => reject(new Error('Network error during upload init.'));
+    xhr.ontimeout = () => reject(new Error('Upload init timed out.'));
+    xhr.send(JSON.stringify({ file: { display_name: displayName, mime_type: mimeType } }));
+  });
+}
+
+/**
+ * Streams the Drive file body directly into a Gemini resumable upload session.
+ *
+ * Strategy
+ * ─────────
+ * 1. Fetch the Drive download URL as a streaming Response (no body buffering).
+ * 2. Use fetch() with the ReadableStream as the body to upload to Gemini.
+ *    `duplex: 'half'` is required by some runtimes for streaming request bodies.
+ * 3. If the browser does not support streaming request bodies (throws TypeError),
+ *    fall back to downloading the full blob and uploading it conventionally.
+ *
+ * Returns the Gemini file URI for use in generateContent.
+ */
+async function streamDriveToGemini(
+  fileId: string,
+  accessToken: string,
+  sessionUrl: string,
+  mimeType: string,
+  size: number,
+  onStatus?: StatusCallback
+): Promise<string> {
+  const driveUrl = `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`;
+
+  onStatus?.('Streaming from Drive to AI Engine...', 15);
+
+  let fileInfo: any;
+
+  try {
+    // Attempt true stream piping — file bytes flow through browser without
+    // ever being fully buffered.
+    const driveRes = await fetch(driveUrl, {
+      headers: { Authorization: `Bearer ${accessToken}` }
+    });
+    if (!driveRes.ok) throw new Error(`Drive fetch failed (${driveRes.status})`);
+    if (!driveRes.body) throw new TypeError('ReadableStream not supported');
+
+    // Track upload progress via a TransformStream that counts bytes passing through
+    let uploaded = 0;
+    const trackingStream = new TransformStream({
+      transform(chunk, controller) {
+        uploaded += chunk.byteLength;
+        if (size > 0) {
+          const pct = Math.min(Math.round((uploaded / size) * 85), 85);
+          onStatus?.(`Streaming to AI Engine: ${pct}%`, 10 + pct);
+        } else {
+          onStatus?.('Streaming to AI Engine...');
+        }
+        controller.enqueue(chunk);
+      }
+    });
+
+    const trackedStream = driveRes.body.pipeThrough(trackingStream);
+
+    const uploadRes = await fetch(sessionUrl, {
+      method: 'POST',
+      headers: {
+        'X-Goog-Upload-Offset': '0',
+        'X-Goog-Upload-Command': 'upload, finalize',
+        'Content-Type': mimeType,
+        ...(size > 0 ? { 'Content-Length': String(size) } : {})
+      },
+      body: trackedStream,
+      // @ts-ignore — duplex is required for streaming request bodies
+      duplex: 'half'
+    });
+
+    if (!uploadRes.ok) {
+      const txt = await uploadRes.text();
+      throw new Error(`Gemini upload failed (${uploadRes.status}): ${txt}`);
+    }
+    fileInfo = await uploadRes.json();
+  } catch (streamErr: any) {
+    // Fallback: browser doesn't support streaming request bodies — download blob then upload
+    logger.warn('[Drive→Gemini] Streaming not supported, falling back to blob upload', streamErr.message);
+    onStatus?.('Downloading file for processing...', 15);
+
+    const blob = await new Promise<Blob>((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      xhr.open('GET', driveUrl);
+      xhr.setRequestHeader('Authorization', `Bearer ${accessToken}`);
+      xhr.responseType = 'blob';
+      xhr.onprogress = (e) => {
+        if (e.lengthComputable) {
+          onStatus?.(`Downloading: ${Math.round((e.loaded / e.total) * 60)}%`, Math.round((e.loaded / e.total) * 60));
+        }
+      };
+      xhr.onload = () => xhr.status < 300 ? resolve(xhr.response) : reject(new Error(`Drive download failed (${xhr.status})`));
+      xhr.onerror = () => reject(new Error('Drive network error'));
+      xhr.timeout = 1_800_000; // 30 min
+      xhr.send();
+    });
+
+    onStatus?.('Uploading to AI Engine...', 65);
+    fileInfo = await new Promise<any>((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      xhr.open('POST', sessionUrl);
+      xhr.setRequestHeader('X-Goog-Upload-Offset', '0');
+      xhr.setRequestHeader('X-Goog-Upload-Command', 'upload, finalize');
+      xhr.upload.onprogress = (e) => {
+        if (e.lengthComputable) {
+          const pct = 65 + Math.round((e.loaded / e.total) * 20);
+          onStatus?.(`Uploading to AI Engine: ${Math.round((e.loaded / e.total) * 100)}%`, pct);
+        }
+      };
+      xhr.onload = () => {
+        if (xhr.status < 300) {
+          try { resolve(JSON.parse(xhr.responseText)); }
+          catch { reject(new Error('Failed to parse upload response.')); }
+        } else {
+          reject(new Error(`Gemini upload failed (${xhr.status})`));
+        }
+      };
+      xhr.onerror = () => reject(new Error('Network error during upload.'));
+      xhr.ontimeout = () => reject(new Error('Upload timed out (30 min).'));
+      xhr.timeout = 1_800_000;
+      xhr.send(blob);
+    });
+  }
+
+  const fileUri = fileInfo?.file?.uri || fileInfo?.uri;
+  const fileName = fileInfo?.file?.name || fileInfo?.name;
+  if (!fileName) throw new Error('Gemini upload response missing resource name.');
+
+  // Poll for ACTIVE state (reuse stored polling logic)
+  onStatus?.('AI Engine: Processing file...', 90);
+  const pollPath = fileName.startsWith('files/') ? fileName : `files/${fileName}`;
+  const apiKey = getActiveApiKey(0);
+  let retries = 0;
+  while (retries < 300) {
+    const pollData = USE_SERVER_PROXY
+      ? await fetch('/api/gemini-poll', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ fileName: pollPath })
+      }).then(r => r.json())
+      : await new Promise<any>((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        xhr.open('GET', `https://generativelanguage.googleapis.com/v1beta/${pollPath}?key=${apiKey}`);
+        xhr.timeout = 30_000;
+        xhr.onload = () => { try { resolve(JSON.parse(xhr.responseText)); } catch { reject(new Error('Poll parse error')); } };
+        xhr.onerror = () => reject(new Error('Poll network error'));
+        xhr.ontimeout = () => reject(new Error('Poll timed out'));
+        xhr.send();
+      });
+
+    if (pollData.state === 'ACTIVE') return fileUri;
+    if (pollData.state === 'FAILED') throw new Error('File processing failed on AI server.');
+    await new Promise(r => setTimeout(r, retries < 10 ? 2000 : 4000));
+    retries++;
+  }
+  throw new Error('AI processing timed out (max 15 minutes).');
+}
+
+/**
+ * Main entry point for Drive-sourced transcriptions.
+ * Streams the Drive file to Gemini without downloading a Blob to browser RAM.
+ */
+export const transcribeFromDriveFile = async (
+  driveRef: DriveFileRef,
+  accessToken: string,
+  autoEdit: boolean,
+  detectSpeakers: boolean,
+  useSmartModel: boolean,
+  onStatus?: StatusCallback
+): Promise<string> => {
+  onStatus?.('Connecting to Google Drive...', 5);
+
+  // Resolve metadata if size is unknown
+  let { id, name, mimeType, size } = driveRef;
+  if (!size || !name) {
+    onStatus?.('Fetching file info...', 7);
+    const meta = await fetchDriveMeta(id, accessToken);
+    name = name || meta.name;
+    mimeType = mimeType || meta.mimeType;
+    size = size || meta.size;
+  }
+
+  let finalMimeType = mimeType;
+  if (!finalMimeType || finalMimeType === 'application/octet-stream') finalMimeType = 'audio/mp3';
+
+  // Init resumable upload session with Gemini
+  const sessionUrl = await initGeminiUploadSession(finalMimeType, size, name);
+
+  // Stream Drive → Gemini (no full-file Blob in browser RAM)
+  const fileUri = await streamDriveToGemini(id, accessToken, sessionUrl, finalMimeType, size, onStatus);
+
+  // Build content part using the file URI (same as uploadFileToGemini output)
+  const contentPart = { fileData: { mimeType: finalMimeType, fileUri } };
+
+  // Reuse the full prompt/retry/model-switch logic from transcribeAudio
+  const PRIMARY_MODEL = AI_MODELS.PRIMARY;
+  const FALLBACK_MODEL = AI_MODELS.FAST;
+
+  const speakerInstruction = detectSpeakers
+    ? `**Speaker Diarization (Strict)**: Identify distinct speakers. Listen for names and use them. If unknown, assign \"Speaker 1\", \"Speaker 2\" etc. consistently.`
+    : `**No Speaker Labels**: Output text continuously, breaking paragraphs by voice change.`;
+
+  const commonInstructions = `
+    1. ${speakerInstruction}
+    2. **Linguistic Context (Pidgin English & Dialects)**:
+       - The audio likely contains West African English, Nigerian/Ghanaian/Liberian Pidgin, or mixed languages.
+       - **Markers**: Look for "wey", "dey", "don", "no be", "sabi", "comot", "abi/shey", "pikin".
+       - **CRITICAL**: Transcribe Pidgin EXACTLY as spoken. DO NOT translate or "correct" to standard English.
+    3. **Timestamps**: Insert [MM:SS] (or [HH:MM:SS] for long files) timestamps at every speaker turn.
+  `;
+
+  const rawPrompt = `
+    Start now. Transcribe the audio/video file exactly as spoken (100% Verbatim).
+    RULES:
+    ${commonInstructions}
+    4. **ABSOLUTE VERBATIM**: Capture every utterance, stutter, filler word exactly.
+    5. **NO SUMMARIZATION**: Do not omit any parts.
+    6. **Formatting**: New line for every speaker turn.
+    Output only the transcription. No preamble.
+  `;
+
+  const autoEditPrompt = `
+    Start now. Transcribe using "Intelligent Verbatim" standards.
+    RULES:
+    ${commonInstructions}
+    4. **Clean & Intelligent**: Remove stuttering and non-meaningful fillers to improve readability.
+    5. **Preserve Meaning**: Keep the speaker's unique voice/dialect.
+    6. **Formatting**: Use **bold** for key terms/entities.
+    Output only the transcription. No preamble.
+  `;
+
+  const executeGen = async (attempt = 0, model = useSmartModel ? PRIMARY_MODEL : FALLBACK_MODEL): Promise<string> => {
+    const modelName = attempt >= FALLBACK_CONFIG.SWITCH_TO_FAST_MODEL_ATTEMPT ? FALLBACK_MODEL : model;
+    onStatus?.(`Generating transcription with ${modelName}... (Attempt ${attempt + 1})`, 95);
+
+    const fakeTimer = setInterval(() => {
+      const msgs = ['Decoding audio structure...', 'Aligning timestamps...', 'Transcribing speech segments...', 'Verifying speaker identity...'];
+      onStatus?.(msgs[Math.floor(Math.random() * msgs.length)]);
+    }, 3000);
+
+    try {
+      const payload = {
+        contents: [{ parts: [contentPart, { text: autoEdit ? autoEditPrompt : rawPrompt }] }]
+      };
+      const response = await executeGaiRequest(payload, modelName, onStatus, attempt, 900_000); // 15-min timeout for long files
+      if (response.text) {
+        onStatus?.('Transcription complete.', 100);
+        return response.text;
+      }
+      throw new Error('Empty response from AI model.');
+    } catch (err: any) {
+      const msg = err.message?.toLowerCase() || '';
+      const isRateLimit = msg.includes('429') || msg.includes('quota');
+      const isServer = msg.includes('500') || msg.includes('503') || msg.includes('network');
+      if (attempt < FALLBACK_CONFIG.MAX_RETRIES && (isRateLimit || isServer)) {
+        onStatus?.(`Retrying with ${FALLBACK_MODEL}...`, 90);
+        await new Promise(r => setTimeout(r, (attempt + 1) * 2000));
+        return executeGen(attempt + 1, FALLBACK_MODEL);
+      }
+      throw err;
+    } finally {
+      clearInterval(fakeTimer);
+    }
+  };
+
+  return executeGen();
+};
+
 /**
  * Classifies the content type based on the text.
  */

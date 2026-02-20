@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { AudioFile, AudioSource, ArchiveItem, EditorTab, TranscriptionState } from '../../types';
-import { transcribeAudio } from '../../services/geminiService';
+import { transcribeAudio, transcribeFromDriveFile, DriveFileRef } from '../../services/geminiService';
 import { splitAudioToWavChunks, offsetTranscriptTimestamps } from '../../utils/audioChunking';
 import { validateMediaFile } from '../../utils/mediaValidation';
 
@@ -13,6 +13,8 @@ interface UseTranscriptionFlowOptions {
   transcriptionMode: 'verbatim' | 'polish';
   isSpeakerDetectEnabled: boolean;
   isDeepThinking: boolean;
+  driveFileMeta: DriveFileRef | null;
+  googleAccessToken: string | null;
   createTab: (data: Partial<EditorTab>) => string;
   setTabs: React.Dispatch<React.SetStateAction<EditorTab[]>>;
   setArchiveItems: React.Dispatch<React.SetStateAction<ArchiveItem[]>>;
@@ -30,6 +32,8 @@ export const useTranscriptionFlow = ({
   transcriptionMode,
   isSpeakerDetectEnabled,
   isDeepThinking,
+  driveFileMeta,
+  googleAccessToken,
   createTab,
   setTabs,
   setArchiveItems,
@@ -81,9 +85,10 @@ export const useTranscriptionFlow = ({
       const autoEdit = transcriptionMode !== 'verbatim';
 
       // Chunking strategy for large audio files.
-      // Keep it invisible to the user; show progress as a single job.
-      // 3-minute chunks keep WAV blobs under 20MB inline limit (~5.5MB/min at 48kHz stereo)
-      const chunkSeconds = 3 * 60;
+      // Chunks are resampled to 16kHz mono (~1.9 MB/min) so a 10-minute
+      // chunk fits comfortably under Gemini's 20 MB inline limit.
+      // A 3-hour recording becomes ~18 chunks instead of the old 60.
+      const chunkSeconds = 10 * 60;
 
       // Only chunk large audio files (>35MB). Video is NOT chunked.
       const shouldChunk =
@@ -163,6 +168,40 @@ export const useTranscriptionFlow = ({
       const resolvedMicUrl = overrides?.micUrl ?? micUrl;
       const resolvedUploadedFile = overrides?.uploadedFile ?? uploadedFile;
 
+      const autoEdit = transcriptionMode !== 'verbatim';
+
+      // ── Drive streaming path (no Blob in browser RAM) ──────────────────────
+      if (resolvedSource === AudioSource.DRIVE && !resolvedUploadedFile?.file) {
+        if (!driveFileMeta) throw new Error('No Drive file selected. Please pick a file first.');
+        if (!googleAccessToken) throw new Error('Google Drive is not connected. Please sign in.');
+
+        const initialTitle = overrides?.title || driveFileMeta.name || 'Drive Recording';
+        currentLoadingTabId = createTab({
+          title: initialTitle,
+          transcription: { isLoading: true, text: null, error: null },
+          recordedBlob: null, micUrl: null,
+          uploadedFile: resolvedUploadedFile,
+          isEditorMode: false
+        });
+
+        const text = await transcribeFromDriveFile(
+          driveFileMeta, googleAccessToken, autoEdit,
+          isSpeakerDetectEnabled, isDeepThinking,
+          (msg, prg) => updateStatusLog(msg, prg, currentLoadingTabId)
+        );
+
+        setTabs(prev => prev.map(tab =>
+          tab.id === currentLoadingTabId
+            ? { ...tab, transcription: { isLoading: false, text, error: null } } : tab
+        ));
+        setArchiveItems(prev => [{
+          id: Math.random().toString(36).substring(7), name: initialTitle, text,
+          date: new Date().toLocaleString(), status: 'complete', progress: 100
+        }, ...prev]);
+        return;
+      }
+      // ─────────────────────────────────────────────────────────────────────
+
       let mediaBlob: Blob | File | null = null;
       let mimeType = '';
 
@@ -170,8 +209,13 @@ export const useTranscriptionFlow = ({
         if (!resolvedRecordedBlob) throw new Error('No recording found.');
         mediaBlob = resolvedRecordedBlob;
         mimeType = resolvedRecordedBlob.type;
-      } else if (resolvedSource === AudioSource.FILE || resolvedSource === AudioSource.URL || resolvedSource === AudioSource.DRIVE) {
+      } else if (resolvedSource === AudioSource.FILE || resolvedSource === AudioSource.URL) {
         if (!resolvedUploadedFile?.file) throw new Error('No file selected.');
+        mediaBlob = resolvedUploadedFile.file;
+        mimeType = resolvedUploadedFile.file.type || '';
+      } else if (resolvedSource === AudioSource.DRIVE) {
+        // Drive with an actual file blob (pickerCallback fallback path)
+        if (!resolvedUploadedFile?.file) throw new Error('No Drive file selected.');
         mediaBlob = resolvedUploadedFile.file;
         mimeType = resolvedUploadedFile.file.type || '';
       }
@@ -225,16 +269,10 @@ export const useTranscriptionFlow = ({
       }
     }
   }, [
-    activeTab,
-    createTab,
-    executeTranscription,
-    micUrl,
-    recordedBlob,
-    setArchiveItems,
-    setTabs,
-    setTranscription,
-    updateStatusLog,
-    uploadedFile
+    activeTab, createTab, executeTranscription, micUrl, recordedBlob,
+    setArchiveItems, setTabs, setTranscription, updateStatusLog, uploadedFile,
+    driveFileMeta, googleAccessToken, isSpeakerDetectEnabled, isDeepThinking,
+    transcriptionMode
   ]);
 
   const handleBackgroundTranscribe = useCallback(async (file: AudioFile) => {

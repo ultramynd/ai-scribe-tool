@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { 
-  X, MagnifyingGlass, FileAudio, FileVideo, Folder, 
+import {
+  X, MagnifyingGlass, FileAudio, FileVideo, Folder,
   CaretRight, MagnifyingGlassPlus, Spinner, ArrowLeft,
   Clock, HardDrive, Star, Trash, CaretDown, Check
 } from '@phosphor-icons/react';
@@ -17,7 +17,7 @@ interface DriveFile {
 
 interface GoogleFilePickerProps {
   accessToken: string;
-  onSelect: (file: { id: string; name: string; mimeType: string }) => void;
+  onSelect: (file: { id: string; name: string; mimeType: string; size?: string }) => void;
   onClose: () => void;
   isOpen: boolean;
 }
@@ -38,7 +38,7 @@ const GoogleFilePicker: React.FC<GoogleFilePickerProps> = ({ accessToken, onSele
       } else {
         q = `'root' in parents and ${q}`;
       }
-      
+
       if (query) {
         q = `name contains '${query}' and trashed = false and (mimeType contains 'audio/' or mimeType contains 'video/' or mimeType = 'application/vnd.google-apps.folder')`;
       }
@@ -87,7 +87,7 @@ const GoogleFilePicker: React.FC<GoogleFilePickerProps> = ({ accessToken, onSele
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-md animate-in fade-in duration-300">
       <div className="bg-white dark:bg-dark-card w-full max-w-4xl h-[80vh] rounded-[2.5rem] shadow-2xl border border-white/20 dark:border-white/5 flex flex-col overflow-hidden animate-in zoom-in-95 duration-300">
-        
+
         {/* Header */}
         <div className="p-6 border-b border-slate-100 dark:border-dark-border flex items-center justify-between bg-slate-50/50 dark:bg-dark-bg/30">
           <div className="flex items-center gap-4">
@@ -107,7 +107,7 @@ const GoogleFilePicker: React.FC<GoogleFilePickerProps> = ({ accessToken, onSele
               </div>
             </div>
           </div>
-          <button 
+          <button
             onClick={onClose}
             className="w-10 h-10 rounded-xl flex items-center justify-center text-slate-400 hover:bg-slate-100 dark:hover:bg-dark-border transition-all"
           >
@@ -117,7 +117,7 @@ const GoogleFilePicker: React.FC<GoogleFilePickerProps> = ({ accessToken, onSele
 
         {/* Toolbar */}
         <div className="p-4 px-6 border-b border-slate-100 dark:border-dark-border flex flex-col sm:flex-row gap-4 items-center bg-white/50 dark:bg-dark-card/50">
-          <button 
+          <button
             onClick={handleBack}
             disabled={folderStack.length === 0}
             className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold text-slate-600 dark:text-dark-text hover:bg-slate-100 dark:hover:bg-dark-border disabled:opacity-30 disabled:cursor-not-allowed transition-all"
@@ -125,10 +125,10 @@ const GoogleFilePicker: React.FC<GoogleFilePickerProps> = ({ accessToken, onSele
             <ArrowLeft size={16} weight="bold" />
             Back
           </button>
-          
+
           <div className="relative flex-1 group">
             <MagnifyingGlass size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-primary transition-colors" />
-            <input 
+            <input
               type="text"
               placeholder="Search files and folders..."
               value={searchQuery}
@@ -158,21 +158,20 @@ const GoogleFilePicker: React.FC<GoogleFilePickerProps> = ({ accessToken, onSele
               {files.map(file => {
                 const isFolder = file.mimeType === 'application/vnd.google-apps.folder';
                 const isAudio = file.mimeType.startsWith('audio/');
-                
+
                 return (
-                  <button 
+                  <button
                     key={file.id}
-                    onClick={() => isFolder ? handleFolderClick({ id: file.id, name: file.name }) : onSelect(file)}
+                    onClick={() => isFolder ? handleFolderClick({ id: file.id, name: file.name }) : onSelect({ id: file.id, name: file.name, mimeType: file.mimeType, size: file.size })}
                     className="flex items-center gap-4 p-4 rounded-2xl bg-white dark:bg-dark-bg border border-slate-100 dark:border-dark-border hover:border-primary/30 hover:shadow-lg dark:hover:shadow-primary/5 hover:-translate-y-0.5 transition-all text-left group"
                   >
-                    <div className={`w-12 h-12 rounded-xl flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform ${
-                      isFolder ? 'bg-amber-100 text-amber-600 dark:bg-amber-900/20' : 
-                      isAudio ? 'bg-primary/10 text-primary dark:text-accent' : 
-                      'bg-purple-100 text-purple-600 dark:bg-purple-900/20'
-                    }`}>
-                      {isFolder ? <Folder size={24} weight="duotone" /> : 
-                       isAudio ? <FileAudio size={24} weight="duotone" /> : 
-                       <FileVideo size={24} weight="duotone" />}
+                    <div className={`w-12 h-12 rounded-xl flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform ${isFolder ? 'bg-amber-100 text-amber-600 dark:bg-amber-900/20' :
+                        isAudio ? 'bg-primary/10 text-primary dark:text-accent' :
+                          'bg-purple-100 text-purple-600 dark:bg-purple-900/20'
+                      }`}>
+                      {isFolder ? <Folder size={24} weight="duotone" /> :
+                        isAudio ? <FileAudio size={24} weight="duotone" /> :
+                          <FileVideo size={24} weight="duotone" />}
                     </div>
                     <div className="flex-1 min-w-0">
                       <h4 className="text-sm font-bold text-slate-800 dark:text-white truncate group-hover:text-primary transition-colors">{file.name}</h4>
@@ -193,12 +192,12 @@ const GoogleFilePicker: React.FC<GoogleFilePickerProps> = ({ accessToken, onSele
             Showing only supported audio and video formats.
           </p>
           <div className="flex gap-3">
-             <button 
-               onClick={onClose}
-               className="px-6 py-2.5 rounded-xl text-sm font-bold text-slate-500 hover:bg-slate-100 dark:hover:bg-dark-border transition-all"
-             >
-               Cancel
-             </button>
+            <button
+              onClick={onClose}
+              className="px-6 py-2.5 rounded-xl text-sm font-bold text-slate-500 hover:bg-slate-100 dark:hover:bg-dark-border transition-all"
+            >
+              Cancel
+            </button>
           </div>
         </div>
       </div>
