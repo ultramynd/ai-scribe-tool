@@ -639,45 +639,61 @@ async function initGeminiUploadSession(
   displayName: string,
   attempt: number = 0
 ): Promise<string> {
-  const apiKey = getActiveApiKey(attempt);
+  let lastError: any;
+  const maxRetries = 3;
 
-  if (USE_SERVER_PROXY) {
-    const res = await fetch('/api/gemini-upload-init', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'X-Request-Id': `drive-stream-${Date.now()}` },
-      body: JSON.stringify({ displayName, mimeType, size })
-    });
-    if (!res.ok) {
-      const text = await res.text();
-      const requestId = res.headers.get('x-request-id');
-      throw new Error(getProxyErrorMessage(res.status, text, requestId));
+  for (let currentAttempt = attempt; currentAttempt < attempt + maxRetries; currentAttempt++) {
+    try {
+      const apiKey = getActiveApiKey(currentAttempt);
+
+      if (USE_SERVER_PROXY) {
+        const res = await fetch('/api/gemini-upload-init', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'X-Request-Id': `drive-stream-${Date.now()}-${currentAttempt}` },
+          body: JSON.stringify({ displayName, mimeType, size })
+        });
+        if (!res.ok) {
+          const text = await res.text();
+          const requestId = res.headers.get('x-request-id');
+          throw new Error(getProxyErrorMessage(res.status, text, requestId));
+        }
+        const data = await res.json();
+        if (!data?.uploadUrl) throw new Error('No upload session URL from proxy.');
+        return data.uploadUrl;
+      }
+
+      return await new Promise<string>((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        xhr.open('POST', `https://generativelanguage.googleapis.com/upload/v1beta/files?key=${apiKey}`);
+        xhr.setRequestHeader('X-Goog-Upload-Protocol', 'resumable');
+        xhr.setRequestHeader('X-Goog-Upload-Command', 'start');
+        xhr.setRequestHeader('X-Goog-Upload-Header-Content-Length', String(size));
+        xhr.setRequestHeader('X-Goog-Upload-Header-Content-Type', mimeType);
+        xhr.setRequestHeader('Content-Type', 'application/json');
+        xhr.timeout = 30_000;
+        xhr.onload = () => {
+          if (xhr.status >= 200 && xhr.status < 300) {
+            const url = xhr.getResponseHeader('x-goog-upload-url');
+            url ? resolve(url) : reject(new Error('No upload session URL returned.'));
+          } else {
+            reject(new Error(`Upload init failed (${xhr.status}): ${xhr.responseText}`));
+          }
+        };
+        xhr.onerror = () => reject(new Error('Network error during upload init.'));
+        xhr.ontimeout = () => reject(new Error('Upload init timed out.'));
+        xhr.send(JSON.stringify({ file: { display_name: displayName, mime_type: mimeType } }));
+      });
+
+    } catch (err: any) {
+      lastError = err;
+      logger.warn(`initGeminiUploadSession attempt ${currentAttempt + 1} failed: ${err.message}`);
+      if (currentAttempt < attempt + maxRetries - 1) {
+        await new Promise(r => setTimeout(r, 1500 * Math.pow(2, currentAttempt - attempt)));
+      }
     }
-    const data = await res.json();
-    if (!data?.uploadUrl) throw new Error('No upload session URL from proxy.');
-    return data.uploadUrl;
   }
 
-  return new Promise((resolve, reject) => {
-    const xhr = new XMLHttpRequest();
-    xhr.open('POST', `https://generativelanguage.googleapis.com/upload/v1beta/files?key=${apiKey}`);
-    xhr.setRequestHeader('X-Goog-Upload-Protocol', 'resumable');
-    xhr.setRequestHeader('X-Goog-Upload-Command', 'start');
-    xhr.setRequestHeader('X-Goog-Upload-Header-Content-Length', String(size));
-    xhr.setRequestHeader('X-Goog-Upload-Header-Content-Type', mimeType);
-    xhr.setRequestHeader('Content-Type', 'application/json');
-    xhr.timeout = 30_000;
-    xhr.onload = () => {
-      if (xhr.status >= 200 && xhr.status < 300) {
-        const url = xhr.getResponseHeader('x-goog-upload-url');
-        url ? resolve(url) : reject(new Error('No upload session URL returned.'));
-      } else {
-        reject(new Error(`Upload init failed (${xhr.status}): ${xhr.responseText}`));
-      }
-    };
-    xhr.onerror = () => reject(new Error('Network error during upload init.'));
-    xhr.ontimeout = () => reject(new Error('Upload init timed out.'));
-    xhr.send(JSON.stringify({ file: { display_name: displayName, mime_type: mimeType } }));
-  });
+  throw lastError || new Error('initGeminiUploadSession failed after retries.');
 }
 
 /**

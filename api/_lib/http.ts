@@ -1,4 +1,3 @@
-import { randomUUID } from 'crypto';
 import type { ApiRequestLike, ApiResponseLike, HeaderValue } from './types';
 
 const REQUEST_ID_REGEX = /^[A-Za-z0-9._:-]{1,128}$/;
@@ -53,8 +52,8 @@ export const resolveRequestId = (incoming?: string): string => {
     return candidate;
   }
 
-  if (typeof randomUUID === 'function') {
-    return randomUUID();
+  if (typeof globalThis.crypto !== 'undefined' && typeof globalThis.crypto.randomUUID === 'function') {
+    return globalThis.crypto.randomUUID();
   }
 
   return `req_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;

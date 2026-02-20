@@ -51,7 +51,7 @@ export const validatePayloadSize = (payload: unknown): { ok: true; bytes: number
 
   let bytes = 0;
   try {
-    bytes = Buffer.byteLength(JSON.stringify(payload), 'utf8');
+    bytes = new TextEncoder().encode(JSON.stringify(payload)).length;
   } catch {
     return { ok: false, message: 'Payload must be JSON-serializable.' };
   }

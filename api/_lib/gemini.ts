@@ -25,7 +25,8 @@ const callGemini = async (apiKey: string, request: GeminiProxyRequest): Promise<
   return fetch(buildGeminiUrl(request.path, apiKey), {
     method: request.method,
     headers: request.headers,
-    body: request.body
+    body: request.body,
+    signal: typeof AbortSignal !== 'undefined' && typeof AbortSignal.timeout === 'function' ? AbortSignal.timeout(8500) : undefined
   });
 };
 
