@@ -1,0 +1,14 @@
+[33mcommit 29b282acd456eeefbbf6a74b4f49bfe390649e48[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mmaster[m[33m)[m
+Author: AI Scribe Tool Agent <ai-scribe-tool@example.com>
+Date:   Fri Feb 20 23:19:05 2026 +0100
+
+    feat: Drive streaming, 16kHz chunking, Smart Editor card
+    
+    - Drive files now stream directly to Gemini File API (no blob download to browser RAM)
+    - Files from Google Drive are piped Drive  Gemini without touching the filesystem
+    - Video files from Drive fully supported via Gemini File API
+    - Audio chunking resampled to 16kHz mono (was 48kHz stereo) using OfflineAudioContext
+    - Chunk size increased from 3 min to 10 min (9x RAM reduction, ~18 vs 60 API calls for 3hr file)
+    - Smart Editor promoted from pill button to full source card in the home grid
+    - Drive errors routed through app toast system instead of browser alert()
+    - GoogleFilePicker now passes file size in onSelect callback

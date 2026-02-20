@@ -133,7 +133,7 @@ const HomeView: React.FC<HomeViewProps> = ({
   React.useEffect(() => {
     if (!activeTab || !uploadedFile) return;
     if (wizardStep !== 'source') return;
-    if (activeTab !== AudioSource.FILE && activeTab !== AudioSource.URL) return;
+    if (activeTab !== AudioSource.FILE && activeTab !== AudioSource.URL && activeTab !== AudioSource.DRIVE) return;
     if (previewFile) return;
 
     moveToPreview(uploadedFile, activeTab);
@@ -524,14 +524,22 @@ const HomeView: React.FC<HomeViewProps> = ({
                             </div>
                             <div>
                               <div className="text-sm font-bold text-slate-800 dark:text-white">
-                                {previewFile.file?.name || 'Recorded Audio'}
+                                {previewFile.file?.name || (activeTab === AudioSource.DRIVE ? 'Google Drive Media' : 'Recorded Audio')}
                               </div>
                               <div className="text-[10px] text-slate-400">
                                 {previewFile.file?.type || previewFile.mimeType || 'audio'}
                               </div>
                             </div>
                           </div>
-                          <audio className="mt-4 w-full" controls src={previewFile.previewUrl} />
+                          {previewFile.previewUrl ? (
+                            <audio className="mt-4 w-full" controls src={previewFile.previewUrl} />
+                          ) : activeTab === AudioSource.DRIVE && (
+                            <div className="mt-4 p-4 rounded-2xl bg-blue-50 dark:bg-blue-500/10 border border-blue-200 dark:border-blue-500/20 flex flex-col items-center justify-center text-center gap-2">
+                              <HardDrive size={24} className="text-blue-500" weight="duotone" />
+                              <div className="text-sm font-semibold text-blue-700 dark:text-blue-400">Ready to Stream from Drive</div>
+                              <p className="text-xs text-blue-600/70 dark:text-blue-300/70">Media will be streamed directly to the AI Engine.</p>
+                            </div>
+                          )}
                         </div>
                         {wizardError && (
                           <div className="rounded-3xl border border-red-200 dark:border-red-500/30 bg-red-50/80 dark:bg-red-500/10 p-4 text-xs text-red-600 dark:text-red-300 font-semibold">
