@@ -1,7 +1,7 @@
 import React, { useEffect } from 'react';
 
-import { 
-  Lightning, SignIn, SignOut, Spinner, Moon, Sun, Microphone, UploadSimple, 
+import {
+  Lightning, SignIn, SignOut, Spinner, Moon, Sun, Microphone, UploadSimple,
   Link, ArrowLeft, ArrowRight, FileText, Sparkle, Users, User, Check, WarningCircle, Brain, Info, Clock, X, GoogleLogo, FileAudio, FileVideo
 
 } from '@phosphor-icons/react';
@@ -78,9 +78,9 @@ const HomeView: React.FC<HomeViewProps> = ({
   uploadedFile, setUploadedFile, transcriptionError,
   setShowArchiveSidebar, archiveItems, setEditorMode,
   isAutoEditEnabled, setIsAutoEditEnabled, isWebSpeechSupported,
-   handleBackgroundTranscribe, setPickerCallback, setIsPickerOpen, isPickerOpen, handlePickDriveFile,
-   onStartSmartEditor, onNewSession, hasDrafts, onResumeDraft
- }) => {
+  handleBackgroundTranscribe, setPickerCallback, setIsPickerOpen, isPickerOpen, handlePickDriveFile,
+  onStartSmartEditor, onNewSession, hasDrafts, onResumeDraft
+}) => {
 
   const { darkMode, setDarkMode } = useTheme();
 
@@ -139,14 +139,14 @@ const HomeView: React.FC<HomeViewProps> = ({
   return (
 
     <div className="min-h-screen font-sans flex flex-col relative overflow-y-auto transition-colors duration-500">
-      
+
       {/* Immersive Mesh Background */}
       <div className="bg-mesh">
         <div className="mesh-blob w-[500px] h-[500px] bg-primary/20 -top-20 -left-20"></div>
         <div className="mesh-blob w-[600px] h-[600px] bg-accent/20 top-1/2 -right-20 animation-delay-2000"></div>
         <div className="mesh-blob w-[400px] h-[400px] bg-purple-500/10 bottom-0 left-1/3 animation-delay-4000"></div>
       </div>
-      
+
       {/* Glass Header */}
       <header className="glass-header sticky top-0 z-50 transition-all duration-300">
         <div className="max-w-5xl mx-auto px-6 h-20 flex items-center justify-between text-slate-900 dark:text-white">
@@ -163,63 +163,63 @@ const HomeView: React.FC<HomeViewProps> = ({
           </div>
 
           <div className="flex items-center gap-4">
-             {/* Archive Button */}
-              <button 
-                onClick={() => setShowArchiveSidebar(true)}
-                className="flex items-center gap-2.5 px-5 py-2.5 rounded-2xl bg-white dark:bg-dark-card border border-slate-100 dark:border-white/5 text-xs font-bold text-slate-600 dark:text-slate-300 hover:shadow-md transition-all group"
-              >
-                <Clock size={18} weight="duotone" className="text-slate-400 group-hover:text-primary transition-colors" />
-                <span className="hidden sm:inline">Tabs and Sessions</span>
-                {archiveItems.length > 0 && (
-                  <span className="rounded-full bg-primary/10 text-primary text-[9px] font-black px-2 py-0.5">
-                    {archiveItems.length}
-                  </span>
-                )}
-              </button>
+            {/* Archive Button */}
+            <button
+              onClick={() => setShowArchiveSidebar(true)}
+              className="flex items-center gap-2.5 px-5 py-2.5 rounded-2xl bg-white dark:bg-dark-card border border-slate-100 dark:border-white/5 text-xs font-bold text-slate-600 dark:text-slate-300 hover:shadow-md transition-all group"
+            >
+              <Clock size={18} weight="duotone" className="text-slate-400 group-hover:text-primary transition-colors" />
+              <span className="hidden sm:inline">Tabs and Sessions</span>
+              {archiveItems.length > 0 && (
+                <span className="rounded-full bg-primary/10 text-primary text-[9px] font-black px-2 py-0.5">
+                  {archiveItems.length}
+                </span>
+              )}
+            </button>
 
 
-             {/* Connected / Login Status */}
-             {driveScriptsLoaded && (
-               googleAccessToken ? (
-                 <button 
-                    onClick={handleGoogleLogout}
-                    className="w-10 h-10 rounded-2xl bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-100 dark:border-emerald-500/20 flex items-center justify-center hover:shadow-md transition-all group relative"
-                    title="Disconnect Google Drive"
+            {/* Connected / Login Status */}
+            {driveScriptsLoaded && (
+              googleAccessToken ? (
+                <button
+                  onClick={handleGoogleLogout}
+                  className="w-10 h-10 rounded-2xl bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-100 dark:border-emerald-500/20 flex items-center justify-center hover:shadow-md transition-all group relative"
+                  title="Disconnect Google Drive"
+                >
+                  <User size={18} weight="bold" className="text-emerald-600 dark:text-emerald-400 group-hover:opacity-0 transition-opacity" />
+                  <SignOut size={18} weight="bold" className="text-red-500 absolute opacity-0 group-hover:opacity-100 transition-opacity" />
+
+                  <div className="absolute top-0 right-0 -mt-1 -mr-1 w-2.5 h-2.5 bg-emerald-500 rounded-full border-2 border-white dark:border-[#0a0a0a]"></div>
+                </button>
+              ) : (
+                googleClientId && (
+                  <button
+                    onClick={handleGoogleLogin}
+                    disabled={isLoggingIn}
+                    className="w-10 h-10 rounded-2xl bg-white dark:bg-dark-card border border-slate-100 dark:border-white/5 flex items-center justify-center hover:shadow-md transition-all group"
+                    title="Connect Google Drive"
                   >
-                     <User size={18} weight="bold" className="text-emerald-600 dark:text-emerald-400 group-hover:opacity-0 transition-opacity" />
-                     <SignOut size={18} weight="bold" className="text-red-500 absolute opacity-0 group-hover:opacity-100 transition-opacity" />
+                    {isLoggingIn ? <Spinner size={18} weight="bold" className="animate-spin text-primary" /> : <User size={18} weight="bold" className="text-slate-400 group-hover:text-primary transition-colors" />}
 
-                    <div className="absolute top-0 right-0 -mt-1 -mr-1 w-2.5 h-2.5 bg-emerald-500 rounded-full border-2 border-white dark:border-[#0a0a0a]"></div>
                   </button>
-               ) : (
-                 googleClientId && (
-                    <button 
-                      onClick={handleGoogleLogin}
-                      disabled={isLoggingIn}
-                      className="w-10 h-10 rounded-2xl bg-white dark:bg-dark-card border border-slate-100 dark:border-white/5 flex items-center justify-center hover:shadow-md transition-all group"
-                      title="Connect Google Drive"
-                    >
-                       {isLoggingIn ? <Spinner size={18} weight="bold" className="animate-spin text-primary" /> : <User size={18} weight="bold" className="text-slate-400 group-hover:text-primary transition-colors" />}
+                )
+              )
+            )}
 
-                    </button>
-                 )
-               )
-             )}
-
-             {/* Theme Toggle */}
-             <button 
-               onClick={() => setDarkMode(!darkMode)}
-               className="w-10 h-10 rounded-2xl flex items-center justify-center text-slate-500 hover:text-primary hover:bg-slate-100 dark:hover:bg-white/5 transition-all"
-               title="Toggle Theme"
-             >
-               {darkMode ? <Sun size={20} weight="duotone" /> : <Moon size={20} weight="duotone" />}
-             </button>
+            {/* Theme Toggle */}
+            <button
+              onClick={() => setDarkMode(!darkMode)}
+              className="w-10 h-10 rounded-2xl flex items-center justify-center text-slate-500 hover:text-primary hover:bg-slate-100 dark:hover:bg-white/5 transition-all"
+              title="Toggle Theme"
+            >
+              {darkMode ? <Sun size={20} weight="duotone" /> : <Moon size={20} weight="duotone" />}
+            </button>
           </div>
         </div>
       </header>
 
       <main className="max-w-5xl mx-auto px-6 py-16 w-full flex-1 flex flex-col z-10">
-        
+
         {!shouldShowWizard ? (
 
           <div className="flex flex-col flex-1 justify-center animate-in fade-in slide-in-from-bottom-3 duration-300">
@@ -231,13 +231,13 @@ const HomeView: React.FC<HomeViewProps> = ({
                 </div>
                 <span className="text-[9px] font-extrabold text-slate-500 dark:text-dark-muted uppercase tracking-[0.2em]">ScribeAI Professional Engine</span>
               </div>
-              
+
               <h2 className="text-5xl sm:text-7xl font-bold text-slate-900 dark:text-white tracking-tight leading-[0.95] flex flex-col items-center">
                 <span>Turn your audio into</span>
                 <span className="text-transparent bg-clip-text bg-gradient-to-r from-primary via-purple-500 to-accent leading-[1.2]">actionable text.</span>
               </h2>
               <p className="text-lg text-slate-500 dark:text-dark-muted max-w-xl mx-auto leading-relaxed">
-                Professional-grade transcription with speaker detection, <br className="hidden sm:block"/> auto-formatting, and intelligent summaries.
+                Professional-grade transcription with speaker detection, <br className="hidden sm:block" /> auto-formatting, and intelligent summaries.
               </p>
               <div className="text-[11px] font-semibold uppercase tracking-[0.3em] text-slate-400 dark:text-dark-muted">
                 ScribeAI Professional Engine
@@ -249,9 +249,10 @@ const HomeView: React.FC<HomeViewProps> = ({
               {[
                 { id: AudioSource.MICROPHONE, icon: <Microphone size={28} weight="duotone" />, title: "Record Node", desc: "Capture voice notes or meetings with optional Live AI.", color: "text-amber-500", bg: "bg-amber-500/5", accent: "amber-500" },
                 { id: AudioSource.FILE, icon: <UploadSimple size={28} weight="duotone" />, title: "Upload Media", desc: "Transcribe MP3, WAV, or MP4 files.", color: "text-accent", bg: "bg-accent/5", accent: "accent" },
-                { id: AudioSource.URL, icon: <Link size={28} weight="duotone" />, title: "Cloud Import", desc: "Load from public URL or Google Drive.", color: "text-emerald-500", bg: "bg-emerald-500/5", accent: "emerald-500" },
+                { id: AudioSource.DRIVE, icon: <svg className="w-7 h-7" viewBox="0 0 87.3 78" xmlns="http://www.w3.org/2000/svg"><path d="m6.6 66.85 3.85 6.65c.8 1.4 1.95 2.5 3.3 3.3l13.75-23.8h-27.5c0 1.55.4 3.1 1.2 4.5z" fill="#0066da" /><path d="m43.65 25-13.75-23.8c-1.35.8-2.5 1.9-3.3 3.3l-25.4 44a9.06 9.06 0 0 0 -1.2 4.5h27.5z" fill="#00ac47" /><path d="m73.55 76.8c1.35-.8 2.5-1.9 3.3-3.3l1.6-2.75 7.65-13.25c.8-1.4 1.2-2.95 1.2-4.5h-27.502l5.852 11.5z" fill="#ea4335" /><path d="m43.65 25 13.75-23.8c-1.35-.8-2.9-1.2-4.5-1.2h-18.5c-1.6 0-3.15.4-4.5 1.2z" fill="#00832d" /><path d="m59.8 53h-27.5l-13.75 23.8c1.35.8 2.9 1.2 4.5 1.2h50.5c1.6 0 3.15-.4 4.5-1.2z" fill="#2684fc" /><path d="m73.4 26.5-12.7-22c-.8-1.4-1.95-2.5-3.3-3.3l-13.75 23.8 29.75 51.5c.8-1.4 1.2-2.95 1.2-4.5v-28.5c0-1.55-.4-3.1-1.2-4.5z" fill="#ffba00" /></svg>, title: "Google Drive", desc: "Access your cloud storage directly.", color: "text-blue-500", bg: "bg-blue-500/5", accent: "blue-500" },
+                { id: AudioSource.URL, icon: <Link size={28} weight="duotone" />, title: "Public Link", desc: "Transcribe from public web URLs.", color: "text-emerald-500", bg: "bg-emerald-500/5", accent: "emerald-500" },
               ].map((card) => (
-                <button 
+                <button
                   key={card.id}
                   onClick={() => onNewSession(card.id as AudioSource)}
 
@@ -274,21 +275,21 @@ const HomeView: React.FC<HomeViewProps> = ({
             {/* Premium Editor Access */}
             <div className="mt-16 flex flex-col items-center gap-4">
               <div className="flex flex-col sm:flex-row items-center gap-3">
-                <button 
+                <button
                   onClick={() => {
                     onStartSmartEditor();
                   }}
                   className="group flex items-center gap-4 px-4 py-2.5 rounded-full bg-white/90 dark:bg-dark-card/80 backdrop-blur-xl border border-slate-200/80 dark:border-white/10   hover:-translate-y-0.5 transition-all duration-300 ease-out"
                 >
                   <div className="w-10 h-10 bg-gradient-to-br from-primary to-purple-600 rounded-full flex items-center justify-center text-white shadow-md shadow-primary/25">
-                      <FileText size={18} weight="duotone" />
+                    <FileText size={18} weight="duotone" />
                   </div>
                   <div className="flex flex-col items-start">
-                      <span className="text-sm font-semibold text-slate-800 dark:text-white">Open Smart Editor</span>
-                      <span className="text-[10px] text-slate-400 dark:text-dark-muted font-medium">Advanced Workspace</span>
+                    <span className="text-sm font-semibold text-slate-800 dark:text-white">Open Smart Editor</span>
+                    <span className="text-[10px] text-slate-400 dark:text-dark-muted font-medium">Advanced Workspace</span>
                   </div>
                   <div className="ml-2 w-8 h-8 rounded-full bg-slate-100 dark:bg-dark-bg flex items-center justify-center text-slate-400 group-hover:bg-primary group-hover:text-white transition-all duration-200">
-                      <ArrowRight size={16} weight="bold" />
+                    <ArrowRight size={16} weight="bold" />
                   </div>
                 </button>
 
@@ -302,14 +303,14 @@ const HomeView: React.FC<HomeViewProps> = ({
                   </button>
                 )}
               </div>
-              
+
               <div className="flex items-center justify-center gap-6">
-                 <div className="flex items-center gap-1.5 text-xs text-slate-400 dark:text-dark-muted">
-                    <Sparkle size={11} weight="duotone" className="text-amber-500" /> Multi-Language
-                 </div>
-                 <div className="flex items-center gap-1.5 text-xs text-slate-400 dark:text-dark-muted">
-                    <Sparkle size={11} weight="duotone" className="text-primary" /> Auto-Save
-                 </div>
+                <div className="flex items-center gap-1.5 text-xs text-slate-400 dark:text-dark-muted">
+                  <Sparkle size={11} weight="duotone" className="text-amber-500" /> Multi-Language
+                </div>
+                <div className="flex items-center gap-1.5 text-xs text-slate-400 dark:text-dark-muted">
+                  <Sparkle size={11} weight="duotone" className="text-primary" /> Auto-Save
+                </div>
               </div>
             </div>
 
@@ -317,18 +318,18 @@ const HomeView: React.FC<HomeViewProps> = ({
         ) : (
           <div className="animate-in fade-in zoom-in-95 duration-200 max-w-2xl mx-auto w-full">
             <div className="mb-8 flex items-center gap-4">
-                <button 
-                  onClick={() => safeNavigation(() => {
-                    clearAll();
-                    handleWizardReset();
-                  })}
-                  className="flex items-center gap-3 text-slate-400 hover:text-primary dark:hover:text-accent font-bold text-sm transition-all group"
-                >
-                  <div className="p-2 rounded-xl bg-white/50 dark:bg-dark-card/50 border border-white/60 dark:border-white/5  group-hover:scale-110 transition-transform">
-                    <ArrowLeft size={16} weight="bold" />
-                  </div>
-                  <span className="uppercase tracking-widest text-[10px]">Back to Selection</span>
-                </button>
+              <button
+                onClick={() => safeNavigation(() => {
+                  clearAll();
+                  handleWizardReset();
+                })}
+                className="flex items-center gap-3 text-slate-400 hover:text-primary dark:hover:text-accent font-bold text-sm transition-all group"
+              >
+                <div className="p-2 rounded-xl bg-white/50 dark:bg-dark-card/50 border border-white/60 dark:border-white/5  group-hover:scale-110 transition-transform">
+                  <ArrowLeft size={16} weight="bold" />
+                </div>
+                <span className="uppercase tracking-widest text-[10px]">Back to Selection</span>
+              </button>
 
 
               {/* Service Tabs */}
@@ -336,11 +337,10 @@ const HomeView: React.FC<HomeViewProps> = ({
                 <button
                   onClick={() => onNewSession(AudioSource.MICROPHONE)}
 
-                  className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all ${
-                    activeTab === AudioSource.MICROPHONE
+                  className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all ${activeTab === AudioSource.MICROPHONE
                       ? 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20'
                       : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 hover:bg-white/50 dark:hover:bg-dark-card/50'
-                  }`}
+                    }`}
                 >
                   <Microphone size={14} weight="duotone" />
                   <span className="hidden sm:inline">Record</span>
@@ -348,23 +348,30 @@ const HomeView: React.FC<HomeViewProps> = ({
                 <button
                   onClick={() => onNewSession(AudioSource.FILE)}
 
-                  className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all ${
-                    activeTab === AudioSource.FILE
+                  className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all ${activeTab === AudioSource.FILE
                       ? 'bg-accent/10 text-accent border border-accent/20'
                       : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 hover:bg-white/50 dark:hover:bg-dark-card/50'
-                  }`}
+                    }`}
                 >
                   <UploadSimple size={14} weight="duotone" />
                   <span className="hidden sm:inline">Upload</span>
                 </button>
                 <button
+                  onClick={() => onNewSession(AudioSource.DRIVE)}
+                  className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all ${activeTab === AudioSource.DRIVE
+                      ? 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20'
+                      : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 hover:bg-white/50 dark:hover:bg-dark-card/50'
+                    }`}
+                >
+                  <HardDrive size={14} weight="duotone" />
+                  <span className="hidden sm:inline">Drive</span>
+                </button>
+                <button
                   onClick={() => onNewSession(AudioSource.URL)}
-
-                  className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all ${
-                    activeTab === AudioSource.URL
+                  className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all ${activeTab === AudioSource.URL
                       ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20'
                       : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 hover:bg-white/50 dark:hover:bg-dark-card/50'
-                  }`}
+                    }`}
                 >
                   <Link size={14} weight="duotone" />
                   <span className="hidden sm:inline">URL</span>
@@ -373,200 +380,254 @@ const HomeView: React.FC<HomeViewProps> = ({
             </div>
 
             <div className="glass-card rounded-[3rem] overflow-hidden">
-               <div className="p-10 sm:p-14 min-h-[480px] flex flex-col relative">
-                  {/* Decorative Glow */}
-                  <div className="absolute top-0 left-1/2 -translate-x-1/2 w-64 h-24 bg-primary/20 blur-[60px] rounded-full -z-10"></div>
-                  
-                  <div className="mb-12 text-center space-y-2">
-                    <h3 className="text-3xl font-extrabold text-slate-900 dark:text-white tracking-tight">
-                      {activeTab === AudioSource.MICROPHONE && "Record New Session"}
-                      {activeTab === AudioSource.FILE && "Upload Media"}
-                      {activeTab === AudioSource.URL && "Remote Import"}
-                    </h3>
-                    <p className="text-xs text-slate-400 dark:text-dark-muted font-bold uppercase tracking-widest">
-                       Prepare your transcription settings
-                    </p>
-                  </div>
+              <div className="p-10 sm:p-14 min-h-[480px] flex flex-col relative">
+                {/* Decorative Glow */}
+                <div className="absolute top-0 left-1/2 -translate-x-1/2 w-64 h-24 bg-primary/20 blur-[60px] rounded-full -z-10"></div>
 
-                   <div className="flex-1 flex flex-col justify-center items-center relative z-10">
-                     {wizardStep === 'source' && activeTab === AudioSource.MICROPHONE && (
-                       <div className="flex flex-col gap-4">
-                         <AudioRecorder 
-                           onRecordingComplete={(blob, liveText) => {
-                             const previewUrl = URL.createObjectURL(blob);
-                             const audioFile: AudioFile = {
-                               file: new File([blob], 'recording.webm', { type: blob.type || 'audio/webm' }),
-                               previewUrl,
-                               base64: null,
-                               mimeType: blob.type || 'audio/webm'
-                             };
-                             setRecordedBlob(blob);
-                             setMicUrl(previewUrl);
-                             if (liveText) {
-                               setTranscription(prev => ({ 
-                                 ...prev,
-                                 isLoading: false, 
-                                 text: `**Live Intelligence Transcription**\n\n---\n\n${liveText}`, 
-                                 error: null 
-                               }));
-                               setContentType("Live Session");
-                             }
-                             moveToPreview(audioFile, AudioSource.MICROPHONE);
-                           }}
-                           isTranscribing={false}
-                           mode={transcriptionMode}
-                         />
-                         {!isWebSpeechSupported && (
-                           <div className="flex items-start gap-3 rounded-2xl border border-amber-200/70 bg-amber-50/80 px-4 py-3 text-amber-800 text-xs font-medium">
-                             <WarningCircle size={18} weight="duotone" className="text-amber-500" />
-                             <div>
-                               Live transcription isn’t supported in this browser. You can still record and upload audio.
-                             </div>
-                           </div>
-                         )}
-                       </div>
-                     )}
+                <div className="mb-12 text-center space-y-2">
+                  <h3 className="text-3xl font-extrabold text-slate-900 dark:text-white tracking-tight">
+                    {activeTab === AudioSource.MICROPHONE && "Record New Session"}
+                    {activeTab === AudioSource.FILE && "Upload Media"}
+                    {activeTab === AudioSource.DRIVE && "Google Drive Import"}
+                    {activeTab === AudioSource.URL && "Public Link Import"}
+                  </h3>
+                  <p className="text-xs text-slate-400 dark:text-dark-muted font-bold uppercase tracking-widest">
+                    Prepare your transcription settings
+                  </p>
+                </div>
 
-                     {wizardStep === 'source' && activeTab === AudioSource.FILE && (
-                       <FileUploader 
-                         onFileSelected={(file) => {
-                           setUploadedFile(file);
-                           moveToPreview(file, AudioSource.FILE);
-                         }}
-                         selectedFile={uploadedFile}
-                         onClear={() => setUploadedFile(null)}
-                         isLoading={false}
-                       />
-                     )}
-
-                     {wizardStep === 'source' && activeTab === AudioSource.URL && (
-                        <UrlLoader 
-                           onFileLoaded={(file) => {
-                             setUploadedFile(file);
-                             moveToPreview(file, AudioSource.URL);
-                           }}
-                           isLoading={false}
-                           googleAccessToken={googleAccessToken}
-                           clientId={googleClientId}
-                           onGoogleLogin={handleGoogleLogin}
-                           isLoggingIn={isLoggingIn}
-                        />
-                     )}
-
-                      {wizardStep === 'review' && previewFile && (
-                        <div className="flex flex-col gap-8 w-full">
-                          <div className="w-full max-w-md mx-auto flex flex-col gap-6">
-                            <div className="rounded-3xl border border-slate-200 dark:border-white/10 bg-white/70 dark:bg-dark-card/60 p-5">
-                              <div className="text-xs font-bold uppercase tracking-widest text-slate-400">Preview</div>
-                              <div className="mt-4 flex items-center gap-4">
-                                <div className="w-12 h-12 rounded-2xl bg-slate-100 dark:bg-dark-bg flex items-center justify-center text-slate-500">
-                                  {React.createElement(getPreviewIcon(), { size: 20, weight: 'duotone' })}
-                                </div>
-                                <div>
-                                  <div className="text-sm font-bold text-slate-800 dark:text-white">
-                                    {previewFile.file?.name || 'Recorded Audio'}
-                                  </div>
-                                  <div className="text-[10px] text-slate-400">
-                                    {previewFile.file?.type || previewFile.mimeType || 'audio'}
-                                  </div>
-                                </div>
-                              </div>
-                              <audio className="mt-4 w-full" controls src={previewFile.previewUrl} />
-                            </div>
-                            {wizardError && (
-                              <div className="rounded-3xl border border-red-200 dark:border-red-500/30 bg-red-50/80 dark:bg-red-500/10 p-4 text-xs text-red-600 dark:text-red-300 font-semibold">
-                                {wizardError}
-                              </div>
-                            )}
-                          </div>
-
-                          <div className="flex flex-col gap-4 max-w-sm mx-auto w-full">
-                            <div className="flex flex-col gap-4 max-w-sm mx-auto p-4 rounded-3xl bg-white/40 dark:bg-black/20 border border-white/20  backdrop-blur-md transition-all">
-                              <div className="grid grid-cols-2 gap-2 p-1 bg-slate-200/50 dark:bg-white/5 rounded-2xl border border-transparent dark:border-white/5">
-                              <button
-                                onClick={() => setTranscriptionMode('verbatim')}
-                                className={`flex flex-col items-center justify-center py-4 px-2 rounded-xl transition-all duration-300 ${transcriptionMode === 'verbatim' ? 'bg-white dark:bg-dark-card text-primary dark:text-accent  border border-primary/20 scale-[1.02]' : 'text-slate-500 hover:text-primary dark:text-slate-400 dark:hover:text-accent hover:bg-primary/5'}`}
-                              >
-
-                                  <Lightning size={24} weight={transcriptionMode === 'verbatim' ? "duotone" : "regular"} className="mb-2" />
-                                  <span className="font-bold text-sm">Verbatim</span>
-                                  <span className="text-[10px] opacity-60 mt-0.5">Exact Words</span>
-                                </button>
-                              <button
-                                  onClick={() => setTranscriptionMode('polish')}
-                                  className={`flex flex-col items-center justify-center py-4 px-2 rounded-xl transition-all duration-300 ${transcriptionMode === 'polish' ? 'bg-white dark:bg-dark-card text-primary dark:text-accent  border border-primary/20 scale-[1.02]' : 'text-slate-500 hover:text-primary dark:text-slate-400 dark:hover:text-accent hover:bg-primary/5'}`}
-                              >
-
-                                  <Sparkle size={24} weight={transcriptionMode === 'polish' ? "duotone" : "regular"} className="mb-2" />
-                                  <span className="font-bold text-sm">Polish</span>
-                                  <span className="text-[10px] opacity-60 mt-0.5">Smart Edit</span>
-                                </button>
-                              </div>
-
-                              <div className="text-center px-2 min-h-[40px] flex items-center justify-center">
-                                <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
-                                  {transcriptionMode === 'verbatim' 
-                                    ? "Captures every utterance, stutter, and filler word for a 100% literal transcript." 
-                                    : "Smooths out grammar, removes fillers, and formats text while keeping the original meaning."}
-                                </p>
-                              </div>
-
-                              <div className="flex flex-col gap-2">
-                                <button 
-                                  onClick={() => setIsSpeakerDetectEnabled(!isSpeakerDetectEnabled)}
-                                  className={`flex items-center justify-between p-3 rounded-xl border transition-all ${isSpeakerDetectEnabled ? 'bg-primary/5 border-primary/30' : 'bg-transparent border-slate-200 dark:border-white/10 opacity-70 hover:opacity-100 hover:border-primary/30'}`}
-                                >
-                                  <div className="flex items-center gap-3">
-                                    <div className={`w-8 h-8 rounded-full flex items-center justify-center ${isSpeakerDetectEnabled ? 'bg-primary/10 text-primary' : 'bg-slate-100 dark:bg-white/10'}`}>
-                                      <Users size={16} weight="duotone" />
-                                    </div>
-                                    <div className="text-left">
-                                      <div className="text-xs font-bold text-slate-700 dark:text-slate-200">Speaker Labels</div>
-                                      <div className="text-[10px] text-slate-500">{isSpeakerDetectEnabled ? "Identifying distinct voices" : "Generalized labeling"}</div>
-                                    </div>
-                                  </div>
-                                  <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center transition-all ${isSpeakerDetectEnabled ? 'border-primary bg-primary' : 'border-slate-300 dark:border-slate-600'}`}>
-                                    {isSpeakerDetectEnabled && <Check size={10} color="white" weight="bold" />}
-                                  </div>
-                                </button>
-
-                                {transcriptionMode === 'polish' && (
-                                  <button 
-                                    onClick={() => setIsDeepThinking(!isDeepThinking)}
-                                    className={`flex items-center justify-between p-3 rounded-xl border transition-all animate-in fade-in slide-in-from-top-2 ${isDeepThinking ? 'bg-purple-500/5 border-purple-500/30' : 'bg-transparent border-slate-200 dark:border-white/10 opacity-70 hover:opacity-100 hover:border-purple-500/30'}`}
-                                  >
-                                    <div className="flex items-center gap-3">
-                                      <div className={`w-8 h-8 rounded-full flex items-center justify-center ${isDeepThinking ? 'bg-purple-500/10 text-purple-600' : 'bg-slate-100 dark:bg-white/10'}`}>
-                                        <Brain size={16} weight="duotone" />
-                                      </div>
-                                      <div className="text-left">
-                                        <div className="text-xs font-bold text-slate-700 dark:text-slate-200">Deep Inference</div>
-                                        <div className="text-[10px] text-slate-500">Elevated analysis quality</div>
-                                      </div>
-                                    </div>
-                                    <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center transition-all ${isDeepThinking ? 'border-purple-500 bg-purple-500' : 'border-slate-300 dark:border-slate-600'}`}>
-                                      {isDeepThinking && <Check size={10} color="white" weight="bold" />}
-                                    </div>
-                                  </button>
-                                )}
-                              </div>
-                            </div>
-
-                            <div className="flex items-center">
-                              <button
-                                type="button"
-                                onClick={handleWizardTranscribe}
-                                className="w-full py-3 rounded-2xl bg-gradient-to-r from-primary via-purple-500 to-accent text-white text-xs font-bold uppercase tracking-widest transition-all duration-300 hover:opacity-90 active:scale-[0.99]"
-                              >
-                                Start Transcription
-                              </button>
-                            </div>
+                <div className="flex-1 flex flex-col justify-center items-center relative z-10">
+                  {wizardStep === 'source' && activeTab === AudioSource.MICROPHONE && (
+                    <div className="flex flex-col gap-4">
+                      <AudioRecorder
+                        onRecordingComplete={(blob, liveText) => {
+                          const previewUrl = URL.createObjectURL(blob);
+                          const audioFile: AudioFile = {
+                            file: new File([blob], 'recording.webm', { type: blob.type || 'audio/webm' }),
+                            previewUrl,
+                            base64: null,
+                            mimeType: blob.type || 'audio/webm'
+                          };
+                          setRecordedBlob(blob);
+                          setMicUrl(previewUrl);
+                          if (liveText) {
+                            setTranscription(prev => ({
+                              ...prev,
+                              isLoading: false,
+                              text: `**Live Intelligence Transcription**\n\n---\n\n${liveText}`,
+                              error: null
+                            }));
+                            setContentType("Live Session");
+                          }
+                          moveToPreview(audioFile, AudioSource.MICROPHONE);
+                        }}
+                        isTranscribing={false}
+                        mode={transcriptionMode}
+                      />
+                      {!isWebSpeechSupported && (
+                        <div className="flex items-start gap-3 rounded-2xl border border-amber-200/70 bg-amber-50/80 px-4 py-3 text-amber-800 text-xs font-medium">
+                          <WarningCircle size={18} weight="duotone" className="text-amber-500" />
+                          <div>
+                            Live transcription isn’t supported in this browser. You can still record and upload audio.
                           </div>
                         </div>
                       )}
-
                     </div>
-                  </div>
+                  )}
+
+                  {wizardStep === 'source' && activeTab === AudioSource.FILE && (
+                    <FileUploader
+                      onFileSelected={(file) => {
+                        setUploadedFile(file);
+                        moveToPreview(file, AudioSource.FILE);
+                      }}
+                      selectedFile={uploadedFile}
+                      onClear={() => setUploadedFile(null)}
+                      isLoading={false}
+                    />
+                  )}
+
+                  {wizardStep === 'source' && activeTab === AudioSource.DRIVE && (
+                    <div className="flex flex-col items-center gap-6 w-full max-w-sm mx-auto">
+                      {!googleAccessToken ? (
+                        <div className="w-full p-8 bg-slate-50 dark:bg-dark-bg/40 rounded-[2rem] border border-slate-200 dark:border-dark-border text-center">
+                          <div className="w-16 h-16 bg-white dark:bg-dark-card rounded-2xl flex items-center justify-center mx-auto mb-4 border border-slate-100 dark:border-white/5 shadow-sm">
+                            <svg className="w-8 h-8" viewBox="0 0 87.3 78" xmlns="http://www.w3.org/2000/svg">
+                              <path d="m6.6 66.85 3.85 6.65c.8 1.4 1.95 2.5 3.3 3.3l13.75-23.8h-27.5c0 1.55.4 3.1 1.2 4.5z" fill="#0066da" />
+                              <path d="m43.65 25-13.75-23.8c-1.35.8-2.5 1.9-3.3 3.3l-25.4 44a9.06 9.06 0 0 0 -1.2 4.5h27.5z" fill="#00ac47" />
+                              <path d="m73.55 76.8c1.35-.8 2.5-1.9 3.3-3.3l1.6-2.75 7.65-13.25c.8-1.4 1.2-2.95 1.2-4.5h-27.502l5.852 11.5z" fill="#ea4335" />
+                              <path d="m43.65 25 13.75-23.8c-1.35-.8-2.9-1.2-4.5-1.2h-18.5c-1.6 0-3.15.4-4.5 1.2z" fill="#00832d" />
+                              <path d="m59.8 53h-27.5l-13.75 23.8c1.35.8 2.9 1.2 4.5 1.2h50.5c1.6 0 3.15-.4 4.5-1.2z" fill="#2684fc" />
+                              <path d="m73.4 26.5-12.7-22c-.8-1.4-1.95-2.5-3.3-3.3l-13.75 23.8 29.75 51.5c.8-1.4 1.2-2.95 1.2-4.5v-28.5c0-1.55-.4-3.1-1.2-4.5z" fill="#ffba00" />
+                            </svg>
+                          </div>
+                          <h4 className="text-lg font-bold text-slate-900 dark:text-white mb-2">Connect to Drive</h4>
+                          <p className="text-sm text-slate-500 dark:text-dark-muted mb-8">Sign in with your Google account to browse and transcribe your files.</p>
+                          <button
+                            onClick={handleGoogleLogin}
+                            disabled={isLoggingIn}
+                            className="w-full flex items-center justify-center gap-3 bg-white dark:bg-dark-card border border-gray-300 dark:border-dark-border text-gray-700 dark:text-dark-text font-bold py-4 px-6 rounded-2xl hover:bg-gray-50 dark:hover:bg-dark-border transition-all shadow-sm group disabled:opacity-50"
+                          >
+                            {isLoggingIn ? (
+                              <Spinner className="animate-spin text-primary dark:text-accent" size={20} weight="bold" />
+                            ) : (
+                              <GoogleLogo size={20} weight="bold" />
+                            )}
+                            <span>{isLoggingIn ? 'Connecting...' : 'Continue with Google'}</span>
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="w-full flex flex-col items-center">
+                          <button
+                            onClick={() => setIsPickerOpen(true)}
+                            className="w-full max-w-sm py-8 px-6 bg-blue-500 hover:bg-blue-600 text-white rounded-[2rem] shadow-xl shadow-blue-500/20 transition-all flex flex-col items-center gap-4 group"
+                          >
+                            <div className="w-16 h-16 bg-white/20 rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform">
+                              <HardDrive size={32} weight="duotone" />
+                            </div>
+                            <div className="text-center">
+                              <div className="text-xl font-black uppercase tracking-widest">Open Picker</div>
+                              <p className="text-blue-100 text-xs mt-1 font-medium italic">Select audio or video from your Drive</p>
+                            </div>
+                          </button>
+
+                          <div className="mt-8 flex items-center gap-2 text-xs text-slate-400 font-bold uppercase tracking-widest">
+                            <Check size={14} className="text-emerald-500" />
+                            Google Connected
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {wizardStep === 'source' && activeTab === AudioSource.URL && (
+                    <UrlLoader
+                      onFileLoaded={(file) => {
+                        setUploadedFile(file);
+                        moveToPreview(file, AudioSource.URL);
+                      }}
+                      isLoading={false}
+                      googleAccessToken={googleAccessToken}
+                      clientId={googleClientId}
+                      onGoogleLogin={handleGoogleLogin}
+                      isLoggingIn={isLoggingIn}
+                    />
+                  )}
+
+                  {wizardStep === 'review' && previewFile && (
+                    <div className="flex flex-col gap-8 w-full">
+                      <div className="w-full max-w-md mx-auto flex flex-col gap-6">
+                        <div className="rounded-3xl border border-slate-200 dark:border-white/10 bg-white/70 dark:bg-dark-card/60 p-5">
+                          <div className="text-xs font-bold uppercase tracking-widest text-slate-400">Preview</div>
+                          <div className="mt-4 flex items-center gap-4">
+                            <div className="w-12 h-12 rounded-2xl bg-slate-100 dark:bg-dark-bg flex items-center justify-center text-slate-500">
+                              {React.createElement(getPreviewIcon(), { size: 20, weight: 'duotone' })}
+                            </div>
+                            <div>
+                              <div className="text-sm font-bold text-slate-800 dark:text-white">
+                                {previewFile.file?.name || 'Recorded Audio'}
+                              </div>
+                              <div className="text-[10px] text-slate-400">
+                                {previewFile.file?.type || previewFile.mimeType || 'audio'}
+                              </div>
+                            </div>
+                          </div>
+                          <audio className="mt-4 w-full" controls src={previewFile.previewUrl} />
+                        </div>
+                        {wizardError && (
+                          <div className="rounded-3xl border border-red-200 dark:border-red-500/30 bg-red-50/80 dark:bg-red-500/10 p-4 text-xs text-red-600 dark:text-red-300 font-semibold">
+                            {wizardError}
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="flex flex-col gap-4 max-w-sm mx-auto w-full">
+                        <div className="flex flex-col gap-4 max-w-sm mx-auto p-4 rounded-3xl bg-white/40 dark:bg-black/20 border border-white/20  backdrop-blur-md transition-all">
+                          <div className="grid grid-cols-2 gap-2 p-1 bg-slate-200/50 dark:bg-white/5 rounded-2xl border border-transparent dark:border-white/5">
+                            <button
+                              onClick={() => setTranscriptionMode('verbatim')}
+                              className={`flex flex-col items-center justify-center py-4 px-2 rounded-xl transition-all duration-300 ${transcriptionMode === 'verbatim' ? 'bg-white dark:bg-dark-card text-primary dark:text-accent  border border-primary/20 scale-[1.02]' : 'text-slate-500 hover:text-primary dark:text-slate-400 dark:hover:text-accent hover:bg-primary/5'}`}
+                            >
+
+                              <Lightning size={24} weight={transcriptionMode === 'verbatim' ? "duotone" : "regular"} className="mb-2" />
+                              <span className="font-bold text-sm">Verbatim</span>
+                              <span className="text-[10px] opacity-60 mt-0.5">Exact Words</span>
+                            </button>
+                            <button
+                              onClick={() => setTranscriptionMode('polish')}
+                              className={`flex flex-col items-center justify-center py-4 px-2 rounded-xl transition-all duration-300 ${transcriptionMode === 'polish' ? 'bg-white dark:bg-dark-card text-primary dark:text-accent  border border-primary/20 scale-[1.02]' : 'text-slate-500 hover:text-primary dark:text-slate-400 dark:hover:text-accent hover:bg-primary/5'}`}
+                            >
+
+                              <Sparkle size={24} weight={transcriptionMode === 'polish' ? "duotone" : "regular"} className="mb-2" />
+                              <span className="font-bold text-sm">Polish</span>
+                              <span className="text-[10px] opacity-60 mt-0.5">Smart Edit</span>
+                            </button>
+                          </div>
+
+                          <div className="text-center px-2 min-h-[40px] flex items-center justify-center">
+                            <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
+                              {transcriptionMode === 'verbatim'
+                                ? "Captures every utterance, stutter, and filler word for a 100% literal transcript."
+                                : "Smooths out grammar, removes fillers, and formats text while keeping the original meaning."}
+                            </p>
+                          </div>
+
+                          <div className="flex flex-col gap-2">
+                            <button
+                              onClick={() => setIsSpeakerDetectEnabled(!isSpeakerDetectEnabled)}
+                              className={`flex items-center justify-between p-3 rounded-xl border transition-all ${isSpeakerDetectEnabled ? 'bg-primary/5 border-primary/30' : 'bg-transparent border-slate-200 dark:border-white/10 opacity-70 hover:opacity-100 hover:border-primary/30'}`}
+                            >
+                              <div className="flex items-center gap-3">
+                                <div className={`w-8 h-8 rounded-full flex items-center justify-center ${isSpeakerDetectEnabled ? 'bg-primary/10 text-primary' : 'bg-slate-100 dark:bg-white/10'}`}>
+                                  <Users size={16} weight="duotone" />
+                                </div>
+                                <div className="text-left">
+                                  <div className="text-xs font-bold text-slate-700 dark:text-slate-200">Speaker Labels</div>
+                                  <div className="text-[10px] text-slate-500">{isSpeakerDetectEnabled ? "Identifying distinct voices" : "Generalized labeling"}</div>
+                                </div>
+                              </div>
+                              <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center transition-all ${isSpeakerDetectEnabled ? 'border-primary bg-primary' : 'border-slate-300 dark:border-slate-600'}`}>
+                                {isSpeakerDetectEnabled && <Check size={10} color="white" weight="bold" />}
+                              </div>
+                            </button>
+
+                            {transcriptionMode === 'polish' && (
+                              <button
+                                onClick={() => setIsDeepThinking(!isDeepThinking)}
+                                className={`flex items-center justify-between p-3 rounded-xl border transition-all animate-in fade-in slide-in-from-top-2 ${isDeepThinking ? 'bg-purple-500/5 border-purple-500/30' : 'bg-transparent border-slate-200 dark:border-white/10 opacity-70 hover:opacity-100 hover:border-purple-500/30'}`}
+                              >
+                                <div className="flex items-center gap-3">
+                                  <div className={`w-8 h-8 rounded-full flex items-center justify-center ${isDeepThinking ? 'bg-purple-500/10 text-purple-600' : 'bg-slate-100 dark:bg-white/10'}`}>
+                                    <Brain size={16} weight="duotone" />
+                                  </div>
+                                  <div className="text-left">
+                                    <div className="text-xs font-bold text-slate-700 dark:text-slate-200">Deep Inference</div>
+                                    <div className="text-[10px] text-slate-500">Elevated analysis quality</div>
+                                  </div>
+                                </div>
+                                <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center transition-all ${isDeepThinking ? 'border-purple-500 bg-purple-500' : 'border-slate-300 dark:border-slate-600'}`}>
+                                  {isDeepThinking && <Check size={10} color="white" weight="bold" />}
+                                </div>
+                              </button>
+                            )}
+                          </div>
+                        </div>
+
+                        <div className="flex items-center">
+                          <button
+                            type="button"
+                            onClick={handleWizardTranscribe}
+                            className="w-full py-3 rounded-2xl bg-gradient-to-r from-primary via-purple-500 to-accent text-white text-xs font-bold uppercase tracking-widest transition-all duration-300 hover:opacity-90 active:scale-[0.99]"
+                          >
+                            Start Transcription
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                </div>
+              </div>
             </div>
           </div>
         )}
@@ -577,22 +638,22 @@ const HomeView: React.FC<HomeViewProps> = ({
         {transcriptionError && (
           <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[100] animate-in slide-in-from-bottom-5 fade-in duration-300">
             <div className="bg-red-50 dark:bg-red-900/90 text-red-900 dark:text-red-100 px-6 py-4 rounded-2xl border border-red-100 dark:border-red-800 shadow-2xl flex items-center gap-4 backdrop-blur-xl">
-                <div className={`${transcriptionError.includes('Quota') ? 'bg-amber-100 dark:bg-amber-900 border border-amber-200 dark:border-amber-800 text-amber-600 dark:text-amber-200' : 'bg-red-100 dark:bg-red-800 text-red-600 dark:text-red-200'} p-2.5 rounded-2xl min-w-[42px] min-h-[42px] flex items-center justify-center `}>
-                 {transcriptionError.includes('Quota') ? <Clock size={22} weight="duotone" className="animate-pulse" /> : <Info size={22} weight="duotone" />}
-               </div>
-               <div className="flex-1">
-                  <h4 className={`font-black text-sm uppercase tracking-wider ${transcriptionError.includes('Quota') ? 'text-amber-700 dark:text-amber-300' : 'text-red-900 dark:text-red-100'}`}>
-                    {transcriptionError.includes('Quota') ? 'Engine Resting' : 'Transcription Failed'}
-                  </h4>
-                  <p className="text-[11px] font-medium opacity-80 mt-1 max-w-[280px] leading-relaxed tracking-tight">{transcriptionError}</p>
-               </div>
-               <button 
-                  onClick={() => setTranscription(prev => ({...prev, error: null}))} 
-                  className="ml-2 hover:bg-red-100 dark:hover:bg-red-800 p-2 rounded-full transition-colors cursor-pointer active:scale-95 flex-shrink-0 relative z-50"
-                  title="Dismiss"
-                >
-                  <X size={18} weight="bold" />
-                </button>
+              <div className={`${transcriptionError.includes('Quota') ? 'bg-amber-100 dark:bg-amber-900 border border-amber-200 dark:border-amber-800 text-amber-600 dark:text-amber-200' : 'bg-red-100 dark:bg-red-800 text-red-600 dark:text-red-200'} p-2.5 rounded-2xl min-w-[42px] min-h-[42px] flex items-center justify-center `}>
+                {transcriptionError.includes('Quota') ? <Clock size={22} weight="duotone" className="animate-pulse" /> : <Info size={22} weight="duotone" />}
+              </div>
+              <div className="flex-1">
+                <h4 className={`font-black text-sm uppercase tracking-wider ${transcriptionError.includes('Quota') ? 'text-amber-700 dark:text-amber-300' : 'text-red-900 dark:text-red-100'}`}>
+                  {transcriptionError.includes('Quota') ? 'Engine Resting' : 'Transcription Failed'}
+                </h4>
+                <p className="text-[11px] font-medium opacity-80 mt-1 max-w-[280px] leading-relaxed tracking-tight">{transcriptionError}</p>
+              </div>
+              <button
+                onClick={() => setTranscription(prev => ({ ...prev, error: null }))}
+                className="ml-2 hover:bg-red-100 dark:hover:bg-red-800 p-2 rounded-full transition-colors cursor-pointer active:scale-95 flex-shrink-0 relative z-50"
+                title="Dismiss"
+              >
+                <X size={18} weight="bold" />
+              </button>
             </div>
           </div>
         )}

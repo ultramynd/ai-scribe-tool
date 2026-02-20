@@ -23,9 +23,18 @@ export const useGoogleDriveAuth = (googleClientId?: string) => {
   }, [googleAccessToken]);
 
   const handleGoogleLogin = useCallback(() => {
-    if (!googleClientId || !driveScriptsLoaded) return;
+    if (!googleClientId) {
+      console.warn('[DriveAuth] Google Drive is disabled because VITE_GOOGLE_CLIENT_ID is missing.');
+      return;
+    }
+    if (!driveScriptsLoaded) return;
     setIsLoggingIn(true);
     const google = (window as any).google;
+    if (!google?.accounts?.oauth2) {
+      setIsLoggingIn(false);
+      console.warn('[DriveAuth] Google OAuth client SDK is not loaded yet.');
+      return;
+    }
 
     try {
       if (!tokenClientRef.current) {

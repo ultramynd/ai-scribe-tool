@@ -170,7 +170,7 @@ export const useTranscriptionFlow = ({
         if (!resolvedRecordedBlob) throw new Error('No recording found.');
         mediaBlob = resolvedRecordedBlob;
         mimeType = resolvedRecordedBlob.type;
-      } else if (resolvedSource === AudioSource.FILE || resolvedSource === AudioSource.URL) {
+      } else if (resolvedSource === AudioSource.FILE || resolvedSource === AudioSource.URL || resolvedSource === AudioSource.DRIVE) {
         if (!resolvedUploadedFile?.file) throw new Error('No file selected.');
         mediaBlob = resolvedUploadedFile.file;
         mimeType = resolvedUploadedFile.file.type || '';
@@ -302,7 +302,7 @@ export const useTranscriptionFlow = ({
   const isReadyToTranscribe = useCallback(() => {
     if (transcription.isLoading) return false;
     if (activeTab === AudioSource.MICROPHONE) return !!recordedBlob;
-    if (activeTab === AudioSource.FILE || activeTab === AudioSource.URL) return !!uploadedFile;
+    if (activeTab === AudioSource.FILE || activeTab === AudioSource.URL || activeTab === AudioSource.DRIVE) return !!uploadedFile;
     return false;
   }, [activeTab, recordedBlob, transcription.isLoading, uploadedFile]);
 

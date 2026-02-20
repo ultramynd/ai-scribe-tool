@@ -1,114 +1,196 @@
-const RATE_LIMIT_WINDOW_MS = 60_000;
-const RATE_LIMIT_MAX = 30;
+import { sendError, getUpstreamErrorMessage } from './_lib/errors';
+import { callGeminiWithFallback } from './_lib/gemini';
+import { applyBaseHeaders, getClientIp, getHeader, parseBody, resolveRequestId } from './_lib/http';
+import { logApiEvent } from './_lib/observability';
+import { enforceOriginPolicy } from './_lib/origin';
+import { checkRateLimit } from './_lib/rateLimit';
+import type { ApiRequestLike, ApiResponseLike } from './_lib/types';
+import { sanitizeDisplayName, validateMimeType, validateUploadSize } from './_lib/validation';
 
-const rateLimits = new Map<string, { count: number; resetAt: number }>();
+export default async function handler(req: ApiRequestLike, res: ApiResponseLike) {
+  const startedAt = Date.now();
+  const requestId = resolveRequestId(getHeader(req, 'x-request-id'));
+  const originCheck = enforceOriginPolicy(req);
 
-const getClientIp = (req: any) => {
-  const forwarded = req.headers?.['x-forwarded-for'];
-  if (typeof forwarded === 'string' && forwarded.length > 0) {
-    return forwarded.split(',')[0].trim();
-  }
-  return req.socket?.remoteAddress || 'unknown';
-};
-
-const isRateLimited = (ip: string) => {
-  const now = Date.now();
-  const record = rateLimits.get(ip);
-  if (!record || now > record.resetAt) {
-    rateLimits.set(ip, { count: 1, resetAt: now + RATE_LIMIT_WINDOW_MS });
-    return false;
-  }
-  record.count += 1;
-  return record.count > RATE_LIMIT_MAX;
-};
-
-const parseBody = (body: any) => {
-  if (!body) return null;
-  if (typeof body === 'string') {
-    try {
-      return JSON.parse(body);
-    } catch {
-      return null;
-    }
-  }
-  return body;
-};
-
-const startUploadSession = async (apiKey: string, displayName: string, mimeType: string, size: number) => {
-  const uploadUrl = `https://generativelanguage.googleapis.com/upload/v1beta/files?key=${apiKey}`;
-  return fetch(uploadUrl, {
-    method: 'POST',
-    headers: {
-      'X-Goog-Upload-Protocol': 'resumable',
-      'X-Goog-Upload-Command': 'start',
-      'X-Goog-Upload-Header-Content-Length': size.toString(),
-      'X-Goog-Upload-Header-Content-Type': mimeType,
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify({ file: { display_name: displayName, mime_type: mimeType } })
+  applyBaseHeaders(res, {
+    requestId,
+    allowedOrigin: originCheck.allowOrigin,
+    allowMethods: 'POST, OPTIONS'
   });
-};
-
-export default async function handler(req: any, res: any) {
-  res.setHeader('Cache-Control', 'no-store');
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 
   if (req.method === 'OPTIONS') {
-    res.status(200).end();
+    if (!originCheck.ok) {
+      sendError(res, {
+        status: 403,
+        code: originCheck.code || 'origin_not_allowed',
+        message: originCheck.reason || 'Origin is not allowed.',
+        requestId
+      });
+      return;
+    }
+
+    res.status(204).end();
     return;
   }
 
-  if (req.method !== 'POST') {
-    res.status(405).json({ error: 'Method not allowed' });
-    return;
-  }
-
-  const body = parseBody(req.body);
-  const displayName = body?.displayName || 'uploaded_media';
-  const mimeType = body?.mimeType;
-  const size = Number(body?.size || 0);
-
-  if (!mimeType || !size) {
-    res.status(400).json({ error: 'Missing mimeType or size.' });
-    return;
-  }
-
-  const ip = getClientIp(req);
-  if (isRateLimited(ip)) {
-    res.status(429).json({ error: 'Rate limit exceeded.' });
-    return;
-  }
-
-  const apiKey = process.env.GEMINI_API_KEY;
-  const fallbackKey = process.env.GEMINI_API_KEY_FALLBACK;
-
-  if (!apiKey) {
-    res.status(500).json({ error: 'Missing GEMINI_API_KEY server secret.' });
-    return;
-  }
+  let finalStatus = 500;
+  let upstreamStatus: number | undefined;
+  let usedFallbackKey = false;
+  let rateLimitBackend: 'redis' | 'memory' | undefined;
 
   try {
-    let response = await startUploadSession(apiKey, displayName, mimeType, size);
-
-    if (!response.ok && fallbackKey && (response.status === 429 || response.status >= 500)) {
-      response = await startUploadSession(fallbackKey, displayName, mimeType, size);
-    }
-
-    if (!response.ok) {
-      const text = await response.text();
-      res.status(response.status).json({ error: text });
+    if (!originCheck.ok) {
+      finalStatus = 403;
+      sendError(res, {
+        status: 403,
+        code: originCheck.code || 'origin_not_allowed',
+        message: originCheck.reason || 'Origin is not allowed.',
+        requestId
+      });
       return;
     }
 
-    const uploadUrl = response.headers.get('x-goog-upload-url');
+    if (req.method !== 'POST') {
+      finalStatus = 405;
+      sendError(res, {
+        status: 405,
+        code: 'method_not_allowed',
+        message: 'Method not allowed.',
+        requestId
+      });
+      return;
+    }
+
+    const body = parseBody(req.body);
+    if (!body) {
+      finalStatus = 400;
+      sendError(res, {
+        status: 400,
+        code: 'invalid_json',
+        message: 'Request body must be valid JSON.',
+        requestId
+      });
+      return;
+    }
+
+    const mimeTypeResult = validateMimeType((body as any).mimeType);
+    if (!mimeTypeResult.ok) {
+      finalStatus = 400;
+      const mimeTypeMessage = 'message' in mimeTypeResult ? mimeTypeResult.message : 'mimeType is invalid.';
+      sendError(res, {
+        status: 400,
+        code: 'invalid_mime_type',
+        message: mimeTypeMessage,
+        requestId
+      });
+      return;
+    }
+
+    const sizeResult = validateUploadSize((body as any).size);
+    if (!sizeResult.ok) {
+      finalStatus = 413;
+      const sizeMessage = 'message' in sizeResult ? sizeResult.message : 'size is invalid.';
+      sendError(res, {
+        status: 413,
+        code: 'invalid_size',
+        message: sizeMessage,
+        requestId
+      });
+      return;
+    }
+
+    const displayName = sanitizeDisplayName((body as any).displayName);
+
+    const rateLimit = await checkRateLimit({
+      key: `gemini-upload-init:${getClientIp(req)}`,
+      limit: Number(process.env.RATE_LIMIT_UPLOAD_MAX || 30),
+      windowSeconds: Number(process.env.RATE_LIMIT_UPLOAD_WINDOW_SECONDS || 60),
+      prefix: process.env.RATE_LIMIT_PREFIX || 'scrybe'
+    });
+    rateLimitBackend = rateLimit.backend;
+
+    if (!rateLimit.allowed) {
+      finalStatus = 429;
+      res.setHeader('Retry-After', String(rateLimit.retryAfterSeconds));
+      sendError(res, {
+        status: 429,
+        code: 'rate_limit_exceeded',
+        message: 'Rate limit exceeded.',
+        requestId,
+        retryAfterSeconds: rateLimit.retryAfterSeconds
+      });
+      return;
+    }
+
+    const upstream = await callGeminiWithFallback({
+      path: '/upload/v1beta/files',
+      method: 'POST',
+      headers: {
+        'X-Goog-Upload-Protocol': 'resumable',
+        'X-Goog-Upload-Command': 'start',
+        'X-Goog-Upload-Header-Content-Length': String(sizeResult.value),
+        'X-Goog-Upload-Header-Content-Type': mimeTypeResult.value,
+        'Content-Type': 'application/json',
+        'X-Request-Id': requestId
+      },
+      body: JSON.stringify({
+        file: {
+          display_name: displayName,
+          mime_type: mimeTypeResult.value
+        }
+      })
+    });
+
+    usedFallbackKey = upstream.usedFallback;
+    upstreamStatus = upstream.response.status;
+
+    const upstreamText = await upstream.response.text();
+    if (!upstream.response.ok) {
+      finalStatus = upstream.response.status;
+      const retryAfter = Number(upstream.response.headers.get('retry-after') || 0);
+
+      sendError(res, {
+        status: upstream.response.status,
+        code: 'upstream_error',
+        message: getUpstreamErrorMessage(upstreamText, 'Failed to initialize upload session.'),
+        requestId,
+        retryAfterSeconds: Number.isFinite(retryAfter) && retryAfter > 0 ? retryAfter : undefined
+      });
+      return;
+    }
+
+    const uploadUrl = upstream.response.headers.get('x-goog-upload-url');
     if (!uploadUrl) {
-      res.status(500).json({ error: 'Missing upload session URL.' });
+      finalStatus = 502;
+      sendError(res, {
+        status: 502,
+        code: 'missing_upload_url',
+        message: 'Upload session URL was not returned by Gemini.',
+        requestId
+      });
       return;
     }
 
-    res.status(200).json({ uploadUrl });
+    finalStatus = 200;
+    res.status(200).json({ uploadUrl, requestId });
   } catch (error: any) {
-    res.status(500).json({ error: error?.message || 'Upload session init failed.' });
+    finalStatus = 500;
+    sendError(res, {
+      status: 500,
+      code: 'proxy_error',
+      message: error?.message || 'Upload session init failed.',
+      requestId
+    });
+  } finally {
+    logApiEvent({
+      endpoint: '/api/gemini-upload-init',
+      method: req.method || 'UNKNOWN',
+      requestId,
+      status: finalStatus,
+      latencyMs: Date.now() - startedAt,
+      rateLimitBackend,
+      usedFallbackKey,
+      upstreamStatus
+    });
   }
 }

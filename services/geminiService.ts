@@ -3,7 +3,41 @@ import { logger } from "../utils/logger";
 import { AI_MODELS, FALLBACK_CONFIG } from "../src/config/aiModels";
 import { getMimeTypeFromExtension } from "../utils/mimeTypes";
 
-const USE_SERVER_PROXY = import.meta.env.VITE_GEMINI_USE_PROXY === 'true';
+const isHostedDeployment = (): boolean => {
+  if (typeof window === 'undefined') return true;
+  const host = window.location.hostname;
+  return host !== 'localhost' && host !== '127.0.0.1';
+};
+
+const resolveProxyPreference = (): boolean => {
+  const envValue = import.meta.env.VITE_GEMINI_USE_PROXY;
+  if (envValue === 'true') return true;
+  if (envValue === 'false') return false;
+  return isHostedDeployment();
+};
+
+const USE_SERVER_PROXY = resolveProxyPreference();
+
+const getProxyErrorMessage = (status: number, text: string, requestId?: string | null): string => {
+  let parsedMessage = text;
+  try {
+    const parsed = JSON.parse(text);
+    parsedMessage =
+      parsed?.error?.message ||
+      parsed?.message ||
+      text;
+  } catch {
+    parsedMessage = text;
+  }
+
+  const requestLabel = requestId ? ` [request ${requestId}]` : '';
+  return `AI Error (${status})${requestLabel}: ${parsedMessage}`;
+};
+
+export const __geminiServiceInternals = {
+  resolveProxyPreference,
+  getProxyErrorMessage
+};
 
 /**
  * Returns the appropriate API key based on the attempt count.
@@ -41,14 +75,15 @@ async function executeGaiRequest(
       try {
         const response = await fetch('/api/gemini', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'application/json', 'X-Request-Id': `ui-${Date.now()}` },
           body: JSON.stringify({ model, payload }),
           signal: controller.signal
         });
 
         const text = await response.text();
         if (!response.ok) {
-          throw new Error(`AI Error (${response.status}): ${text}`);
+          const requestId = response.headers.get('x-request-id');
+          throw new Error(getProxyErrorMessage(response.status, text, requestId));
         }
 
         const data = JSON.parse(text);
@@ -105,7 +140,7 @@ async function executeGaiRequest(
         else onStatus("Connection lost, reconnecting...");
       }
 
-      if (isRateLimited && import.meta.env.VITE_GEMINI_USE_PROXY === 'true') {
+      if (isRateLimited && USE_SERVER_PROXY) {
         const minutes = isLastDitch ? 3 : 2;
         onStatus?.(`Cooling down for ${minutes} minutes...`, 60);
         await new Promise(r => setTimeout(r, minutes * 60 * 1000));
@@ -146,7 +181,7 @@ const uploadFileToGemini = async (
       if (USE_SERVER_PROXY) {
         const response = await fetch('/api/gemini-upload-init', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'application/json', 'X-Request-Id': `ui-upload-${Date.now()}` },
           body: JSON.stringify({
             displayName,
             mimeType,
@@ -160,7 +195,8 @@ const uploadFileToGemini = async (
 
         if (!response.ok) {
           const text = await response.text();
-          throw new Error(`Upload Session Init Failed (${response.status}): ${text}`);
+          const requestId = response.headers.get('x-request-id');
+          throw new Error(getProxyErrorMessage(response.status, text, requestId));
         }
 
         const data = await response.json();
@@ -261,13 +297,14 @@ const uploadFileToGemini = async (
           ? await (async () => {
             const response = await fetch('/api/gemini-poll', {
               method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
+              headers: { 'Content-Type': 'application/json', 'X-Request-Id': `ui-poll-${Date.now()}` },
               body: JSON.stringify({ fileName: pollPath })
             });
 
             if (!response.ok) {
               const text = await response.text();
-              throw new Error(`Polling failed with status: ${response.status} ${text}`);
+              const requestId = response.headers.get('x-request-id');
+              throw new Error(getProxyErrorMessage(response.status, text, requestId));
             }
 
             return response.json();
@@ -312,20 +349,20 @@ const uploadFileToGemini = async (
     throw new Error("Polling timeout: File took too long to process on server. (Max 15 minutes reached)");
   } catch (error: any) {
     logger.error("Upload process failed", error);
-    
+
     // RETRY LOGIC: Handle 429 (Quota), Network Errors, and Timeouts
     const msg = error.message.toLowerCase();
-    const isRetryable = msg.includes('429') || 
-                        msg.includes('network') || 
-                        msg.includes('xhr') || 
-                        msg.includes('timeout') || 
-                        msg.includes('fetch') ||
-                        msg.includes('503') ||
-                        msg.includes('500');
+    const isRetryable = msg.includes('429') ||
+      msg.includes('network') ||
+      msg.includes('xhr') ||
+      msg.includes('timeout') ||
+      msg.includes('fetch') ||
+      msg.includes('503') ||
+      msg.includes('500');
 
     if (isRetryable && attempt < 3) {
       const waitTime = Math.pow(2, attempt) * 2000; // 2s, 4s, 8s backoff
-      onStatus?.(`Connection issue. Retrying upload in ${waitTime/1000}s... (Attempt ${attempt + 1}/3)`, 8);
+      onStatus?.(`Connection issue. Retrying upload in ${waitTime / 1000}s... (Attempt ${attempt + 1}/3)`, 8);
       await new Promise(r => setTimeout(r, waitTime));
       return uploadFileToGemini(mediaFile, mimeType, onStatus, attempt + 1);
     }
@@ -357,7 +394,8 @@ export const transcribeAudio = async (
   }
 
   let contentPart: any;
-  const MAX_INLINE_SIZE = 20 * 1024 * 1024; // 20MB Limit for Inline (Boosted for speed)
+  // Keep proxy payload under serverless body limits by preferring upload mode when proxied.
+  const MAX_INLINE_SIZE = USE_SERVER_PROXY ? 3 * 1024 * 1024 : 20 * 1024 * 1024;
 
   try {
     if (mediaFile.size < MAX_INLINE_SIZE) {
@@ -540,12 +578,16 @@ export const transcribeAudio = async (
     if (msg.includes('api key')) userMessage = "Invalid API Key. Please check your settings.";
     else if (msg.includes('quota') || msg.includes('429')) {
       const now = new Date();
-      // Gemini free-tier quotas typically reset every 60 seconds. 
-      // We estimate 65 seconds from now to be safe.
-      const resetTime = new Date(now.getTime() + 65 * 1000).toLocaleTimeString([], {
-        hour: '2-digit', minute: '2-digit', second: '2-digit'
-      });
-      userMessage = `Daily/Per-Minute Quota Exceeded. You can try again at approximately ${resetTime}.`;
+      if (msg.includes('daily')) {
+        userMessage = "Daily usage limit reached. Gemini free tier has a set amount of requests per day. Please try again tomorrow or check your quota in Google AI Studio (aistudio.google.com/app/plan).";
+      } else {
+        // Per-minute limits (RPM/TPM) reset every 60 seconds.
+        // We add a 75s buffer from the failure time to be safe.
+        const resetTime = new Date(now.getTime() + 75 * 1000).toLocaleTimeString([], {
+          hour: '2-digit', minute: '2-digit', second: '2-digit'
+        });
+        userMessage = `Connection Resting. Per-minute rate limit reached. Please wait for the 60-second cooldown and try again after approximately ${resetTime}.`;
+      }
     }
     else if (msg.includes('network') || msg.includes('fetch')) userMessage = "Network Connection Error. Please check your internet.";
     else if (msg.includes('safety') || msg.includes('blocked')) userMessage = "Content Blocked by AI Safety Filters.";
