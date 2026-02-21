@@ -650,22 +650,6 @@ async function initGeminiUploadSession(
     try {
       const apiKey = getActiveApiKey(currentAttempt);
 
-      if (USE_SERVER_PROXY) {
-        const res = await fetch('/api/gemini-upload-init', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'X-Request-Id': `drive-stream-${Date.now()}-${currentAttempt}` },
-          body: JSON.stringify({ displayName, mimeType, size })
-        });
-        if (!res.ok) {
-          const text = await res.text();
-          const requestId = res.headers.get('x-request-id');
-          throw new Error(getProxyErrorMessage(res.status, text, requestId));
-        }
-        const data = await res.json();
-        if (!data?.uploadUrl) throw new Error('No upload session URL from proxy.');
-        return data.uploadUrl;
-      }
-
       return await new Promise<string>((resolve, reject) => {
         const xhr = new XMLHttpRequest();
         xhr.open('POST', `https://generativelanguage.googleapis.com/upload/v1beta/files?key=${apiKey}`);
