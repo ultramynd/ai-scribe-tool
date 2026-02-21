@@ -25,14 +25,16 @@ interface GoogleFilePickerProps {
 const GoogleFilePicker: React.FC<GoogleFilePickerProps> = ({ accessToken, onSelect, onClose, isOpen }) => {
   const [files, setFiles] = useState<DriveFile[]>([]);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [currentFolder, setCurrentFolder] = useState<{ id: string; name: string } | null>(null);
   const [folderStack, setFolderStack] = useState<{ id: string; name: string }[]>([]);
 
   const fetchFiles = useCallback(async (folderId: string = 'root', query: string = '') => {
     setLoading(true);
+    setError(null);
     try {
-      let q = `trashed = false and (mimeType contains 'audio/' or mimeType contains 'video/' or mimeType contains 'mpeg' or mimeType = 'application/vnd.google-apps.folder' or mimeType = 'application/octet-stream')`;
+      let q = `trashed = false and (mimeType contains 'audio' or mimeType contains 'video' or mimeType = 'application/vnd.google-apps.folder' or mimeType = 'application/octet-stream')`;
       if (folderId !== 'root' || folderStack.length > 0) {
         q = `'${folderId}' in parents and ${q}`;
       } else {
@@ -40,24 +42,25 @@ const GoogleFilePicker: React.FC<GoogleFilePickerProps> = ({ accessToken, onSele
       }
 
       if (query) {
-        q = `name contains '${query}' and trashed = false and (mimeType contains 'audio/' or mimeType contains 'video/' or mimeType = 'application/vnd.google-apps.folder')`;
+        q = `name contains '${query}' and trashed = false and (mimeType contains 'audio' or mimeType contains 'video' or mimeType = 'application/vnd.google-apps.folder')`;
       }
 
       const data = await new Promise<any>((resolve, reject) => {
         const xhr = new XMLHttpRequest();
-        const url = `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(q)}&fields=files(id,name,mimeType,modifiedTime,size,iconLink,thumbnailLink)&pageSize=100&orderBy=folder,name`;
+        const url = `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(q)}&fields=files(id,name,mimeType,modifiedTime,size,iconLink,thumbnailLink)&pageSize=100&orderBy=folder,name&supportsAllDrives=true&includeItemsFromAllDrives=true`;
         xhr.open('GET', url);
         xhr.setRequestHeader('Authorization', `Bearer ${accessToken}`);
         xhr.onload = () => {
           if (xhr.status >= 200 && xhr.status < 300) resolve(JSON.parse(xhr.responseText));
-          else reject(new Error(`Drive fetch failed: ${xhr.status}`));
+          else reject(new Error(`Drive API Error (${xhr.status}): ${xhr.responseText}`));
         };
         xhr.onerror = () => reject(new Error('Network error listing files'));
         xhr.send();
       });
       setFiles(data.files || []);
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
+      setError(err.message || 'Failed to fetch Drive files');
     } finally {
       setLoading(false);
     }
@@ -140,7 +143,13 @@ const GoogleFilePicker: React.FC<GoogleFilePickerProps> = ({ accessToken, onSele
 
         {/* File List */}
         <div className="flex-1 overflow-y-auto p-4 px-6 custom-scrollbar">
-          {loading ? (
+          {error ? (
+            <div className="h-full flex flex-col items-center justify-center p-6 bg-red-50 dark:bg-red-500/10 rounded-2xl border border-red-200 dark:border-red-500/20 max-w-lg mx-auto overflow-y-auto mt-8">
+              <X size={24} className="text-red-500 mb-2" weight="bold" />
+              <h4 className="font-bold text-red-600 dark:text-red-400 mb-2">Drive Error</h4>
+              <pre className="text-xs text-red-500/80 whitespace-pre-wrap font-mono break-all">{error}</pre>
+            </div>
+          ) : loading ? (
             <div className="h-full flex flex-col items-center justify-center text-slate-400 gap-4">
               <Spinner size={32} weight="bold" className="animate-spin text-primary" />
               <p className="text-sm font-medium animate-pulse">Syncing with Google Drive...</p>
@@ -166,8 +175,8 @@ const GoogleFilePicker: React.FC<GoogleFilePickerProps> = ({ accessToken, onSele
                     className="flex items-center gap-4 p-4 rounded-2xl bg-white dark:bg-dark-bg border border-slate-100 dark:border-dark-border hover:border-primary/30 hover:shadow-lg dark:hover:shadow-primary/5 hover:-translate-y-0.5 transition-all text-left group"
                   >
                     <div className={`w-12 h-12 rounded-xl flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform ${isFolder ? 'bg-amber-100 text-amber-600 dark:bg-amber-900/20' :
-                        isAudio ? 'bg-primary/10 text-primary dark:text-accent' :
-                          'bg-purple-100 text-purple-600 dark:bg-purple-900/20'
+                      isAudio ? 'bg-primary/10 text-primary dark:text-accent' :
+                        'bg-purple-100 text-purple-600 dark:bg-purple-900/20'
                       }`}>
                       {isFolder ? <Folder size={24} weight="duotone" /> :
                         isAudio ? <FileAudio size={24} weight="duotone" /> :
