@@ -1,26 +1,16 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
-const GOOGLE_TOKEN_STORAGE_KEY = 'google_access_token';
-
 export const useGoogleDriveAuth = (googleClientId?: string) => {
   const [driveScriptsLoaded, setDriveScriptsLoaded] = useState(false);
-  const [googleAccessToken, setGoogleAccessToken] = useState<string | null>(() =>
-    localStorage.getItem(GOOGLE_TOKEN_STORAGE_KEY)
-  );
+  // Do NOT persist the token to localStorage — Google OAuth tokens expire after 1 hour.
+  // Persisting them causes stale 401 errors when the user returns to the app.
+  const [googleAccessToken, setGoogleAccessToken] = useState<string | null>(null);
   const [isLoggingIn, setIsLoggingIn] = useState(false);
   const tokenClientRef = useRef<any>(null);
 
   useEffect(() => {
     setDriveScriptsLoaded(true);
   }, []);
-
-  useEffect(() => {
-    if (googleAccessToken) {
-      localStorage.setItem(GOOGLE_TOKEN_STORAGE_KEY, googleAccessToken);
-    } else {
-      localStorage.removeItem(GOOGLE_TOKEN_STORAGE_KEY);
-    }
-  }, [googleAccessToken]);
 
   const handleGoogleLogin = useCallback(() => {
     if (!googleClientId) {
@@ -48,7 +38,9 @@ export const useGoogleDriveAuth = (googleClientId?: string) => {
         });
       }
 
-      tokenClientRef.current.requestAccessToken({ prompt: 'consent' });
+      // Use empty prompt so returning users don't have to re-consent every time.
+      // The browser will show a minimal account picker if needed.
+      tokenClientRef.current.requestAccessToken({ prompt: '' });
     } catch (error) {
       setIsLoggingIn(false);
     }
@@ -72,5 +64,3 @@ export const useGoogleDriveAuth = (googleClientId?: string) => {
     setGoogleAccessToken
   };
 };
-
-export { GOOGLE_TOKEN_STORAGE_KEY };

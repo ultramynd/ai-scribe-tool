@@ -517,6 +517,7 @@ const App: React.FC = () => {
             onClose={() => setIsPickerOpen(false)}
             accessToken={googleAccessToken || ''}
             onSelect={handlePickDriveFile}
+            onRelogin={handleGoogleLogin}
           />
         </div>
       </ErrorBoundary>
