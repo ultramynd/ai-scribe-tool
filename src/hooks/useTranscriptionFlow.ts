@@ -184,20 +184,31 @@ export const useTranscriptionFlow = ({
           isEditorMode: false
         });
 
+        const archiveId = Math.random().toString(36).substring(7);
+        setArchiveItems(prev => [{
+          id: archiveId,
+          name: initialTitle,
+          text: '',
+          date: new Date().toLocaleString(),
+          status: 'loading',
+          progress: 0,
+          audioUrl: null
+        }, ...prev]);
+
         const text = await transcribeFromDriveFile(
           driveFileMeta, googleAccessToken, autoEdit,
           isSpeakerDetectEnabled, isDeepThinking,
-          (msg, prg) => updateStatusLog(msg, prg, currentLoadingTabId)
+          (msg, prg) => {
+            updateStatusLog(msg, prg, currentLoadingTabId);
+            setArchiveItems(prev => prev.map(item => item.id === archiveId ? { ...item, progress: prg !== undefined ? prg : Math.min(item.progress + 5, 95) } : item));
+          }
         );
 
         setTabs(prev => prev.map(tab =>
           tab.id === currentLoadingTabId
             ? { ...tab, transcription: { isLoading: false, text, error: null } } : tab
         ));
-        setArchiveItems(prev => [{
-          id: Math.random().toString(36).substring(7), name: initialTitle, text,
-          date: new Date().toLocaleString(), status: 'complete', progress: 100
-        }, ...prev]);
+        setArchiveItems(prev => prev.map(item => item.id === archiveId ? { ...item, text, status: 'complete', progress: 100 } : item));
         return;
       }
       // ─────────────────────────────────────────────────────────────────────
@@ -237,22 +248,28 @@ export const useTranscriptionFlow = ({
         isEditorMode: false
       });
 
-      const text = await executeTranscription(mediaBlob, mimeType, (msg, prg) => updateStatusLog(msg, prg, currentLoadingTabId), controller.signal);
-
-      setTabs(prev => prev.map(tab => (tab.id === currentLoadingTabId ? { ...tab, transcription: { isLoading: false, text, error: null } } : tab)));
-
       const archiveId = Math.random().toString(36).substring(7);
       setArchiveItems(prev => [
         {
           id: archiveId,
           name: initialTitle,
-          text,
+          text: '',
           date: new Date().toLocaleString(),
-          status: 'complete',
-          progress: 100
+          status: 'loading',
+          progress: 0,
+          audioUrl: resolvedMicUrl || resolvedUploadedFile?.previewUrl || null
         },
         ...prev
       ]);
+
+      const text = await executeTranscription(mediaBlob, mimeType, (msg, prg) => {
+        updateStatusLog(msg, prg, currentLoadingTabId);
+        setArchiveItems(prev => prev.map(item => item.id === archiveId ? { ...item, progress: prg !== undefined ? prg : Math.min(item.progress + 5, 95) } : item));
+      }, controller.signal);
+
+      setTabs(prev => prev.map(tab => (tab.id === currentLoadingTabId ? { ...tab, transcription: { isLoading: false, text, error: null } } : tab)));
+
+      setArchiveItems(prev => prev.map(item => item.id === archiveId ? { ...item, text, status: 'complete', progress: 100 } : item));
     } catch (err: any) {
       // Don't show error for intentional cancellations
       if (err.message === 'Transcription cancelled.') {
@@ -267,6 +284,9 @@ export const useTranscriptionFlow = ({
       } else {
         setTranscription({ isLoading: false, text: null, error: errorMsg });
       }
+
+      // Update any loading archive items to error state
+      setArchiveItems(prev => prev.map(item => item.status === 'loading' ? { ...item, status: 'error', error: errorMsg } : item));
     }
   }, [
     activeTab, createTab, executeTranscription, micUrl, recordedBlob,
