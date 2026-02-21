@@ -510,7 +510,7 @@ export const transcribeAudio = async (
       };
 
       try {
-        const response = await executeGaiRequest(payload, modelName, onStatus, attempt, 600000);
+        const response = await executeGaiRequest(payload, modelName, onStatus, attempt, 600000, true);
 
         if (response.text) {
           onStatus?.("Transcription complete.", 100);
