@@ -707,76 +707,41 @@ async function streamDriveToGemini(
 ): Promise<string> {
   const driveUrl = `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`;
 
-  onStatus?.('Streaming from Drive to AI Engine...', 15);
+  onStatus?.('Downloading file for processing...', 15);
+  logger.info('[Drive→Gemini] Downloading file as Blob...');
 
-  let fileInfo: any;
-
+  let blob: Blob;
   try {
-    // Attempt true stream piping — file bytes flow through browser without
-    // ever being fully buffered.
-    const driveRes = await fetch(driveUrl, {
-      headers: { Authorization: `Bearer ${accessToken}` }
-    });
-    if (!driveRes.ok) throw new Error(`Drive fetch failed (${driveRes.status})`);
-    if (!driveRes.body) throw new TypeError('ReadableStream not supported');
-
-    // Track upload progress via a TransformStream that counts bytes passing through
-    let uploaded = 0;
-    const trackingStream = new TransformStream({
-      transform(chunk, controller) {
-        uploaded += chunk.byteLength;
-        if (size > 0) {
-          const pct = Math.min(Math.round((uploaded / size) * 85), 85);
-          onStatus?.(`Streaming to AI Engine: ${pct}%`, 10 + pct);
-        } else {
-          onStatus?.('Streaming to AI Engine...');
-        }
-        controller.enqueue(chunk);
-      }
-    });
-
-    const trackedStream = driveRes.body.pipeThrough(trackingStream);
-
-    const uploadRes = await fetch(sessionUrl, {
-      method: 'POST',
-      headers: {
-        'X-Goog-Upload-Offset': '0',
-        'X-Goog-Upload-Command': 'upload, finalize',
-        'Content-Type': mimeType,
-        ...(size > 0 ? { 'Content-Length': String(size) } : {})
-      },
-      body: trackedStream,
-      // @ts-ignore — duplex is required for streaming request bodies
-      duplex: 'half'
-    });
-
-    if (!uploadRes.ok) {
-      const txt = await uploadRes.text();
-      throw new Error(`Gemini upload failed (${uploadRes.status}): ${txt}`);
-    }
-    fileInfo = await uploadRes.json();
-  } catch (streamErr: any) {
-    // Fallback: browser doesn't support streaming request bodies — download blob then upload
-    logger.warn('[Drive→Gemini] Streaming not supported, falling back to blob upload', streamErr.message);
-    onStatus?.('Downloading file for processing...', 15);
-
-    const blob = await new Promise<Blob>((resolve, reject) => {
+    blob = await new Promise<Blob>((resolve, reject) => {
       const xhr = new XMLHttpRequest();
       xhr.open('GET', driveUrl);
       xhr.setRequestHeader('Authorization', `Bearer ${accessToken}`);
       xhr.responseType = 'blob';
       xhr.onprogress = (e) => {
         if (e.lengthComputable) {
-          onStatus?.(`Downloading: ${Math.round((e.loaded / e.total) * 60)}%`, Math.round((e.loaded / e.total) * 60));
+          const pct = Math.round((e.loaded / e.total) * 60);
+          onStatus?.(`Downloading from Drive: ${pct}%`, pct);
         }
       };
-      xhr.onload = () => xhr.status < 300 ? resolve(xhr.response) : reject(new Error(`Drive download failed (${xhr.status})`));
-      xhr.onerror = () => reject(new Error('Drive network error'));
+      xhr.onload = () => {
+        if (xhr.status >= 200 && xhr.status < 300) {
+          resolve(xhr.response);
+        } else {
+          reject(new Error(`Drive download failed (${xhr.status}): ${xhr.statusText}`));
+        }
+      };
+      xhr.onerror = () => reject(new Error('Drive network error during download'));
       xhr.timeout = 1_800_000; // 30 min
       xhr.send();
     });
+  } catch (downloadErr: any) {
+    logger.error('Failed to download Drive file', downloadErr);
+    throw new Error(`Could not download file from Google Drive: ${downloadErr.message}`);
+  }
 
-    onStatus?.('Uploading to AI Engine...', 65);
+  onStatus?.('Uploading to AI Engine...', 65);
+  let fileInfo: any;
+  try {
     fileInfo = await new Promise<any>((resolve, reject) => {
       const xhr = new XMLHttpRequest();
       xhr.open('POST', sessionUrl);
@@ -789,25 +754,30 @@ async function streamDriveToGemini(
         }
       };
       xhr.onload = () => {
-        if (xhr.status < 300) {
-          try { resolve(JSON.parse(xhr.responseText)); }
-          catch { reject(new Error('Failed to parse upload response.')); }
+        if (xhr.status >= 200 && xhr.status < 300) {
+          try {
+            resolve(JSON.parse(xhr.responseText));
+          } catch (e) {
+            reject(new Error('Invalid JSON response from upload'));
+          }
         } else {
-          reject(new Error(`Gemini upload failed (${xhr.status})`));
+          reject(new Error(`Gemini upload failed (${xhr.status}): ${xhr.responseText}`));
         }
       };
-      xhr.onerror = () => reject(new Error('Network error during upload.'));
-      xhr.ontimeout = () => reject(new Error('Upload timed out (30 min).'));
-      xhr.timeout = 1_800_000;
+      xhr.onerror = () => reject(new Error('Network error during upload to Gemini'));
+      xhr.timeout = 1_800_000; // 30 min
       xhr.send(blob);
     });
+  } catch (uploadErr: any) {
+    logger.error('Failed to upload file to Gemini', uploadErr);
+    throw new Error(`Upload to AI Engine failed: ${uploadErr.message}`);
   }
 
   const fileUri = fileInfo?.file?.uri || fileInfo?.uri;
   const fileName = fileInfo?.file?.name || fileInfo?.name;
   if (!fileName) throw new Error('Gemini upload response missing resource name.');
 
-  // Poll for ACTIVE state (reuse stored polling logic)
+  // Poll for ACTIVE state
   onStatus?.('AI Engine: Processing file...', 90);
   const pollPath = fileName.startsWith('files/') ? fileName : `files/${fileName}`;
   const apiKey = getActiveApiKey(0);

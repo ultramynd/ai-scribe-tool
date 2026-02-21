@@ -275,54 +275,81 @@ export const useTranscriptionFlow = ({
     transcriptionMode
   ]);
 
-  const handleBackgroundTranscribe = useCallback(async (file: AudioFile) => {
+  const handleBackgroundTranscribe = useCallback(async (file: AudioFile | DriveFileRef, source: AudioSource = AudioSource.FILE) => {
     const id = Math.random().toString(36).substring(7);
 
-    const validation = file.file ? validateMediaFile(file.file, file.file.type) : { valid: false, message: 'Missing file.' };
-    if (!validation.valid) {
-      setArchiveItems(prev => [
-        {
-          id,
-          name: file.file?.name || 'Untitled Transcription',
-          text: '',
-          date: new Date().toLocaleString(),
-          status: 'error',
-          progress: 0,
-          error: validation.message,
-          audioUrl: file.previewUrl
-        },
-        ...prev
-      ]);
-      return;
+    let fileName = '';
+    let isDrive = source === AudioSource.DRIVE;
+
+    if (isDrive) {
+      const driveMeta = file as DriveFileRef;
+      fileName = driveMeta.name;
+    } else {
+      const audioFile = file as AudioFile;
+      fileName = audioFile.file?.name || 'Untitled Transcription';
+      const validation = audioFile.file ? validateMediaFile(audioFile.file, audioFile.file.type) : { valid: false, message: 'Missing file.' };
+      if (!validation.valid) {
+        setArchiveItems(prev => [
+          {
+            id,
+            name: fileName,
+            text: '',
+            date: new Date().toLocaleString(),
+            status: 'error',
+            progress: 0,
+            error: validation.message,
+            audioUrl: audioFile.previewUrl
+          },
+          ...prev
+        ]);
+        return;
+      }
     }
 
     const newItem: ArchiveItem = {
       id,
-      name: file.file?.name || 'Untitled Transcription',
+      name: fileName,
       text: '',
       date: new Date().toLocaleString(),
       status: 'loading',
       progress: 0,
-      audioUrl: file.previewUrl
+      audioUrl: isDrive ? null : (file as AudioFile).previewUrl
     };
 
     setArchiveItems(prev => [newItem, ...prev]);
     setShowArchiveSidebar(true);
 
     try {
-      const text = await executeTranscription(file.file!, file.file?.type || '', (msg, prg) => {
-        setArchiveItems(prev =>
-          prev.map(item =>
-            item.id === id ? { ...item, progress: prg !== undefined ? prg : Math.min(item.progress + 5, 95) } : item
-          )
+      let text = '';
+      if (isDrive) {
+        if (!googleAccessToken) throw new Error("Google Drive access token missing.");
+        text = await transcribeFromDriveFile(
+          file as DriveFileRef, googleAccessToken,
+          transcriptionMode !== 'verbatim', isSpeakerDetectEnabled, isDeepThinking,
+          (msg, prg) => {
+            setArchiveItems(prev =>
+              prev.map(item =>
+                item.id === id ? { ...item, progress: prg !== undefined ? prg : Math.min(item.progress + 5, 95) } : item
+              )
+            );
+          }
         );
-      });
+      } else {
+        const audioFile = file as AudioFile;
+        text = await executeTranscription(audioFile.file!, audioFile.file?.type || '', (msg, prg) => {
+          setArchiveItems(prev =>
+            prev.map(item =>
+              item.id === id ? { ...item, progress: prg !== undefined ? prg : Math.min(item.progress + 5, 95) } : item
+            )
+          );
+        });
+      }
 
       setArchiveItems(prev => prev.map(item => (item.id === id ? { ...item, text, status: 'complete', progress: 100 } : item)));
     } catch (err: any) {
       setArchiveItems(prev => prev.map(item => (item.id === id ? { ...item, status: 'error', error: err.message } : item)));
     }
-  }, [executeTranscription, setArchiveItems, setShowArchiveSidebar]);
+  }, [executeTranscription, setArchiveItems, setShowArchiveSidebar, googleAccessToken, transcriptionMode, isSpeakerDetectEnabled, isDeepThinking]);
 
   const handleArchiveUpload = useCallback(
     (file: File) => {

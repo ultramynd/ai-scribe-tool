@@ -9,6 +9,7 @@ import {
 import { useTheme } from '../contexts/ThemeContext';
 
 import { AudioSource, TranscriptionState, AudioFile, ArchiveItem } from '../../types';
+import type { DriveFileRef } from '../../services/geminiService';
 const TranscriptionEditor = lazy(() => import('../../components/TranscriptionEditor'));
 
 
@@ -48,8 +49,8 @@ interface EditorViewProps {
   showArchiveSidebar: boolean;
   setActiveTab: (tab: AudioSource | null) => void;
 
-  handleBackgroundTranscribe: (file: AudioFile) => void;
-  setPickerCallback: (callback: ((file: AudioFile) => void) | null) => void;
+  handleBackgroundTranscribe: (file: AudioFile | DriveFileRef, source?: AudioSource) => void;
+  setPickerCallback: (callback: ((file: AudioFile | DriveFileRef, source: AudioSource) => void) | null) => void;
   setIsPickerOpen: (val: boolean) => void;
   isPickerOpen: boolean;
   handlePickDriveFile: (file: { id: string; name: string; mimeType: string }) => void;
@@ -668,7 +669,7 @@ const EditorView: React.FC<EditorViewProps> = ({
             onBackgroundTranscribe={handleBackgroundTranscribe}
             onAttachDrive={() => {
               if (!googleAccessToken) { handleGoogleLogin(); return; }
-              setPickerCallback(() => (file: AudioFile) => handleBackgroundTranscribe(file));
+              setPickerCallback(() => (file: AudioFile | DriveFileRef, source: AudioSource) => handleBackgroundTranscribe(file, source));
               setIsPickerOpen(true);
             }}
             onStartUpload={(file) => {

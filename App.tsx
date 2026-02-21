@@ -92,7 +92,7 @@ const App: React.FC = () => {
   const { archiveItems, setArchiveItems } = useArchive();
   const [showArchiveSidebar, setShowArchiveSidebar] = useState(false);
   const [isPickerOpen, setIsPickerOpen] = useState(false);
-  const [pickerCallback, setPickerCallback] = useState<((file: AudioFile) => void) | null>(null);
+  const [pickerCallback, setPickerCallback] = useState<((file: AudioFile | DriveFileRef, source: AudioSource) => void) | null>(null);
   const [isFetchingDrive, setIsFetchingDrive] = useState(false);
   const [driveProgress, setDriveProgress] = useState(0);
   const [driveFileMeta, setDriveFileMeta] = useState<DriveFileRef | null>(null);
@@ -203,34 +203,10 @@ const App: React.FC = () => {
     };
 
     if (pickerCallback) {
-      // UrlLoader background-transcription path: still needs a real file blob
-      // Trigger a background download for the callback case only
-      setIsFetchingDrive(true);
-      setDriveProgress(0);
-      const xhr = new XMLHttpRequest();
-      xhr.open('GET', `https://www.googleapis.com/drive/v3/files/${file.id}?alt=media`);
-      xhr.setRequestHeader('Authorization', `Bearer ${googleAccessToken}`);
-      xhr.responseType = 'blob';
-      xhr.onprogress = (e) => {
-        if (e.lengthComputable) setDriveProgress(Math.round((e.loaded / e.total) * 100));
-      };
-      xhr.onload = () => {
-        setIsFetchingDrive(false);
-        setDriveProgress(0);
-        if (xhr.status < 300) {
-          const blob = xhr.response as Blob;
-          const audioFile: AudioFile = {
-            file: new File([blob], file.name, { type: file.mimeType }),
-            previewUrl: URL.createObjectURL(blob),
-            base64: null,
-            mimeType: file.mimeType
-          };
-          pickerCallback(audioFile);
-        }
-        setPickerCallback(null);
-      };
-      xhr.onerror = () => { setIsFetchingDrive(false); setPickerCallback(null); };
-      xhr.send();
+      // Direct stream to background transcriber — drastically faster!
+      // Skips the browser memory blob fallback.
+      pickerCallback(meta, AudioSource.DRIVE);
+      setPickerCallback(null);
       return;
     }
 
@@ -347,6 +323,10 @@ const App: React.FC = () => {
                   if (activeTabId) {
                     closeTab(activeTabId);
                   }
+                }}
+                onHide={() => {
+                  setActiveTabId(null);
+                  setShowArchiveSidebar(true);
                 }}
               />
             )}
