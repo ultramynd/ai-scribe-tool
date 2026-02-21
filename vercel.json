@@ -1,0 +1,13 @@
+{
+    "functions": {
+        "api/gemini.ts": {
+            "maxDuration": 60
+        },
+        "api/gemini-upload-init.ts": {
+            "maxDuration": 60
+        },
+        "api/gemini-poll.ts": {
+            "maxDuration": 30
+        }
+    }
+}

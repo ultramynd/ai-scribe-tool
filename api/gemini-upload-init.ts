@@ -7,10 +7,6 @@ import { checkRateLimit } from './_lib/rateLimit';
 import type { ApiRequestLike, ApiResponseLike } from './_lib/types';
 import { sanitizeDisplayName, validateMimeType, validateUploadSize } from './_lib/validation';
 
-export const config = {
-  runtime: 'edge'
-};
-
 export default async function handler(req: ApiRequestLike, res: ApiResponseLike) {
   const startedAt = Date.now();
   const requestId = resolveRequestId(getHeader(req, 'x-request-id'));
