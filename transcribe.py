@@ -2,6 +2,11 @@ import os
 import sys
 import time
 import argparse
+import warnings
+
+# Suppress the deprecation warning for the old SDK name
+warnings.filterwarnings("ignore", category=FutureWarning, module="google.generativeai")
+
 import google.generativeai as genai
 from google.generativeai.types import HarmCategory, HarmBlockThreshold
 
