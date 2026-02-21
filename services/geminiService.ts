@@ -62,13 +62,17 @@ async function executeGaiRequest(
   model: string,
   onStatus?: StatusCallback,
   attempt: number = 0,
-  timeoutMs: number = 300000
+  timeoutMs: number = 300000,
+  forceDirectApi: boolean = false  // Set true for long Drive file generation — bypasses proxy timeout limits
 ): Promise<any> {
   const apiKey = getActiveApiKey(attempt);
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
 
   try {
-    if (USE_SERVER_PROXY) {
+    // Use proxy ONLY if configured AND not explicitly forced to direct mode.
+    // IMPORTANT: Drive file generation is always forced to direct mode because
+    // Gemini can take 60-120s for long audio, which exceeds ALL Vercel timeouts.
+    if (USE_SERVER_PROXY && !forceDirectApi) {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
@@ -935,7 +939,7 @@ export const transcribeFromDriveFile = async (
       const payload = {
         contents: [{ parts: [contentPart, { text: autoEdit ? autoEditPrompt : rawPrompt }] }]
       };
-      const response = await executeGaiRequest(payload, modelName, onStatus, attempt, 900_000); // 15-min timeout for long files
+      const response = await executeGaiRequest(payload, modelName, onStatus, attempt, 900_000, true); // forceDirectApi: bypass proxy for Drive — Gemini can take >60s for long files
       if (response.text) {
         onStatus?.('Transcription complete.', 100);
         return response.text;
