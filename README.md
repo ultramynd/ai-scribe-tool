@@ -36,6 +36,8 @@ ScribeAI operates with a **Local-First** philosophy.
 
 **Developed by [Dosu Jr](https://github.com/kfdos)**
 
+**This is an application in progress**
+
 ## Developer Setup
 - API runtime setup guide: `docs/API_SETUP.md`
 - Secure production mode uses server-side `/api/*` proxy endpoints.
